@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date
+from datetime import date, datetime, timedelta
 import hashlib
 from html import escape
 from pathlib import Path
@@ -22,8 +22,10 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "gemini-persistent-v3"
+SESSION_SCHEMA_VERSION = "mobile-controls-v4"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
+VIEW_OPTIONS = ["Oggi", "Mondiali 2026", "Predict manuale", "Config"]
+WORLD_CUP_START = date(2026, 6, 11)
 
 
 def settings():
@@ -62,16 +64,10 @@ def main() -> None:
 
     with st.sidebar:
         st.markdown('<div class="side-title">Filtro</div>', unsafe_allow_html=True)
-        page = st.radio("Vista", ["Oggi", "Mondiali 2026", "Predict manuale", "Config"], label_visibility="collapsed")
-        target_date = st.date_input("Data", value=date.today())
-        if page == "Mondiali 2026" and target_date < date(2026, 6, 11):
-            target_date = st.date_input("Data Mondiali", value=date(2026, 6, 11), key="worldcup_date")
-        refresh = st.button("Aggiorna dati", type="primary")
-        if refresh:
-            load_predictions.clear()
-            st.session_state.pop("llm_predictions", None)
+        st.caption("Da telefono usa i comandi rapidi nella pagina principale.")
 
-    render_app_header(page)
+    render_app_header(st.session_state.get("control_page", "Oggi"))
+    page, target_date = render_control_panel()
     if page == "Config":
         render_config()
     elif page == "Predict manuale":
@@ -603,6 +599,20 @@ def render_global_styles() -> None:
             font-weight: 900;
         }
 
+        .control-panel-title {
+            color: var(--teal);
+            font-size: 0.78rem;
+            font-weight: 900;
+            margin: 0.1rem 0 0.7rem;
+        }
+
+        .control-panel-caption {
+            color: var(--muted);
+            font-size: 0.78rem;
+            margin-top: -0.2rem;
+            margin-bottom: 0.55rem;
+        }
+
         @media (max-width: 760px) {
             .main .block-container {
                 padding-left: 0.75rem;
@@ -682,9 +692,115 @@ def init_session_state() -> None:
         return
     load_predictions.clear()
     st.session_state["session_schema_version"] = SESSION_SCHEMA_VERSION
+    st.session_state.setdefault("control_page", "Oggi")
+    st.session_state.setdefault("control_date", date.today())
+    st.session_state.setdefault("control_date_text", date.today().isoformat())
+    st.session_state.setdefault("control_date_error", "")
     st.session_state.pop("llm_predictions", None)
     st.session_state.pop("llm_requested_predictions", None)
     st.session_state.pop("manual_prediction", None)
+
+
+def render_control_panel() -> tuple[str, date]:
+    with st.container(border=True):
+        st.markdown(
+            """
+            <div class="control-panel-title">Comandi rapidi</div>
+            <div class="control-panel-caption">Pensato anche per telefono: puoi digitare la data o usare i pulsanti.</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        col_page, col_date = st.columns([1, 1])
+        page = col_page.selectbox(
+            "Vista",
+            VIEW_OPTIONS,
+            index=_view_index(st.session_state.get("control_page", "Oggi")),
+            key="control_page",
+            on_change=_apply_page_defaults,
+        )
+        col_date.text_input(
+            "Data",
+            key="control_date_text",
+            placeholder="2026-06-22 oppure 22/06/2026",
+        )
+
+        btn_prev, btn_today, btn_next = st.columns(3)
+        btn_prev.button("Giorno -", on_click=_shift_control_date, args=(-1,))
+        btn_today.button("Oggi", on_click=_set_control_date, args=(date.today(),))
+        btn_next.button("Giorno +", on_click=_shift_control_date, args=(1,))
+        btn_wc, btn_refresh = st.columns([1, 1])
+        btn_wc.button("Start Mondiali", on_click=_set_control_date, args=(WORLD_CUP_START,))
+        btn_refresh.button("Aggiorna", type="primary", on_click=_refresh_control_data)
+
+        parsed_date = _parse_date_text(st.session_state.get("control_date_text", ""))
+        if parsed_date:
+            st.session_state["control_date"] = parsed_date
+            st.session_state["control_date_error"] = ""
+        elif st.session_state.get("control_date_text"):
+            st.session_state["control_date_error"] = "Formato data non valido. Usa YYYY-MM-DD oppure DD/MM/YYYY."
+
+        target_date = st.session_state.get("control_date", date.today())
+        if page == "Mondiali 2026" and target_date < WORLD_CUP_START:
+            target_date = WORLD_CUP_START
+            st.info("Per i Mondiali uso la prima data disponibile: 2026-06-11.")
+
+        if st.session_state.get("control_date_error"):
+            st.warning(st.session_state["control_date_error"])
+
+    return page, target_date
+
+
+def _view_index(page: str) -> int:
+    return VIEW_OPTIONS.index(page) if page in VIEW_OPTIONS else 0
+
+
+def _apply_page_defaults() -> None:
+    if st.session_state.get("control_page") == "Mondiali 2026":
+        current_date = _parse_date_text(st.session_state.get("control_date_text", "")) or date.today()
+        if current_date < WORLD_CUP_START:
+            _set_control_date(WORLD_CUP_START)
+
+
+def _shift_control_date(days: int) -> None:
+    current_date = _parse_date_text(st.session_state.get("control_date_text", ""))
+    if current_date is None:
+        current_date = st.session_state.get("control_date", date.today())
+    _set_control_date(current_date + timedelta(days=days))
+
+
+def _set_control_date(target_date: date) -> None:
+    st.session_state["control_date"] = target_date
+    st.session_state["control_date_text"] = target_date.isoformat()
+    st.session_state["control_date_error"] = ""
+
+
+def _refresh_control_data() -> None:
+    parsed_date = _parse_date_text(st.session_state.get("control_date_text", ""))
+    if parsed_date is None:
+        st.session_state["control_date_error"] = "Formato data non valido. Usa YYYY-MM-DD oppure DD/MM/YYYY."
+        return
+    st.session_state["control_date"] = parsed_date
+    st.session_state["control_date_text"] = parsed_date.isoformat()
+    st.session_state["control_date_error"] = ""
+    load_predictions.clear()
+    st.session_state.pop("llm_predictions", None)
+
+
+def _parse_date_text(value: str) -> date | None:
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    for candidate in (cleaned, cleaned.replace("/", "-")):
+        try:
+            return date.fromisoformat(candidate)
+        except ValueError:
+            pass
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            pass
+    return None
 
 
 def render_config() -> None:
@@ -885,36 +1001,34 @@ def render_probability_strip(picks: list[MarketPick]) -> str:
 
 
 def render_match_visuals(prediction: MatchPrediction, top: MarketPick) -> None:
-    st.markdown(
-        f"""
-        <div class="viz-grid">
-            {render_pick_gauge(top)}
-            {render_market_bars(prediction.picks)}
-            {render_form_board(prediction)}
-        </div>
-        """,
-        unsafe_allow_html=True,
+    html = (
+        '<div class="viz-grid">'
+        f"{render_pick_gauge(top)}"
+        f"{render_market_bars(prediction.picks)}"
+        f"{render_form_board(prediction)}"
+        "</div>"
     )
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def render_pick_gauge(top: MarketPick) -> str:
     probability = max(0.0, min(1.0, top.average_probability))
     degrees = probability * 360
     color = _probability_color(probability)
-    return f"""
-    <div class="viz-card">
-        <div class="viz-title">Pick Pulse</div>
-        <div class="gauge-wrap">
-            <div class="gauge" style="background: conic-gradient({color} 0deg {degrees:.1f}deg, rgba(244,251,247,0.08) {degrees:.1f}deg 360deg);">
-                <div class="gauge-core">{probability:.0%}</div>
-            </div>
-            <div>
-                <div class="gauge-pick">{escape(top.selection)}</div>
-                <div class="gauge-note">{escape(top.market)} | {escape(top.confidence)}</div>
-            </div>
-        </div>
-    </div>
-    """
+    return (
+        '<div class="viz-card">'
+        '<div class="viz-title">Pick Pulse</div>'
+        '<div class="gauge-wrap">'
+        f'<div class="gauge" style="background: conic-gradient({color} 0deg {degrees:.1f}deg, rgba(244,251,247,0.08) {degrees:.1f}deg 360deg);">'
+        f'<div class="gauge-core">{probability:.0%}</div>'
+        "</div>"
+        "<div>"
+        f'<div class="gauge-pick">{escape(top.selection)}</div>'
+        f'<div class="gauge-note">{escape(top.market)} | {escape(top.confidence)}</div>'
+        "</div>"
+        "</div>"
+        "</div>"
+    )
 
 
 def render_market_bars(picks: list[MarketPick]) -> str:
@@ -932,22 +1046,20 @@ def render_market_bars(picks: list[MarketPick]) -> str:
         color = APP_ACCENT_COLORS[index % len(APP_ACCENT_COLORS)]
         label = f"{pick.market} | {pick.selection}"
         rows.append(
-            f"""
-            <div class="bar-row">
-                <div class="bar-label">{escape(label)}</div>
-                <div class="bar-track">
-                    <div class="bar-fill" style="width:{width:.1f}%; background:{color};"></div>
-                </div>
-                <div class="bar-value">{probability:.0%}</div>
-            </div>
-            """
+            '<div class="bar-row">'
+            f'<div class="bar-label">{escape(label)}</div>'
+            '<div class="bar-track">'
+            f'<div class="bar-fill" style="width:{width:.1f}%; background:{color};"></div>'
+            "</div>"
+            f'<div class="bar-value">{probability:.0%}</div>'
+            "</div>"
         )
-    return f"""
-    <div class="viz-card">
-        <div class="viz-title">Mercati chiave</div>
-        <div class="market-bars">{"".join(rows)}</div>
-    </div>
-    """
+    return (
+        '<div class="viz-card">'
+        '<div class="viz-title">Mercati chiave</div>'
+        f'<div class="market-bars">{"".join(rows)}</div>'
+        "</div>"
+    )
 
 
 def render_form_board(prediction: MatchPrediction) -> str:
@@ -961,12 +1073,12 @@ def render_form_board(prediction: MatchPrediction) -> str:
             break
     if not rows:
         return _empty_viz_card("Forma recente", "Storico recente non disponibile")
-    return f"""
-    <div class="viz-card">
-        <div class="viz-title">Forma recente</div>
-        <div class="form-board">{"".join(rows)}</div>
-    </div>
-    """
+    return (
+        '<div class="viz-card">'
+        '<div class="viz-title">Forma recente</div>'
+        f'<div class="form-board">{"".join(rows)}</div>'
+        "</div>"
+    )
 
 
 def _form_row(team_name: str, rows: list[dict[str, str]]) -> str:
@@ -982,21 +1094,21 @@ def _form_row(team_name: str, rows: list[dict[str, str]]) -> str:
         else:
             class_name, label = "draw", "-"
         chips.append(f'<span class="form-chip {class_name}">{label}</span>')
-    return f"""
-    <div class="form-team">
-        <div class="form-name">{escape(team_name)}</div>
-        <div class="form-chips">{"".join(chips)}</div>
-    </div>
-    """
+    return (
+        '<div class="form-team">'
+        f'<div class="form-name">{escape(team_name)}</div>'
+        f'<div class="form-chips">{"".join(chips)}</div>'
+        "</div>"
+    )
 
 
 def _empty_viz_card(title: str, text: str) -> str:
-    return f"""
-    <div class="viz-card">
-        <div class="viz-title">{escape(title)}</div>
-        <div class="form-empty">{escape(text)}</div>
-    </div>
-    """
+    return (
+        '<div class="viz-card">'
+        f'<div class="viz-title">{escape(title)}</div>'
+        f'<div class="form-empty">{escape(text)}</div>'
+        "</div>"
+    )
 
 
 def _probability_color(probability: float) -> str:
