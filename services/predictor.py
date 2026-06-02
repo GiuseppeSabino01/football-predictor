@@ -16,6 +16,9 @@ from nlp.gemini_client import GeminiClient
 from nlp.market_probability import LLMMarketProbabilityEstimator
 from nlp.news_extractor import NewsSignalExtractor
 from schemas import Match, MatchPrediction, NewsArticle, NewsSignal
+from storage.llm_cache import apply_llm_payload
+from storage.sqlite_client import SQLiteStorage
+from storage.supabase_client import SupabaseStorage
 
 
 class PredictionService:
@@ -31,6 +34,8 @@ class PredictionService:
         self.news_extractor = NewsSignalExtractor(self.gemini)
         self.llm_probability = LLMMarketProbabilityEstimator(self.gemini)
         self.predictor = EnsemblePredictor()
+        self.sqlite_storage = SQLiteStorage(settings.sqlite_path)
+        self.supabase_storage = SupabaseStorage(settings)
 
     def predictions_for_date(self, target_date: date, worldcup_only: bool = False) -> tuple[list[MatchPrediction], list[str]]:
         errors: list[str] = []
@@ -84,6 +89,28 @@ class PredictionService:
         for error in errors:
             prediction.warnings.append(error)
         return self.llm_probability.enrich(prediction, articles)
+
+    def load_cached_gemini_prediction(self, cache_key: str, base_prediction: MatchPrediction) -> MatchPrediction | None:
+        payload = self.supabase_storage.load_llm_prediction(cache_key)
+        if payload is None:
+            payload = self.sqlite_storage.load_llm_prediction(cache_key)
+        if payload is None:
+            return None
+        return apply_llm_payload(base_prediction, payload)
+
+    def save_cached_gemini_prediction(self, cache_key: str, prediction: MatchPrediction) -> bool:
+        if not any(pick.llm_probability is not None for pick in prediction.picks):
+            return False
+
+        saved = False
+        try:
+            self.sqlite_storage.upsert_llm_prediction(cache_key, prediction, self.settings.gemini_model)
+            saved = True
+        except Exception:
+            saved = False
+        if self.supabase_storage.upsert_llm_prediction(cache_key, prediction, self.settings.gemini_model):
+            saved = True
+        return saved
 
     def _load_matches(
         self,

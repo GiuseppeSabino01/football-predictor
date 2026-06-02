@@ -47,3 +47,12 @@ create table if not exists predictions (
     confidence text
 );
 
+create table if not exists llm_prediction_cache (
+    cache_key text primary key,
+    match_id text not null,
+    match_label text not null,
+    match_date text not null,
+    model text not null,
+    generated_at text not null,
+    payload_json text not null
+);

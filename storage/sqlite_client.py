@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from schemas import Match, MatchPrediction, NewsArticle, NewsSignal
+from storage.llm_cache import llm_payload
 
 
 class SQLiteStorage:
@@ -137,3 +138,48 @@ class SQLiteStorage:
                 ],
             )
 
+    def load_llm_prediction(self, cache_key: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                select payload_json
+                from llm_prediction_cache
+                where cache_key = ?
+                """,
+                (cache_key,),
+            ).fetchone()
+        if not row:
+            return None
+        try:
+            payload = json.loads(row[0])
+        except json.JSONDecodeError:
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def upsert_llm_prediction(self, cache_key: str, prediction: MatchPrediction, model: str) -> None:
+        payload = llm_payload(prediction, model)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                insert into llm_prediction_cache (
+                    cache_key, match_id, match_label, match_date, model, generated_at, payload_json
+                )
+                values (?, ?, ?, ?, ?, ?, ?)
+                on conflict(cache_key) do update set
+                    match_id=excluded.match_id,
+                    match_label=excluded.match_label,
+                    match_date=excluded.match_date,
+                    model=excluded.model,
+                    generated_at=excluded.generated_at,
+                    payload_json=excluded.payload_json
+                """,
+                (
+                    cache_key,
+                    prediction.match.id,
+                    prediction.match.label,
+                    prediction.match.match_date.isoformat(),
+                    model,
+                    prediction.generated_at.isoformat(),
+                    json.dumps(payload),
+                ),
+            )

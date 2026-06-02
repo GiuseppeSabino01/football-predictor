@@ -21,7 +21,7 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "gemini-on-demand-v2"
+SESSION_SCHEMA_VERSION = "gemini-persistent-v3"
 
 
 def settings():
@@ -70,7 +70,6 @@ def main() -> None:
         if refresh:
             load_predictions.clear()
             st.session_state.pop("llm_predictions", None)
-            st.session_state.pop("llm_requested_predictions", None)
 
     if page == "Config":
         render_config()
@@ -139,10 +138,9 @@ def render_predictions(target_date: date, worldcup_only: bool) -> None:
 
 def render_prediction_card(prediction: MatchPrediction) -> None:
     base_prediction = _without_gemini_output(prediction)
-    prediction_key = _prediction_cache_key(prediction)
-    requested = bool(st.session_state.get("llm_requested_predictions", {}).get(prediction_key))
-    cached_prediction = st.session_state.get("llm_predictions", {}).get(prediction_key) if requested else None
-    if requested and cached_prediction:
+    prediction_key = _prediction_cache_key(base_prediction)
+    cached_prediction = load_saved_gemini_prediction(base_prediction, prediction_key)
+    if cached_prediction:
         prediction = cached_prediction
     else:
         prediction = base_prediction
@@ -219,11 +217,14 @@ def render_gemini_probability_button(
         prediction_to_enrich = deepcopy(base_prediction)
         with st.spinner(f"Calcolo Gemini per {prediction_to_enrich.match.label}..."):
             enriched_prediction = service.enrich_prediction_with_gemini(prediction_to_enrich)
-        st.session_state.setdefault("llm_requested_predictions", {})[prediction_key] = True
+        if not service.save_cached_gemini_prediction(prediction_key, enriched_prediction) and any(
+            pick.llm_probability is not None for pick in enriched_prediction.picks
+        ):
+            enriched_prediction.warnings.append("Analisi Gemini calcolata ma non salvata.")
         st.session_state.setdefault("llm_predictions", {})[prediction_key] = enriched_prediction
         st.rerun()
     if has_model_probability:
-        col_hint.caption("Probabilita modello calcolata per questa partita.")
+        col_hint.caption("Probabilita modello salvata per questa partita. Clicca per aggiornarla.")
     else:
         col_hint.caption("Gemini non parte in automatico: clicca solo sulla partita che vuoi analizzare.")
 
@@ -239,6 +240,18 @@ def _prediction_cache_key(prediction: MatchPrediction) -> str:
         ]
     )
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def load_saved_gemini_prediction(base_prediction: MatchPrediction, prediction_key: str) -> MatchPrediction | None:
+    cached_prediction = st.session_state.get("llm_predictions", {}).get(prediction_key)
+    if cached_prediction:
+        return cached_prediction
+
+    service = PredictionService(settings())
+    saved_prediction = service.load_cached_gemini_prediction(prediction_key, base_prediction)
+    if saved_prediction:
+        st.session_state.setdefault("llm_predictions", {})[prediction_key] = saved_prediction
+    return saved_prediction
 
 
 def _without_gemini_output(prediction: MatchPrediction) -> MatchPrediction:

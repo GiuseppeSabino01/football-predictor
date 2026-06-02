@@ -68,6 +68,13 @@ Quando la versione locale gira:
 4. Main file: `app/streamlit_app.py`.
 5. Inserisci le chiavi in Streamlit secrets usando `.streamlit/secrets.toml.example` come modello.
 
+### Cache Gemini persistente su Supabase
+
+L'app salva le probabilita' Gemini gia' calcolate per una partita e le ricarica senza consumare altri token.
+In locale usa SQLite. Su Streamlit Cloud, per renderle persistenti anche dopo riavvii/redeploy, apri Supabase > SQL Editor ed esegui `storage/supabase_schema.sql`.
+
+Se la tabella Supabase non e' presente, l'app continua a funzionare usando solo il salvataggio locale.
+
 ## Nota dati
 
 Le predizioni non sono consigli finanziari. I mercati tiri e player props dipendono molto dalla copertura gratuita: quando i dati sono incompleti, l'app abbassa la confidenza o segnala dati insufficienti.
