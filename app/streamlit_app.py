@@ -17,7 +17,6 @@ import streamlit as st
 
 from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
 from config.settings import load_settings
-from features.backtest import BacktestReport
 from features.market_features import fair_odd, recommendation, value_score
 from features.team_strength import canonical_team_name
 from services.predictor import PredictionService
@@ -25,7 +24,7 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "calendar-backtest-v6"
+SESSION_SCHEMA_VERSION = "calendar-v7"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
 VIEW_OPTIONS = ["Home", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
@@ -57,12 +56,6 @@ def require_login() -> bool:
 def load_predictions(target_date: date, competition_keys: tuple[str, ...]) -> tuple[list[MatchPrediction], list[str]]:
     service = PredictionService(settings())
     return service.predictions_for_date(target_date, competition_keys=competition_keys)
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def load_backtest_report(target_date: date) -> BacktestReport:
-    service = PredictionService(settings())
-    return service.backtest_national_model(target_date)
 
 
 def main() -> None:
@@ -614,64 +607,6 @@ def render_global_styles() -> None:
             font-weight: 900;
         }
 
-        .backtest-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.7rem;
-            margin: 0.75rem 0 0.85rem;
-        }
-
-        .backtest-card {
-            border-radius: var(--radius);
-            border: 1px solid rgba(25,230,176,0.22);
-            background:
-                linear-gradient(180deg, rgba(244,251,247,0.065), rgba(244,251,247,0.025));
-            padding: 0.85rem;
-            min-height: 148px;
-        }
-
-        .backtest-market {
-            color: var(--teal);
-            font-size: 0.78rem;
-            font-weight: 900;
-            margin-bottom: 0.55rem;
-        }
-
-        .backtest-score {
-            color: var(--text);
-            font-size: 1.7rem;
-            line-height: 1.05;
-            font-weight: 950;
-        }
-
-        .backtest-label {
-            color: var(--muted);
-            font-size: 0.76rem;
-            margin-top: 0.24rem;
-        }
-
-        .backtest-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 0.5rem;
-            margin-top: 0.42rem;
-            color: #cbd8d4;
-            font-size: 0.78rem;
-        }
-
-        .backtest-badge {
-            width: fit-content;
-            max-width: 100%;
-            margin-top: 0.7rem;
-            border-radius: var(--radius);
-            border: 1px solid rgba(255,176,32,0.30);
-            background: rgba(255,176,32,0.08);
-            color: #ffe1a6;
-            padding: 0.28rem 0.42rem;
-            font-size: 0.72rem;
-            font-weight: 850;
-        }
-
         .control-panel-title {
             color: var(--teal);
             font-size: 0.78rem;
@@ -729,10 +664,6 @@ def render_global_styles() -> None:
                 grid-template-columns: 1fr;
             }
 
-            .backtest-grid {
-                grid-template-columns: 1fr;
-            }
-
             .hero-chip {
                 width: fit-content;
             }
@@ -783,7 +714,6 @@ def init_session_state() -> None:
     if st.session_state.get("session_schema_version") == SESSION_SCHEMA_VERSION:
         return
     load_predictions.clear()
-    load_backtest_report.clear()
     st.session_state["session_schema_version"] = SESSION_SCHEMA_VERSION
     st.session_state.setdefault("control_page", "Home")
     st.session_state.setdefault("control_date", date.today())
@@ -895,9 +825,6 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
             for error in errors:
                 st.warning(error)
 
-    if "worldcup" in competition_keys:
-        render_backtest_panel(target_date)
-
     if not predictions:
         st.info("Nessuna partita trovata per questa data nelle competizioni configurate.")
         if "worldcup" in competition_keys:
@@ -908,55 +835,6 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
     render_section_heading(f"Pronostici del {target_date.isoformat()}", f"{len(predictions)} match | {competition_label}")
     for prediction in predictions:
         render_prediction_card(prediction)
-
-
-def render_backtest_panel(target_date: date) -> None:
-    with st.spinner("Misuro affidabilita modello sullo storico nazionale..."):
-        report = load_backtest_report(target_date)
-
-    render_section_heading("Affidabilita modello", f"{report.samples} partite storiche")
-    if not report.markets:
-        for note in report.notes:
-            st.info(note)
-        return
-
-    cards = []
-    for market in report.markets:
-        cards.append(
-            f"""
-            <div class="backtest-card">
-                <div class="backtest-market">{escape(market.market)}</div>
-                <div class="backtest-score">{market.hit_rate:.1%}</div>
-                <div class="backtest-label">hit-rate reale</div>
-                <div class="backtest-row"><span>Prob. media pick</span><strong>{market.avg_probability:.1%}</strong></div>
-                <div class="backtest-row"><span>Brier</span><strong>{market.brier_score:.3f}</strong></div>
-                <div class="backtest-row"><span>Gap calibrazione</span><strong>{market.calibration_gap:.1%}</strong></div>
-                <div class="backtest-badge">{escape(market.reliability)}</div>
-            </div>
-            """
-        )
-    st.markdown(f'<div class="backtest-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
-
-    metrics_rows = [
-        {
-            "Mercato": market.market,
-            "Campione": market.samples,
-            "Hit-rate": f"{market.hit_rate:.1%}",
-            "Prob. media pick": f"{market.avg_probability:.1%}",
-            "Gap calibrazione": f"{market.calibration_gap:.1%}",
-            "Brier": f"{market.brier_score:.3f}",
-            "Affidabilita": market.reliability,
-        }
-        for market in report.markets
-    ]
-    with st.expander("Dettaglio backtest", expanded=False):
-        st.caption(f"Periodo campione: {report.start_date} -> {report.end_date}. Gemini non viene usato.")
-        st.dataframe(pd.DataFrame(metrics_rows), hide_index=True, width="stretch")
-        if report.recent_rows:
-            st.markdown("**Ultime partite verificate**")
-            st.dataframe(pd.DataFrame(report.recent_rows), hide_index=True, width="stretch")
-        for note in report.notes:
-            st.write(f"- {note}")
 
 
 def render_prediction_card(prediction: MatchPrediction) -> None:
