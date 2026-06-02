@@ -15,6 +15,7 @@ if str(ROOT_DIR) not in sys.path:
 import pandas as pd
 import streamlit as st
 
+from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
 from config.settings import load_settings
 from features.market_features import fair_odd, recommendation, value_score
 from services.predictor import PredictionService
@@ -22,9 +23,9 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "mobile-controls-v4"
+SESSION_SCHEMA_VERSION = "home-competitions-v5"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
-VIEW_OPTIONS = ["Oggi", "Mondiali 2026", "Predict manuale", "Config"]
+VIEW_OPTIONS = ["Home", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
 
 
@@ -51,9 +52,9 @@ def require_login() -> bool:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def load_predictions(target_date: date, worldcup_only: bool) -> tuple[list[MatchPrediction], list[str]]:
+def load_predictions(target_date: date, competition_keys: tuple[str, ...]) -> tuple[list[MatchPrediction], list[str]]:
     service = PredictionService(settings())
-    return service.predictions_for_date(target_date, worldcup_only)
+    return service.predictions_for_date(target_date, competition_keys=competition_keys)
 
 
 def main() -> None:
@@ -66,14 +67,14 @@ def main() -> None:
         st.markdown('<div class="side-title">Filtro</div>', unsafe_allow_html=True)
         st.caption("Da telefono usa i comandi rapidi nella pagina principale.")
 
-    render_app_header(st.session_state.get("control_page", "Oggi"))
-    page, target_date = render_control_panel()
+    render_app_header(st.session_state.get("control_page", "Home"))
+    page, target_date, competition_keys = render_control_panel()
     if page == "Config":
         render_config()
     elif page == "Predict manuale":
         render_manual_prediction()
     else:
-        render_predictions(target_date, worldcup_only=page == "Mondiali 2026")
+        render_predictions(target_date, competition_keys)
 
 
 def render_global_styles() -> None:
@@ -708,45 +709,53 @@ def init_session_state() -> None:
         return
     load_predictions.clear()
     st.session_state["session_schema_version"] = SESSION_SCHEMA_VERSION
-    st.session_state.setdefault("control_page", "Oggi")
+    st.session_state.setdefault("control_page", "Home")
     st.session_state.setdefault("control_date", date.today())
     st.session_state.setdefault("control_date_text", date.today().isoformat())
     st.session_state.setdefault("control_date_error", "")
+    st.session_state.setdefault("selected_competitions", ["worldcup"])
     st.session_state.pop("llm_predictions", None)
     st.session_state.pop("llm_requested_predictions", None)
     st.session_state.pop("manual_prediction", None)
 
 
-def render_control_panel() -> tuple[str, date]:
+def render_control_panel() -> tuple[str, date, tuple[str, ...]]:
     st.markdown('<div class="desktop-control-card">', unsafe_allow_html=True)
     with st.container(border=True):
         st.markdown(
             """
-            <div class="control-panel-title">Comandi rapidi</div>
-            <div class="control-panel-caption">Pensato anche per telefono: puoi digitare la data o usare i pulsanti.</div>
+            <div class="control-panel-title">Home</div>
+            <div class="control-panel-caption">Inserisci data e campionati. Puoi selezionarli tutti, nessuno o solo alcuni.</div>
             """,
             unsafe_allow_html=True,
         )
-        col_page, col_date, col_prev, col_today, col_next, col_wc, col_refresh = st.columns(
-            [1.35, 1.05, 0.72, 0.62, 0.72, 0.95, 0.8]
-        )
+        col_page, col_date, col_competitions = st.columns([0.9, 0.85, 1.8])
+        button_cols = st.columns([0.52, 0.58, 0.52, 0.75, 0.62, 0.72])
+        col_prev, col_today, col_next, col_all, col_none, col_refresh = button_cols
         page = col_page.selectbox(
-            "Vista",
+            "Schermata",
             VIEW_OPTIONS,
-            index=_view_index(st.session_state.get("control_page", "Oggi")),
+            index=_view_index(st.session_state.get("control_page", "Home")),
             key="control_page",
-            on_change=_apply_page_defaults,
         )
         col_date.text_input(
             "Data",
             key="control_date_text",
-            placeholder="2026-06-22 oppure 22/06/2026",
+            placeholder="11-06, 2026-06-11 o 11/06/2026",
+        )
+        selected_competitions = col_competitions.multiselect(
+            "Campionati",
+            list(SUPPORTED_COMPETITIONS.keys()),
+            key="selected_competitions",
+            format_func=_competition_label,
+            placeholder="Scegli uno o piu campionati",
         )
 
         col_prev.button("-1", on_click=_shift_control_date, args=(-1,))
         col_today.button("Oggi", on_click=_set_control_date, args=(date.today(),))
         col_next.button("+1", on_click=_shift_control_date, args=(1,))
-        col_wc.button("Mondiali", on_click=_set_control_date, args=(WORLD_CUP_START,))
+        col_all.button("Tutti", on_click=_set_selected_competitions, args=(tuple(DEFAULT_COMPETITIONS),))
+        col_none.button("Nessuno", on_click=_set_selected_competitions, args=((),))
         col_refresh.button("Aggiorna", type="primary", on_click=_refresh_control_data)
 
         parsed_date = _parse_date_text(st.session_state.get("control_date_text", ""))
@@ -757,7 +766,7 @@ def render_control_panel() -> tuple[str, date]:
             st.session_state["control_date_error"] = "Formato data non valido. Usa YYYY-MM-DD oppure DD/MM/YYYY."
 
         target_date = st.session_state.get("control_date", date.today())
-        if page == "Mondiali 2026" and target_date < WORLD_CUP_START:
+        if "worldcup" in selected_competitions and target_date < WORLD_CUP_START:
             target_date = WORLD_CUP_START
             st.info("Per i Mondiali uso la prima data disponibile: 2026-06-11.")
 
@@ -765,18 +774,28 @@ def render_control_panel() -> tuple[str, date]:
             st.warning(st.session_state["control_date_error"])
 
     st.markdown("</div>", unsafe_allow_html=True)
-    return page, target_date
+    return page, target_date, tuple(selected_competitions)
 
 
 def _view_index(page: str) -> int:
     return VIEW_OPTIONS.index(page) if page in VIEW_OPTIONS else 0
 
 
-def _apply_page_defaults() -> None:
-    if st.session_state.get("control_page") == "Mondiali 2026":
-        current_date = _parse_date_text(st.session_state.get("control_date_text", "")) or date.today()
-        if current_date < WORLD_CUP_START:
-            _set_control_date(WORLD_CUP_START)
+def _competition_label(key: str) -> str:
+    competition = SUPPORTED_COMPETITIONS.get(key)
+    return competition.name if competition else key
+
+
+def _selected_competitions_label(keys: tuple[str, ...]) -> str:
+    if len(keys) == len(DEFAULT_COMPETITIONS):
+        return "Tutti"
+    if len(keys) <= 2:
+        return ", ".join(_competition_label(key) for key in keys)
+    return f"{len(keys)} campionati"
+
+
+def _set_selected_competitions(keys: tuple[str, ...]) -> None:
+    st.session_state["selected_competitions"] = list(keys)
 
 
 def _shift_control_date(days: int) -> None:
@@ -816,6 +835,12 @@ def _parse_date_text(value: str) -> date | None:
     for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
         try:
             return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            pass
+    for fmt in ("%d/%m", "%d-%m"):
+        try:
+            parsed = datetime.strptime(cleaned, fmt).date()
+            return parsed.replace(year=date.today().year)
         except ValueError:
             pass
     return None
@@ -859,9 +884,12 @@ def render_manual_prediction() -> None:
         render_prediction_card(st.session_state["manual_prediction"])
 
 
-def render_predictions(target_date: date, worldcup_only: bool) -> None:
+def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> None:
+    if not competition_keys:
+        st.info("Seleziona almeno un campionato nella Home.")
+        return
     with st.spinner("Carico partite, quote, news e pronostici..."):
-        predictions, errors = load_predictions(target_date, worldcup_only)
+        predictions, errors = load_predictions(target_date, competition_keys)
 
     if errors:
         with st.expander("Warning fonti dati", expanded=False):
@@ -870,11 +898,12 @@ def render_predictions(target_date: date, worldcup_only: bool) -> None:
 
     if not predictions:
         st.info("Nessuna partita trovata per questa data nelle competizioni configurate.")
-        if worldcup_only:
+        if "worldcup" in competition_keys:
             st.caption("Per i Mondiali prova dall'11 giugno 2026 in avanti.")
         return
 
-    render_section_heading(f"Pronostici del {target_date.isoformat()}", f"{len(predictions)} match")
+    competition_label = _selected_competitions_label(competition_keys)
+    render_section_heading(f"Pronostici del {target_date.isoformat()}", f"{len(predictions)} match | {competition_label}")
     for prediction in predictions:
         render_prediction_card(prediction)
 

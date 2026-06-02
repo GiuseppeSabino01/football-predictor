@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS, WORLD_CUP_KEYS
+from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS, Competition
 from config.settings import Settings
 from data_sources.api_football import APIFootballClient
 from data_sources.football_data_org import FootballDataOrgClient
@@ -37,10 +37,17 @@ class PredictionService:
         self.sqlite_storage = SQLiteStorage(settings.sqlite_path)
         self.supabase_storage = SupabaseStorage(settings)
 
-    def predictions_for_date(self, target_date: date, worldcup_only: bool = False) -> tuple[list[MatchPrediction], list[str]]:
+    def predictions_for_date(
+        self,
+        target_date: date,
+        worldcup_only: bool = False,
+        competition_keys: tuple[str, ...] | list[str] | None = None,
+    ) -> tuple[list[MatchPrediction], list[str]]:
         errors: list[str] = []
-        competitions = self._competitions(worldcup_only)
-        matches = self._load_matches(target_date, competitions, errors, worldcup_only)
+        competitions = self._competitions(worldcup_only, competition_keys)
+        if not competitions:
+            return [], errors
+        matches = self._load_matches(target_date, competitions, errors)
         if not matches:
             return [], errors
 
@@ -115,36 +122,35 @@ class PredictionService:
     def _load_matches(
         self,
         target_date: date,
-        competitions: list,
+        competitions: list[Competition],
         errors: list[str],
-        worldcup_only: bool,
     ) -> list[Match]:
         matches: list[Match] = []
-        if worldcup_only:
+        has_worldcup = any(competition.key == "worldcup" for competition in competitions)
+        if has_worldcup:
             try:
-                matches = self.openligadb.worldcup_matches_for_date(target_date)
+                matches.extend(self.openligadb.worldcup_matches_for_date(target_date))
             except Exception as exc:
                 errors.append(f"OpenLigaDB Mondiali non disponibile: {exc}")
-            if matches:
-                return matches
 
+        api_competitions = [competition for competition in competitions if competition.key != "worldcup"]
         try:
-            matches = self.api_football.fixtures_for_date(target_date, competitions)
+            matches.extend(self.api_football.fixtures_for_date(target_date, api_competitions))
         except Exception as exc:
             errors.append(f"API-Football fixture non disponibili: {exc}")
 
         if matches:
-            return matches
+            return _unique_matches(matches)
 
         try:
-            matches = self.football_data_org.matches_for_date(target_date)
+            matches = self.football_data_org.matches_for_date(target_date, competitions)
         except Exception as exc:
             errors.append(f"football-data.org fixture non disponibili: {exc}")
             return []
         if matches:
-            return matches
+            return _unique_matches(matches)
 
-        if any(competition.key == "worldcup" for competition in competitions):
+        if has_worldcup:
             try:
                 return self.openligadb.worldcup_matches_for_date(target_date)
             except Exception as exc:
@@ -265,6 +271,18 @@ class PredictionService:
         return any(candidate_lower == alias.lower() for alias in aliases_for(team))
 
     @staticmethod
-    def _competitions(worldcup_only: bool) -> list:
-        keys = WORLD_CUP_KEYS if worldcup_only else DEFAULT_COMPETITIONS
-        return [SUPPORTED_COMPETITIONS[key] for key in keys]
+    def _competitions(worldcup_only: bool, competition_keys: tuple[str, ...] | list[str] | None = None) -> list[Competition]:
+        if competition_keys is not None:
+            keys = list(competition_keys)
+        elif worldcup_only:
+            keys = ["worldcup"]
+        else:
+            keys = DEFAULT_COMPETITIONS
+        return [SUPPORTED_COMPETITIONS[key] for key in keys if key in SUPPORTED_COMPETITIONS]
+
+
+def _unique_matches(matches: list[Match]) -> list[Match]:
+    unique: dict[str, Match] = {}
+    for match in matches:
+        unique[match.id] = match
+    return list(unique.values())

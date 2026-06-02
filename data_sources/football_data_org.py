@@ -5,6 +5,7 @@ from typing import Any
 
 import requests
 
+from config.competitions import Competition
 from config.settings import Settings
 from data_sources.base import DataSourceError
 from schemas import Match
@@ -30,12 +31,21 @@ class FootballDataOrgClient:
             raise DataSourceError(f"football-data.org error {response.status_code}: {response.text[:240]}")
         return response.json()
 
-    def matches_for_date(self, target_date: date) -> list[Match]:
+    def matches_for_date(self, target_date: date, competitions: list[Competition] | None = None) -> list[Match]:
         payload = self._get(
             "/matches",
             {"dateFrom": target_date.isoformat(), "dateTo": target_date.isoformat()},
         )
-        return [self._parse_match(row) for row in payload.get("matches", [])]
+        rows = payload.get("matches", [])
+        if competitions:
+            allowed_codes = {competition.football_data_org_code for competition in competitions if competition.football_data_org_code}
+            allowed_names = {competition.name.lower() for competition in competitions}
+            rows = [
+                row
+                for row in rows
+                if _competition_matches(row, allowed_codes, allowed_names)
+            ]
+        return [self._parse_match(row) for row in rows]
 
     @staticmethod
     def _parse_match(row: dict[str, Any]) -> Match:
@@ -56,3 +66,10 @@ class FootballDataOrgClient:
             stage=row.get("stage"),
             raw=row,
         )
+
+
+def _competition_matches(row: dict[str, Any], allowed_codes: set[str], allowed_names: set[str]) -> bool:
+    competition = row.get("competition") or {}
+    code = competition.get("code")
+    name = str(competition.get("name", "")).lower()
+    return bool((code and code in allowed_codes) or (name and name in allowed_names))
