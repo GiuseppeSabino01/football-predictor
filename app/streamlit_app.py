@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 import hashlib
 from html import escape
 from pathlib import Path
@@ -65,15 +65,20 @@ def main() -> None:
 
     with st.sidebar:
         st.markdown('<div class="side-title">Filtro</div>', unsafe_allow_html=True)
-        st.caption("Da telefono usa i comandi rapidi nella pagina principale.")
+        page = st.radio(
+            "Schermata",
+            VIEW_OPTIONS,
+            index=_view_index(st.session_state.get("control_page", "Home")),
+            key="control_page",
+        )
 
-    render_app_header(st.session_state.get("control_page", "Home"))
-    page, target_date, competition_keys = render_control_panel()
+    render_app_header(page)
     if page == "Config":
         render_config()
     elif page == "Predict manuale":
         render_manual_prediction()
     else:
+        target_date, competition_keys = render_control_panel()
         render_predictions(target_date, competition_keys)
 
 
@@ -719,25 +724,17 @@ def init_session_state() -> None:
     st.session_state.pop("manual_prediction", None)
 
 
-def render_control_panel() -> tuple[str, date, tuple[str, ...]]:
+def render_control_panel() -> tuple[date, tuple[str, ...]]:
     st.markdown('<div class="desktop-control-card">', unsafe_allow_html=True)
     with st.container(border=True):
         st.markdown(
             """
             <div class="control-panel-title">Home</div>
-            <div class="control-panel-caption">Inserisci data e campionati. Puoi selezionarli tutti, nessuno o solo alcuni.</div>
+            <div class="control-panel-caption">Inserisci data e campionati da analizzare.</div>
             """,
             unsafe_allow_html=True,
         )
-        col_page, col_date, col_competitions = st.columns([0.9, 0.85, 1.8])
-        button_cols = st.columns([0.52, 0.58, 0.52, 0.75, 0.62, 0.72])
-        col_prev, col_today, col_next, col_all, col_none, col_refresh = button_cols
-        page = col_page.selectbox(
-            "Schermata",
-            VIEW_OPTIONS,
-            index=_view_index(st.session_state.get("control_page", "Home")),
-            key="control_page",
-        )
+        col_date, col_competitions = st.columns([0.85, 1.8])
         col_date.text_input(
             "Data",
             key="control_date_text",
@@ -750,13 +747,6 @@ def render_control_panel() -> tuple[str, date, tuple[str, ...]]:
             format_func=_competition_label,
             placeholder="Scegli uno o piu campionati",
         )
-
-        col_prev.button("-1", on_click=_shift_control_date, args=(-1,))
-        col_today.button("Oggi", on_click=_set_control_date, args=(date.today(),))
-        col_next.button("+1", on_click=_shift_control_date, args=(1,))
-        col_all.button("Tutti", on_click=_set_selected_competitions, args=(tuple(DEFAULT_COMPETITIONS),))
-        col_none.button("Nessuno", on_click=_set_selected_competitions, args=((),))
-        col_refresh.button("Aggiorna", type="primary", on_click=_refresh_control_data)
 
         parsed_date = _parse_date_text(st.session_state.get("control_date_text", ""))
         if parsed_date:
@@ -774,7 +764,7 @@ def render_control_panel() -> tuple[str, date, tuple[str, ...]]:
             st.warning(st.session_state["control_date_error"])
 
     st.markdown("</div>", unsafe_allow_html=True)
-    return page, target_date, tuple(selected_competitions)
+    return target_date, tuple(selected_competitions)
 
 
 def _view_index(page: str) -> int:
@@ -792,35 +782,6 @@ def _selected_competitions_label(keys: tuple[str, ...]) -> str:
     if len(keys) <= 2:
         return ", ".join(_competition_label(key) for key in keys)
     return f"{len(keys)} campionati"
-
-
-def _set_selected_competitions(keys: tuple[str, ...]) -> None:
-    st.session_state["selected_competitions"] = list(keys)
-
-
-def _shift_control_date(days: int) -> None:
-    current_date = _parse_date_text(st.session_state.get("control_date_text", ""))
-    if current_date is None:
-        current_date = st.session_state.get("control_date", date.today())
-    _set_control_date(current_date + timedelta(days=days))
-
-
-def _set_control_date(target_date: date) -> None:
-    st.session_state["control_date"] = target_date
-    st.session_state["control_date_text"] = target_date.isoformat()
-    st.session_state["control_date_error"] = ""
-
-
-def _refresh_control_data() -> None:
-    parsed_date = _parse_date_text(st.session_state.get("control_date_text", ""))
-    if parsed_date is None:
-        st.session_state["control_date_error"] = "Formato data non valido. Usa YYYY-MM-DD oppure DD/MM/YYYY."
-        return
-    st.session_state["control_date"] = parsed_date
-    st.session_state["control_date_text"] = parsed_date.isoformat()
-    st.session_state["control_date_error"] = ""
-    load_predictions.clear()
-    st.session_state.pop("llm_predictions", None)
 
 
 def _parse_date_text(value: str) -> date | None:

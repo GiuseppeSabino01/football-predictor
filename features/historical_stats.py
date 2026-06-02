@@ -16,10 +16,6 @@ class ResultSummary:
     score: str
     winner: str
     outcome: str
-    home_shots: str = "-"
-    away_shots: str = "-"
-    home_corners: str = "-"
-    away_corners: str = "-"
 
     def as_row(self) -> dict[str, str]:
         return {
@@ -28,10 +24,6 @@ class ResultSummary:
             "Risultato": self.score,
             "Vincitore": self.winner,
             "Esito": self.outcome,
-            "Tiri casa": self.home_shots,
-            "Tiri trasferta": self.away_shots,
-            "Angoli casa": self.home_corners,
-            "Angoli trasferta": self.away_corners,
         }
 
 
@@ -144,7 +136,6 @@ class HistoricalStatsBuilder:
         self.results = results.copy()
         self.results["home_canonical"] = self.results["home_team"].map(canonical_team_name)
         self.results["away_canonical"] = self.results["away_team"].map(canonical_team_name)
-        self.has_event_detail_data = _has_event_detail_data(self.results)
 
     def build(self, home_team: str, away_team: str, recent_n: int = 10, h2h_n: int = 8) -> MatchHistoricalStats:
         home = canonical_team_name(home_team)
@@ -153,8 +144,6 @@ class HistoricalStatsBuilder:
         away_recent = self._recent_team_stats(away, recent_n)
         h2h = self._h2h_stats(home, away, h2h_n)
         notes = self._notes(home_team, away_team, home_recent, away_recent, h2h)
-        if not self.has_event_detail_data:
-            notes.append("Tiri e angoli storici non disponibili nella fonte gratuita usata: colonne mostrate con '-'.")
         return MatchHistoricalStats(home_recent, away_recent, h2h, notes)
 
     def _recent_team_stats(self, team: str, n: int) -> TeamRecentStats:
@@ -236,10 +225,6 @@ class HistoricalStatsBuilder:
             score=f"{home_score}-{away_score}",
             winner=winner,
             outcome=f"{outcome} {team}",
-            home_shots=_optional_row_number(row, "home_shots"),
-            away_shots=_optional_row_number(row, "away_shots"),
-            home_corners=_optional_row_number(row, "home_corners"),
-            away_corners=_optional_row_number(row, "away_corners"),
         )
 
     @staticmethod
@@ -269,10 +254,6 @@ class HistoricalStatsBuilder:
             score=f"{source_home_score}-{source_away_score}",
             winner=winner,
             outcome=outcome,
-            home_shots=_optional_row_number(row, "home_shots"),
-            away_shots=_optional_row_number(row, "away_shots"),
-            home_corners=_optional_row_number(row, "home_corners"),
-            away_corners=_optional_row_number(row, "away_corners"),
         )
 
     @staticmethod
@@ -329,20 +310,3 @@ def _team_form_note(label: str, stats: TeamRecentStats) -> str:
 
 def _optional_avg(value: float | None) -> str:
     return f"{value:.2f}" if value is not None else "-"
-
-
-def _optional_row_number(row: dict[str, Any], key: str) -> str:
-    value = row.get(key)
-    if value is None or pd.isna(value):
-        return "-"
-    try:
-        return str(int(value))
-    except (TypeError, ValueError):
-        return str(value)
-
-
-def _has_event_detail_data(frame: pd.DataFrame) -> bool:
-    columns = {"home_shots", "away_shots", "home_corners", "away_corners"}
-    if not columns.issubset(set(frame.columns)):
-        return False
-    return bool(frame[list(columns)].notna().any().any())

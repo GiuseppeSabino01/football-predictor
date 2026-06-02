@@ -96,10 +96,6 @@ def test_historical_stats_builder():
                 "away_team": "Italy",
                 "home_score": 2,
                 "away_score": 2,
-                "home_shots": 14,
-                "away_shots": 11,
-                "home_corners": 6,
-                "away_corners": 5,
             },
             {
                 "date": date(2025, 1, 1),
@@ -107,10 +103,6 @@ def test_historical_stats_builder():
                 "away_team": "Germany",
                 "home_score": 2,
                 "away_score": 2,
-                "home_shots": 10,
-                "away_shots": 13,
-                "home_corners": 4,
-                "away_corners": 7,
             },
             {
                 "date": date(2024, 1, 1),
@@ -118,10 +110,6 @@ def test_historical_stats_builder():
                 "away_team": "France",
                 "home_score": 1,
                 "away_score": 0,
-                "home_shots": 9,
-                "away_shots": 8,
-                "home_corners": 3,
-                "away_corners": 2,
             },
         ]
     )
@@ -134,28 +122,4 @@ def test_historical_stats_builder():
     assert "Gol fatti" in stats.notes[0]
     assert "H2H" in stats.notes[2]
     h2h_rows = stats.result_tables("Germany", "Italy")["Scontri diretti"]
-    assert h2h_rows[0]["Tiri casa"] == "14"
-    assert h2h_rows[0]["Tiri trasferta"] == "11"
-    assert h2h_rows[0]["Angoli casa"] == "6"
-    assert h2h_rows[0]["Angoli trasferta"] == "5"
-
-
-def test_historical_stats_missing_shots_and_corners_are_explicit():
-    frame = pd.DataFrame(
-        [
-            {
-                "date": date(2026, 1, 1),
-                "home_team": "Mexico",
-                "away_team": "South Africa",
-                "home_score": 1,
-                "away_score": 1,
-            }
-        ]
-    )
-    stats = HistoricalStatsBuilder(frame).build("Mexico", "South Africa")
-    row = stats.result_tables("Mexico", "South Africa")["Scontri diretti"][0]
-    assert row["Tiri casa"] == "-"
-    assert row["Tiri trasferta"] == "-"
-    assert row["Angoli casa"] == "-"
-    assert row["Angoli trasferta"] == "-"
-    assert any("Tiri e angoli storici non disponibili" in note for note in stats.notes)
+    assert list(h2h_rows[0].keys()) == ["Data", "Partita", "Risultato", "Vincitore", "Esito"]
