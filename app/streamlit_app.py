@@ -319,6 +319,171 @@ def render_global_styles() -> None:
             text-overflow: ellipsis;
         }
 
+        .viz-grid {
+            display: grid;
+            grid-template-columns: minmax(190px, 0.75fr) minmax(260px, 1.25fr) minmax(230px, 1fr);
+            gap: 0.65rem;
+            margin: 0.8rem 0 0.8rem;
+        }
+
+        .viz-card {
+            border-radius: var(--radius);
+            border: 1px solid rgba(244,251,247,0.12);
+            background:
+                linear-gradient(180deg, rgba(244,251,247,0.065), rgba(244,251,247,0.025));
+            padding: 0.78rem;
+            min-height: 142px;
+        }
+
+        .viz-title {
+            color: var(--muted);
+            font-size: 0.75rem;
+            font-weight: 800;
+            margin-bottom: 0.7rem;
+        }
+
+        .gauge-wrap {
+            display: grid;
+            grid-template-columns: 94px minmax(0, 1fr);
+            gap: 0.72rem;
+            align-items: center;
+        }
+
+        .gauge {
+            width: 92px;
+            aspect-ratio: 1;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            box-shadow: inset 0 0 0 1px rgba(244,251,247,0.10), 0 12px 28px rgba(0,0,0,0.22);
+        }
+
+        .gauge-core {
+            width: 66px;
+            aspect-ratio: 1;
+            border-radius: 999px;
+            background: #0b1011;
+            display: grid;
+            place-items: center;
+            color: var(--text);
+            font-weight: 900;
+            font-size: 0.92rem;
+            border: 1px solid rgba(244,251,247,0.09);
+        }
+
+        .gauge-pick {
+            color: var(--text);
+            font-size: 1.02rem;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+            line-height: 1.16;
+        }
+
+        .gauge-note {
+            color: var(--muted);
+            font-size: 0.76rem;
+            margin-top: 0.35rem;
+        }
+
+        .market-bars {
+            display: grid;
+            gap: 0.48rem;
+        }
+
+        .bar-row {
+            display: grid;
+            grid-template-columns: minmax(78px, 1fr) minmax(110px, 1.45fr) 48px;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .bar-label {
+            color: #d9e7e2;
+            font-size: 0.77rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .bar-track {
+            height: 8px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(244,251,247,0.08);
+            border: 1px solid rgba(244,251,247,0.06);
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            box-shadow: 0 0 18px rgba(25,230,176,0.24);
+        }
+
+        .bar-value {
+            color: var(--text);
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-align: right;
+        }
+
+        .form-board {
+            display: grid;
+            gap: 0.56rem;
+        }
+
+        .form-team {
+            display: grid;
+            grid-template-columns: minmax(80px, 0.9fr) minmax(0, 1.8fr);
+            gap: 0.55rem;
+            align-items: center;
+        }
+
+        .form-name {
+            color: #d9e7e2;
+            font-size: 0.78rem;
+            font-weight: 800;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .form-chips {
+            display: flex;
+            gap: 0.28rem;
+            flex-wrap: wrap;
+        }
+
+        .form-chip {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            display: inline-grid;
+            place-items: center;
+            font-size: 0.68rem;
+            font-weight: 900;
+            border: 1px solid rgba(244,251,247,0.12);
+        }
+
+        .form-chip.win {
+            color: #06100d;
+            background: var(--teal);
+        }
+
+        .form-chip.draw {
+            color: #1a1000;
+            background: var(--amber);
+        }
+
+        .form-chip.loss {
+            color: #fff2f7;
+            background: var(--rose);
+        }
+
+        .form-empty {
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
         .dot {
             display: inline-block;
             width: 8px;
@@ -462,6 +627,10 @@ def render_global_styles() -> None:
                 grid-template-columns: 1fr;
             }
 
+            .viz-grid {
+                grid-template-columns: 1fr;
+            }
+
             .hero-chip {
                 width: fit-content;
             }
@@ -590,6 +759,7 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
         top = max((pick for pick in prediction.picks if pick.market == "1X2"), key=lambda p: p.average_probability)
         render_match_header(prediction, top)
         render_gemini_probability_button(base_prediction, prediction, prediction_key)
+        render_match_visuals(prediction, top)
         manual_odds = render_manual_odds_inputs(prediction)
         if not any(pick.market_odd for pick in prediction.picks) and not manual_odds:
             st.info(
@@ -712,6 +882,129 @@ def render_probability_strip(picks: list[MarketPick]) -> str:
         f'<div class="prob-legend">{"".join(labels)}</div>'
         '</div>'
     )
+
+
+def render_match_visuals(prediction: MatchPrediction, top: MarketPick) -> None:
+    st.markdown(
+        f"""
+        <div class="viz-grid">
+            {render_pick_gauge(top)}
+            {render_market_bars(prediction.picks)}
+            {render_form_board(prediction)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_pick_gauge(top: MarketPick) -> str:
+    probability = max(0.0, min(1.0, top.average_probability))
+    degrees = probability * 360
+    color = _probability_color(probability)
+    return f"""
+    <div class="viz-card">
+        <div class="viz-title">Pick Pulse</div>
+        <div class="gauge-wrap">
+            <div class="gauge" style="background: conic-gradient({color} 0deg {degrees:.1f}deg, rgba(244,251,247,0.08) {degrees:.1f}deg 360deg);">
+                <div class="gauge-core">{probability:.0%}</div>
+            </div>
+            <div>
+                <div class="gauge-pick">{escape(top.selection)}</div>
+                <div class="gauge-note">{escape(top.market)} | {escape(top.confidence)}</div>
+            </div>
+        </div>
+    </div>
+    """
+
+
+def render_market_bars(picks: list[MarketPick]) -> str:
+    preferred_markets = ["1X2", "Over/Under 2.5", "Goal/No Goal"]
+    selected: list[MarketPick] = []
+    for market in preferred_markets:
+        selected.extend([pick for pick in picks if pick.market == market])
+    if not selected:
+        return _empty_viz_card("Mercati chiave", "Dati mercato non disponibili")
+
+    rows = []
+    for index, pick in enumerate(selected[:7]):
+        probability = max(0.0, min(1.0, pick.average_probability))
+        width = max(3.0, probability * 100)
+        color = APP_ACCENT_COLORS[index % len(APP_ACCENT_COLORS)]
+        label = f"{pick.market} | {pick.selection}"
+        rows.append(
+            f"""
+            <div class="bar-row">
+                <div class="bar-label">{escape(label)}</div>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:{width:.1f}%; background:{color};"></div>
+                </div>
+                <div class="bar-value">{probability:.0%}</div>
+            </div>
+            """
+        )
+    return f"""
+    <div class="viz-card">
+        <div class="viz-title">Mercati chiave</div>
+        <div class="market-bars">{"".join(rows)}</div>
+    </div>
+    """
+
+
+def render_form_board(prediction: MatchPrediction) -> str:
+    rows = []
+    for title, table_rows in prediction.stats_tables.items():
+        if not title.startswith("Ultime partite") or not table_rows:
+            continue
+        team_name = title.replace("Ultime partite", "").strip()
+        rows.append(_form_row(team_name, table_rows[:10]))
+        if len(rows) == 2:
+            break
+    if not rows:
+        return _empty_viz_card("Forma recente", "Storico recente non disponibile")
+    return f"""
+    <div class="viz-card">
+        <div class="viz-title">Forma recente</div>
+        <div class="form-board">{"".join(rows)}</div>
+    </div>
+    """
+
+
+def _form_row(team_name: str, rows: list[dict[str, str]]) -> str:
+    chips = []
+    for row in rows:
+        outcome = str(row.get("Esito", "")).strip().upper()
+        if outcome.startswith("V"):
+            class_name, label = "win", "V"
+        elif outcome.startswith("N"):
+            class_name, label = "draw", "N"
+        elif outcome.startswith("P"):
+            class_name, label = "loss", "P"
+        else:
+            class_name, label = "draw", "-"
+        chips.append(f'<span class="form-chip {class_name}">{label}</span>')
+    return f"""
+    <div class="form-team">
+        <div class="form-name">{escape(team_name)}</div>
+        <div class="form-chips">{"".join(chips)}</div>
+    </div>
+    """
+
+
+def _empty_viz_card(title: str, text: str) -> str:
+    return f"""
+    <div class="viz-card">
+        <div class="viz-title">{escape(title)}</div>
+        <div class="form-empty">{escape(text)}</div>
+    </div>
+    """
+
+
+def _probability_color(probability: float) -> str:
+    if probability >= 0.58:
+        return "#19e6b0"
+    if probability >= 0.45:
+        return "#ffb020"
+    return "#f4538a"
 
 
 def render_gemini_probability_button(
