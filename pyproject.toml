@@ -1,0 +1,9 @@
+[project]
+name = "football-betting-predictor"
+version = "0.1.0"
+description = "Personal football betting analysis dashboard using free APIs, RSS news and Gemini."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
