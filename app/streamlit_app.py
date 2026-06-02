@@ -24,7 +24,7 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "calendar-v7"
+SESSION_SCHEMA_VERSION = "calendar-compat-v8"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
 VIEW_OPTIONS = ["Home", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
@@ -739,7 +739,6 @@ def render_control_panel() -> tuple[date, tuple[str, ...]]:
             key="control_date",
             min_value=date(2024, 1, 1),
             max_value=date(2035, 12, 31),
-            format="YYYY/MM/DD",
         )
         selected_competitions = col_competitions.multiselect(
             "Campionati",
@@ -891,7 +890,7 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
                     if not rows:
                         continue
                     st.markdown(f"**{title}**")
-                    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+                    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
         if prediction.warnings:
             with st.expander("Warning"):
@@ -1217,7 +1216,7 @@ def render_market_table(picks: list[MarketPick], manual_odds: dict[str, float] |
         _market_row(pick, manual_odds)
         for pick in picks
     ]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
 def _market_row(pick: MarketPick, manual_odds: dict[str, float]) -> dict[str, object]:
