@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import date
 import hashlib
+import inspect
 from html import escape
 from pathlib import Path
 import sys
@@ -55,7 +56,10 @@ def require_login() -> bool:
 @st.cache_data(ttl=900, show_spinner=False)
 def load_predictions(target_date: date, competition_keys: tuple[str, ...]) -> tuple[list[MatchPrediction], list[str]]:
     service = PredictionService(settings())
-    return service.predictions_for_date(target_date, competition_keys=competition_keys)
+    signature = inspect.signature(service.predictions_for_date)
+    if "competition_keys" in signature.parameters:
+        return service.predictions_for_date(target_date, competition_keys=competition_keys)
+    return service.predictions_for_date(target_date, worldcup_only="worldcup" in competition_keys)
 
 
 def main() -> None:
@@ -817,7 +821,12 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
         st.info("Seleziona almeno un campionato nella Home.")
         return
     with st.spinner("Carico partite, quote, news e pronostici..."):
-        predictions, errors = load_predictions(target_date, competition_keys)
+        try:
+            predictions, errors = load_predictions(target_date, competition_keys)
+        except TypeError as exc:
+            st.error("Errore di compatibilita nel servizio predizioni. Riavvia l'app Streamlit dopo il deploy.")
+            st.code(str(exc))
+            return
 
     if errors:
         with st.expander("Warning fonti dati", expanded=False):
