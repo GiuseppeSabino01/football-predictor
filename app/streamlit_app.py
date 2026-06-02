@@ -121,7 +121,7 @@ def render_global_styles() -> None:
 
         .main .block-container {
             max-width: 1180px;
-            padding-top: 2.2rem;
+            padding-top: 1.35rem;
             padding-bottom: 4rem;
         }
 
@@ -156,8 +156,8 @@ def render_global_styles() -> None:
                 linear-gradient(135deg, rgba(25,230,176,0.18), rgba(255,176,32,0.075) 45%, rgba(244,83,138,0.12)),
                 rgba(13, 17, 18, 0.92);
             box-shadow: 0 18px 50px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.08);
-            padding: 1.25rem 1.35rem;
-            margin-bottom: 1.2rem;
+            padding: 0.95rem 1.1rem;
+            margin-bottom: 0.8rem;
         }
 
         .app-hero::after {
@@ -182,7 +182,7 @@ def render_global_styles() -> None:
         .app-title {
             margin: 0;
             color: var(--text);
-            font-size: 2.2rem;
+            font-size: 1.85rem;
             line-height: 1.05;
             font-weight: 900;
         }
@@ -388,14 +388,15 @@ def render_global_styles() -> None:
 
         .bar-row {
             display: grid;
-            grid-template-columns: minmax(78px, 1fr) minmax(110px, 1.45fr) 48px;
+            grid-template-columns: minmax(72px, 0.82fr) minmax(130px, 1.55fr) 44px;
             gap: 0.5rem;
             align-items: center;
         }
 
         .bar-label {
             color: #d9e7e2;
-            font-size: 0.77rem;
+            font-size: 0.84rem;
+            font-weight: 850;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -613,11 +614,26 @@ def render_global_styles() -> None:
             margin-bottom: 0.55rem;
         }
 
+        .desktop-control-card [data-testid="stVerticalBlockBorderWrapper"] {
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        .desktop-control-card .control-panel-title,
+        .desktop-control-card .control-panel-caption {
+            display: none;
+        }
+
         @media (max-width: 760px) {
             .main .block-container {
                 padding-left: 0.75rem;
                 padding-right: 0.75rem;
                 padding-top: 1rem;
+            }
+
+            .desktop-control-card .control-panel-title,
+            .desktop-control-card .control-panel-caption {
+                display: block;
             }
 
             .app-hero-inner,
@@ -702,6 +718,7 @@ def init_session_state() -> None:
 
 
 def render_control_panel() -> tuple[str, date]:
+    st.markdown('<div class="desktop-control-card">', unsafe_allow_html=True)
     with st.container(border=True):
         st.markdown(
             """
@@ -710,7 +727,9 @@ def render_control_panel() -> tuple[str, date]:
             """,
             unsafe_allow_html=True,
         )
-        col_page, col_date = st.columns([1, 1])
+        col_page, col_date, col_prev, col_today, col_next, col_wc, col_refresh = st.columns(
+            [1.35, 1.05, 0.72, 0.62, 0.72, 0.95, 0.8]
+        )
         page = col_page.selectbox(
             "Vista",
             VIEW_OPTIONS,
@@ -724,13 +743,11 @@ def render_control_panel() -> tuple[str, date]:
             placeholder="2026-06-22 oppure 22/06/2026",
         )
 
-        btn_prev, btn_today, btn_next = st.columns(3)
-        btn_prev.button("Giorno -", on_click=_shift_control_date, args=(-1,))
-        btn_today.button("Oggi", on_click=_set_control_date, args=(date.today(),))
-        btn_next.button("Giorno +", on_click=_shift_control_date, args=(1,))
-        btn_wc, btn_refresh = st.columns([1, 1])
-        btn_wc.button("Start Mondiali", on_click=_set_control_date, args=(WORLD_CUP_START,))
-        btn_refresh.button("Aggiorna", type="primary", on_click=_refresh_control_data)
+        col_prev.button("-1", on_click=_shift_control_date, args=(-1,))
+        col_today.button("Oggi", on_click=_set_control_date, args=(date.today(),))
+        col_next.button("+1", on_click=_shift_control_date, args=(1,))
+        col_wc.button("Mondiali", on_click=_set_control_date, args=(WORLD_CUP_START,))
+        col_refresh.button("Aggiorna", type="primary", on_click=_refresh_control_data)
 
         parsed_date = _parse_date_text(st.session_state.get("control_date_text", ""))
         if parsed_date:
@@ -747,6 +764,7 @@ def render_control_panel() -> tuple[str, date]:
         if st.session_state.get("control_date_error"):
             st.warning(st.session_state["control_date_error"])
 
+    st.markdown("</div>", unsafe_allow_html=True)
     return page, target_date
 
 
@@ -1044,7 +1062,7 @@ def render_market_bars(picks: list[MarketPick]) -> str:
         probability = max(0.0, min(1.0, pick.average_probability))
         width = max(3.0, probability * 100)
         color = APP_ACCENT_COLORS[index % len(APP_ACCENT_COLORS)]
-        label = f"{pick.market} | {pick.selection}"
+        label = _market_bar_label(pick)
         rows.append(
             '<div class="bar-row">'
             f'<div class="bar-label">{escape(label)}</div>'
@@ -1060,6 +1078,15 @@ def render_market_bars(picks: list[MarketPick]) -> str:
         f'<div class="market-bars">{"".join(rows)}</div>'
         "</div>"
     )
+
+
+def _market_bar_label(pick: MarketPick) -> str:
+    if pick.market == "Over/Under 2.5":
+        if pick.selection.lower().startswith("over"):
+            return "Over"
+        if pick.selection.lower().startswith("under"):
+            return "Under"
+    return pick.selection
 
 
 def render_form_board(prediction: MatchPrediction) -> str:

@@ -71,6 +71,7 @@ Regole:
 - Mantieni le probabilita' tra 0 e 1.
 - Per il mercato 1X2 le tre probabilita' devono sommare circa 1.
 - Per mercati binari come Over/Under 2.5 e Goal/No Goal, le due probabilita' devono sommare circa 1.
+- Per mercati Over/Under tiri o angoli con stessa linea e stessa squadra, le due probabilita' devono sommare circa 1.
 - Non copiare meccanicamente la probabilita' statistica: puoi correggerla se risultati recenti, H2H o news lo suggeriscono.
 - Se i dati sono scarsi, resta vicino alla probabilita' statistica e segnala confidence low.
 - Usa solo JSON, senza markdown.

@@ -89,8 +89,8 @@ class EnsemblePredictor:
                 warnings.append("Quote mercato non disponibili: modello basato su Elo nazionale, Poisson e news.")
             else:
                 warnings.append("Quote mercato e rating squadra non disponibili: modello basato su baseline.")
-        if any(p.market in {"Tiri giocatore", "Over 10.5 tiri squadra"} for p in picks):
-            warnings.append("Mercati tiri: usare con cautela, copertura gratuita spesso incompleta.")
+        if any("tiri" in p.market.lower() or "angoli" in p.market.lower() for p in picks):
+            warnings.append("Mercati tiri e angoli: usare con cautela, stimati indirettamente da xG e volume atteso.")
         if not news_signals:
             warnings.append("Nessun segnale news concreto estratto dalle fonti italiane disponibili.")
 
