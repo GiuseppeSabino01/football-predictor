@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date
+import hashlib
 from pathlib import Path
 import sys
 
@@ -65,6 +67,7 @@ def main() -> None:
         refresh = st.button("Aggiorna dati", type="primary")
         if refresh:
             load_predictions.clear()
+            st.session_state.pop("llm_predictions", None)
 
     if page == "Config":
         render_config()
@@ -95,8 +98,9 @@ def render_manual_prediction() -> None:
     away = right.text_input("Squadra trasferta", value="Brazil")
     competition = st.text_input("Competizione", value="Manuale")
     if st.button("Calcola pronostico"):
-        prediction = PredictionService(settings()).predict_single(home, away, competition)
-        render_prediction_card(prediction)
+        st.session_state["manual_prediction"] = PredictionService(settings()).predict_single(home, away, competition)
+    if "manual_prediction" in st.session_state:
+        render_prediction_card(st.session_state["manual_prediction"])
 
 
 def render_predictions(target_date: date, worldcup_only: bool) -> None:
@@ -120,6 +124,12 @@ def render_predictions(target_date: date, worldcup_only: bool) -> None:
 
 
 def render_prediction_card(prediction: MatchPrediction) -> None:
+    prediction_key = _prediction_cache_key(prediction)
+    cached_prediction = st.session_state.get("llm_predictions", {}).get(prediction_key)
+    base_prediction = prediction
+    if cached_prediction:
+        prediction = cached_prediction
+
     match = prediction.match
     with st.container(border=True):
         top = max((pick for pick in prediction.picks if pick.market == "1X2"), key=lambda p: p.average_probability)
@@ -131,6 +141,7 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
         cols[3].metric("Confidenza", prediction.confidence)
 
         st.write(prediction.summary)
+        render_gemini_probability_button(base_prediction, prediction, prediction_key)
         manual_odds = render_manual_odds_inputs(prediction)
         if not any(pick.market_odd for pick in prediction.picks) and not manual_odds:
             st.info(
@@ -176,6 +187,40 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
             with st.expander("Warning"):
                 for warning in prediction.warnings:
                     st.warning(warning)
+
+
+def render_gemini_probability_button(
+    base_prediction: MatchPrediction,
+    displayed_prediction: MatchPrediction,
+    prediction_key: str,
+) -> None:
+    has_model_probability = any(pick.llm_probability is not None for pick in displayed_prediction.picks)
+    button_label = "Ricalcola probabilita Gemini" if has_model_probability else "Calcola probabilita Gemini"
+    col_button, col_hint = st.columns([1.1, 3])
+    if col_button.button(button_label, key=f"gemini_{prediction_key}"):
+        service = PredictionService(settings())
+        prediction_to_enrich = deepcopy(base_prediction)
+        with st.spinner(f"Calcolo Gemini per {prediction_to_enrich.match.label}..."):
+            enriched_prediction = service.enrich_prediction_with_gemini(prediction_to_enrich)
+        st.session_state.setdefault("llm_predictions", {})[prediction_key] = enriched_prediction
+        st.rerun()
+    if has_model_probability:
+        col_hint.caption("Probabilita modello calcolata per questa partita.")
+    else:
+        col_hint.caption("Gemini non parte in automatico: clicca solo sulla partita che vuoi analizzare.")
+
+
+def _prediction_cache_key(prediction: MatchPrediction) -> str:
+    match = prediction.match
+    raw = "|".join(
+        [
+            match.id,
+            match.match_date.isoformat(),
+            match.home_team,
+            match.away_team,
+        ]
+    )
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
 def render_manual_odds_inputs(prediction: MatchPrediction) -> dict[str, float]:

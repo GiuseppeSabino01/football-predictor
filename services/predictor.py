@@ -41,11 +41,10 @@ class PredictionService:
 
         teams = sorted({team for match in matches for team in (match.home_team, match.away_team)})
         articles = self._load_news(teams, errors)
-        signals = self._load_signals(articles, teams, errors)
         team_ratings = self._load_team_ratings(target_date, matches, errors)
         stats_builder = self._load_historical_stats(target_date, matches, errors)
         predictions = [
-            self._predict_match(match, signals, articles, errors, team_ratings, stats_builder)
+            self._predict_match(match, [], articles, errors, team_ratings, stats_builder)
             for match in matches
         ]
         return predictions, errors
@@ -61,6 +60,30 @@ class PredictionService:
             away_team=away,
         )
         return self.predictor.predict(match)
+
+    def enrich_prediction_with_gemini(self, prediction: MatchPrediction) -> MatchPrediction:
+        if not self.settings.has_gemini:
+            prediction.warnings.append("Gemini non configurato: impossibile calcolare la probabilita modello.")
+            return prediction
+
+        teams = [prediction.match.home_team, prediction.match.away_team]
+        errors: list[str] = []
+        articles = prediction.news_articles
+        if not articles:
+            articles = self._load_news(teams, errors)
+            articles = self._relevant_articles(prediction.match, articles)
+            prediction.news_articles = articles
+
+        signals = self._load_signals(articles, teams, errors)
+        prediction.news_signals = [
+            signal
+            for signal in signals
+            if self._team_name_matches(signal.team, prediction.match.home_team)
+            or self._team_name_matches(signal.team, prediction.match.away_team)
+        ]
+        for error in errors:
+            prediction.warnings.append(error)
+        return self.llm_probability.enrich(prediction, articles)
 
     def _load_matches(
         self,
@@ -189,8 +212,6 @@ class PredictionService:
             historical_stats=historical_stats,
         )
         prediction.news_articles = relevant_articles
-        if self.settings.has_gemini:
-            prediction = self.llm_probability.enrich(prediction, relevant_articles)
         return prediction
 
     @staticmethod
