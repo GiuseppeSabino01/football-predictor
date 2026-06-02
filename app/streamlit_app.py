@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import date
 import hashlib
+from html import escape
 from pathlib import Path
 import sys
 
@@ -22,6 +23,7 @@ from schemas import MatchPrediction, MarketPick
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
 SESSION_SCHEMA_VERSION = "gemini-persistent-v3"
+APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
 
 
 def settings():
@@ -36,7 +38,7 @@ def require_login() -> bool:
     if st.session_state.get("logged_in"):
         return True
 
-    st.title("Football Betting Predictor")
+    render_login_header()
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
@@ -53,15 +55,13 @@ def load_predictions(target_date: date, worldcup_only: bool) -> tuple[list[Match
 
 
 def main() -> None:
+    render_global_styles()
     if not require_login():
         return
     init_session_state()
 
-    st.title("Football Betting Predictor")
-    st.caption("Analisi betting personale: probabilita, value, news e warning dati.")
-
     with st.sidebar:
-        st.subheader("Filtro")
+        st.markdown('<div class="side-title">Filtro</div>', unsafe_allow_html=True)
         page = st.radio("Vista", ["Oggi", "Mondiali 2026", "Predict manuale", "Config"], label_visibility="collapsed")
         target_date = st.date_input("Data", value=date.today())
         if page == "Mondiali 2026" and target_date < date(2026, 6, 11):
@@ -71,12 +71,441 @@ def main() -> None:
             load_predictions.clear()
             st.session_state.pop("llm_predictions", None)
 
+    render_app_header(page)
     if page == "Config":
         render_config()
     elif page == "Predict manuale":
         render_manual_prediction()
     else:
         render_predictions(target_date, worldcup_only=page == "Mondiali 2026")
+
+
+def render_global_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --bg: #080a0b;
+            --panel: rgba(16, 20, 22, 0.86);
+            --panel-strong: rgba(22, 28, 30, 0.94);
+            --line: rgba(25, 230, 176, 0.24);
+            --line-soft: rgba(244, 251, 247, 0.10);
+            --text: #f4fbf7;
+            --muted: #8e9b96;
+            --teal: #19e6b0;
+            --amber: #ffb020;
+            --rose: #f4538a;
+            --cyan: #62d8ff;
+            --radius: 8px;
+        }
+
+        html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        [data-testid="stAppViewContainer"]::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(90deg, rgba(25,230,176,0.06) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(255,176,32,0.045) 1px, transparent 1px),
+                linear-gradient(135deg, rgba(25,230,176,0.16), transparent 32%),
+                linear-gradient(225deg, rgba(244,83,138,0.12), transparent 36%),
+                #080a0b;
+            background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%;
+            z-index: -1;
+        }
+
+        .stApp {
+            background: transparent;
+        }
+
+        .main .block-container {
+            max-width: 1180px;
+            padding-top: 2.2rem;
+            padding-bottom: 4rem;
+        }
+
+        [data-testid="stSidebar"] {
+            background:
+                linear-gradient(180deg, rgba(16,20,22,0.98), rgba(8,10,11,0.98)),
+                #101416;
+            border-right: 1px solid rgba(25,230,176,0.22);
+        }
+
+        [data-testid="stSidebar"] * {
+            color: var(--text);
+        }
+
+        .side-title {
+            color: var(--teal);
+            font-size: 0.92rem;
+            font-weight: 800;
+            margin: 0.8rem 0 0.65rem;
+        }
+
+        h1, h2, h3, p, label, span {
+            letter-spacing: 0;
+        }
+
+        .app-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: var(--radius);
+            border: 1px solid rgba(25,230,176,0.28);
+            background:
+                linear-gradient(135deg, rgba(25,230,176,0.18), rgba(255,176,32,0.075) 45%, rgba(244,83,138,0.12)),
+                rgba(13, 17, 18, 0.92);
+            box-shadow: 0 18px 50px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.08);
+            padding: 1.25rem 1.35rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .app-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                repeating-linear-gradient(135deg, transparent 0 18px, rgba(244,251,247,0.045) 18px 19px);
+            opacity: 0.8;
+        }
+
+        .app-hero-inner {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .app-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 2.2rem;
+            line-height: 1.05;
+            font-weight: 900;
+        }
+
+        .app-kicker {
+            margin: 0 0 0.45rem;
+            color: var(--teal);
+            font-size: 0.82rem;
+            font-weight: 800;
+        }
+
+        .app-subtitle {
+            margin: 0.45rem 0 0;
+            max-width: 720px;
+            color: #c8d6d1;
+            font-size: 0.98rem;
+        }
+
+        .hero-chip {
+            border-radius: var(--radius);
+            border: 1px solid rgba(255,176,32,0.34);
+            background: rgba(255,176,32,0.10);
+            color: #ffe5ad;
+            padding: 0.72rem 0.9rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            background:
+                linear-gradient(180deg, rgba(18,24,25,0.94), rgba(10,13,14,0.92)),
+                var(--panel);
+            border: 1px solid rgba(25,230,176,0.23);
+            border-radius: var(--radius);
+            box-shadow: 0 16px 42px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.055);
+        }
+
+        .match-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.95fr);
+            gap: 1rem;
+            align-items: start;
+            padding: 0.15rem 0 0.35rem;
+        }
+
+        .match-meta {
+            color: var(--muted);
+            font-size: 0.83rem;
+            margin-bottom: 0.45rem;
+        }
+
+        .match-title {
+            color: var(--text);
+            font-size: 1.62rem;
+            line-height: 1.16;
+            margin: 0;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .match-summary {
+            color: #c9d7d1;
+            margin: 0.85rem 0 0;
+            font-size: 0.98rem;
+            line-height: 1.55;
+        }
+
+        .metric-stack {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+
+        .neo-metric {
+            min-height: 86px;
+            border-radius: var(--radius);
+            border: 1px solid var(--line-soft);
+            background:
+                linear-gradient(180deg, rgba(244,251,247,0.07), rgba(244,251,247,0.025));
+            padding: 0.72rem;
+        }
+
+        .neo-metric-label {
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .neo-metric-value {
+            color: var(--text);
+            font-size: 1.45rem;
+            line-height: 1.12;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .neo-metric-value.accent {
+            color: var(--teal);
+        }
+
+        .prob-strip {
+            margin-top: 0.8rem;
+        }
+
+        .prob-track {
+            display: flex;
+            height: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(244,251,247,0.08);
+            border: 1px solid rgba(244,251,247,0.08);
+        }
+
+        .prob-segment {
+            height: 100%;
+        }
+
+        .prob-legend {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.45rem;
+            margin-top: 0.45rem;
+        }
+
+        .prob-item {
+            color: #cbd8d4;
+            font-size: 0.78rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            margin-right: 0.32rem;
+            vertical-align: 1px;
+        }
+
+        div.stButton > button {
+            min-height: 2.55rem;
+            border-radius: var(--radius);
+            border: 1px solid rgba(25,230,176,0.38);
+            background:
+                linear-gradient(135deg, rgba(25,230,176,0.95), rgba(98,216,255,0.78));
+            color: #06100d;
+            font-weight: 900;
+            box-shadow: 0 8px 24px rgba(25,230,176,0.18);
+        }
+
+        div.stButton > button:hover {
+            border-color: rgba(255,176,32,0.68);
+            color: #06100d;
+            box-shadow: 0 10px 30px rgba(255,176,32,0.16);
+        }
+
+        [data-baseweb="input"] {
+            border-radius: var(--radius);
+            border: 1px solid rgba(244,251,247,0.13);
+            background: rgba(244,251,247,0.055);
+        }
+
+        [data-baseweb="input"] input {
+            color: var(--text);
+        }
+
+        [data-baseweb="radio"] {
+            border-radius: var(--radius);
+            padding: 0.18rem 0.25rem;
+        }
+
+        [data-baseweb="radio"] div[aria-checked="true"] {
+            border-color: var(--teal);
+        }
+
+        [data-testid="stExpander"] {
+            border: 1px solid rgba(244,251,247,0.12);
+            border-radius: var(--radius);
+            background: rgba(244,251,247,0.035);
+        }
+
+        [data-testid="stAlert"] {
+            border-radius: var(--radius);
+            border: 1px solid rgba(25,230,176,0.22);
+            background: rgba(25,230,176,0.08);
+            color: var(--text);
+        }
+
+        [data-testid="stDataFrame"] {
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid rgba(244,251,247,0.12);
+        }
+
+        .section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin: 1.1rem 0 0.85rem;
+        }
+
+        .section-heading h2 {
+            margin: 0;
+            color: var(--text);
+            font-size: 1.45rem;
+            font-weight: 900;
+        }
+
+        .section-pill {
+            border: 1px solid rgba(244,83,138,0.34);
+            background: rgba(244,83,138,0.10);
+            color: #ffd3df;
+            border-radius: var(--radius);
+            padding: 0.42rem 0.62rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 0.7rem;
+            margin: 0.8rem 0 1rem;
+        }
+
+        .status-card {
+            border-radius: var(--radius);
+            border: 1px solid rgba(244,251,247,0.12);
+            background: rgba(244,251,247,0.045);
+            padding: 0.85rem;
+        }
+
+        .status-name {
+            color: var(--muted);
+            font-size: 0.78rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .status-ok {
+            color: var(--teal);
+            font-weight: 900;
+        }
+
+        .status-missing {
+            color: var(--amber);
+            font-weight: 900;
+        }
+
+        @media (max-width: 760px) {
+            .main .block-container {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+                padding-top: 1rem;
+            }
+
+            .app-hero-inner,
+            .match-hero {
+                grid-template-columns: 1fr;
+            }
+
+            .app-title {
+                font-size: 1.7rem;
+            }
+
+            .metric-stack {
+                grid-template-columns: 1fr;
+            }
+
+            .prob-legend {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-chip {
+                width: fit-content;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_login_header() -> None:
+    st.markdown(
+        """
+        <div class="app-hero">
+            <div class="app-hero-inner">
+                <div>
+                    <p class="app-kicker">Private model console</p>
+                    <h1 class="app-title">Football Betting Predictor</h1>
+                    <p class="app-subtitle">Accesso protetto</p>
+                </div>
+                <div class="hero-chip">LOCKED</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_app_header(page: str) -> None:
+    st.markdown(
+        f"""
+        <div class="app-hero">
+            <div class="app-hero-inner">
+                <div>
+                    <p class="app-kicker">{escape(page)}</p>
+                    <h1 class="app-title">Football Betting Predictor</h1>
+                    <p class="app-subtitle">Probabilita, value e segnali partita in un cockpit personale.</p>
+                </div>
+                <div class="hero-chip">MODEL READY</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def init_session_state() -> None:
@@ -91,7 +520,6 @@ def init_session_state() -> None:
 
 def render_config() -> None:
     cfg = settings()
-    st.subheader("Stato configurazione")
     rows = [
         ("Gemini", cfg.has_gemini),
         ("API-Football", cfg.has_api_football),
@@ -99,8 +527,20 @@ def render_config() -> None:
         ("Supabase", cfg.has_supabase),
         ("Password app", bool(cfg.app_password)),
     ]
+    render_section_heading("Stato configurazione", "runtime")
+    status_cards = []
     for name, ok in rows:
-        st.write(f"{name}: {'OK' if ok else 'mancante'}")
+        class_name = "status-ok" if ok else "status-missing"
+        label = "OK" if ok else "mancante"
+        status_cards.append(
+            f"""
+            <div class="status-card">
+                <div class="status-name">{escape(name)}</div>
+                <div class="{class_name}">{label}</div>
+            </div>
+            """
+        )
+    st.markdown(f'<div class="status-grid">{"".join(status_cards)}</div>', unsafe_allow_html=True)
     st.write(f"Modello Gemini: `{cfg.gemini_model}`")
     st.info("Le chiavi non vengono mostrate. Se qualcosa risulta mancante, controlla .env o Streamlit secrets.")
 
@@ -131,7 +571,7 @@ def render_predictions(target_date: date, worldcup_only: bool) -> None:
             st.caption("Per i Mondiali prova dall'11 giugno 2026 in avanti.")
         return
 
-    st.subheader(f"Pronostici del {target_date.isoformat()}")
+    render_section_heading(f"Pronostici del {target_date.isoformat()}", f"{len(predictions)} match")
     for prediction in predictions:
         render_prediction_card(prediction)
 
@@ -148,20 +588,13 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
     match = prediction.match
     with st.container(border=True):
         top = max((pick for pick in prediction.picks if pick.market == "1X2"), key=lambda p: p.average_probability)
-        cols = st.columns([2.2, 1, 1, 1])
-        cols[0].subheader(match.label)
-        cols[0].caption(f"{match.competition} | {match.stage or 'fase non specificata'}")
-        cols[1].metric("Pick", top.selection)
-        cols[2].metric("Prob. media", f"{top.average_probability:.1%}")
-        cols[3].metric("Confidenza", prediction.confidence)
-
-        st.write(prediction.summary)
+        render_match_header(prediction, top)
         render_gemini_probability_button(base_prediction, prediction, prediction_key)
         manual_odds = render_manual_odds_inputs(prediction)
         if not any(pick.market_odd for pick in prediction.picks) and not manual_odds:
             st.info(
                 "Quote bookmaker non disponibili da fonti gratuite per questa partita. "
-                "La tabella mostra quote medie; il value betting e' valutabile solo inserendo quote reali."
+                "La tabella mostra quote medie; value betting sospeso senza quote reali."
             )
         render_market_table(prediction.picks, manual_odds)
 
@@ -204,6 +637,83 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
                     st.warning(warning)
 
 
+def render_section_heading(title: str, pill: str) -> None:
+    st.markdown(
+        f"""
+        <div class="section-heading">
+            <h2>{escape(title)}</h2>
+            <div class="section-pill">{escape(pill)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_match_header(prediction: MatchPrediction, top: MarketPick) -> None:
+    match = prediction.match
+    one_x_two = [pick for pick in prediction.picks if pick.market == "1X2"]
+    probability_strip = render_probability_strip(one_x_two)
+    summary = escape(prediction.summary)
+    stage = escape(match.stage or "fase non specificata")
+    competition = escape(match.competition)
+    title = escape(match.label)
+    pick = escape(top.selection)
+    confidence = escape(prediction.confidence)
+    probability = f"{top.average_probability:.1%}"
+    st.markdown(
+        f"""
+        <div class="match-hero">
+            <div>
+                <div class="match-meta">{competition} | {stage}</div>
+                <h2 class="match-title">{title}</h2>
+                <p class="match-summary">{summary}</p>
+                {probability_strip}
+            </div>
+            <div class="metric-stack">
+                <div class="neo-metric">
+                    <div class="neo-metric-label">Pick</div>
+                    <div class="neo-metric-value accent">{pick}</div>
+                </div>
+                <div class="neo-metric">
+                    <div class="neo-metric-label">Prob. media</div>
+                    <div class="neo-metric-value">{probability}</div>
+                </div>
+                <div class="neo-metric">
+                    <div class="neo-metric-label">Confidenza</div>
+                    <div class="neo-metric-value">{confidence}</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_probability_strip(picks: list[MarketPick]) -> str:
+    if len(picks) < 3:
+        return ""
+    segments = []
+    labels = []
+    total = sum(max(0.0, pick.average_probability) for pick in picks) or 1
+    for index, pick in enumerate(picks[:3]):
+        color = APP_ACCENT_COLORS[index % len(APP_ACCENT_COLORS)]
+        width = max(4.0, min(100.0, pick.average_probability / total * 100))
+        label = escape(pick.selection)
+        probability = f"{pick.average_probability:.1%}"
+        segments.append(
+            f'<div class="prob-segment" style="width:{width:.2f}%; background:{color};"></div>'
+        )
+        labels.append(
+            f'<div class="prob-item"><span class="dot" style="background:{color};"></span>{label} {probability}</div>'
+        )
+    return (
+        '<div class="prob-strip">'
+        f'<div class="prob-track">{"".join(segments)}</div>'
+        f'<div class="prob-legend">{"".join(labels)}</div>'
+        '</div>'
+    )
+
+
 def render_gemini_probability_button(
     base_prediction: MatchPrediction,
     displayed_prediction: MatchPrediction,
@@ -224,9 +734,9 @@ def render_gemini_probability_button(
         st.session_state.setdefault("llm_predictions", {})[prediction_key] = enriched_prediction
         st.rerun()
     if has_model_probability:
-        col_hint.caption("Probabilita modello salvata per questa partita. Clicca per aggiornarla.")
+        col_hint.caption("Analisi Gemini salvata.")
     else:
-        col_hint.caption("Gemini non parte in automatico: clicca solo sulla partita che vuoi analizzare.")
+        col_hint.caption("Gemini non calcolato.")
 
 
 def _prediction_cache_key(prediction: MatchPrediction) -> str:
@@ -276,7 +786,7 @@ def render_manual_odds_inputs(prediction: MatchPrediction) -> dict[str, float]:
     key_prefix = f"manual_odds_{match.id}".replace(" ", "_").replace("/", "_")
     manual: dict[str, float] = {}
     with st.expander("Inserisci quote bookmaker manuali"):
-        st.caption("Opzionale: inserisci quote decimali reali 1X2 per calcolare value. Non vengono salvate.")
+        st.caption("Quote decimali reali 1X2. Non vengono salvate.")
         col_home, col_draw, col_away = st.columns(3)
         home_odd = col_home.number_input(
             match.home_team,
