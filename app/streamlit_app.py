@@ -21,6 +21,7 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
+SESSION_SCHEMA_VERSION = "gemini-on-demand-v2"
 
 
 def settings():
@@ -54,6 +55,7 @@ def load_predictions(target_date: date, worldcup_only: bool) -> tuple[list[Match
 def main() -> None:
     if not require_login():
         return
+    init_session_state()
 
     st.title("Football Betting Predictor")
     st.caption("Analisi betting personale: probabilita, value, news e warning dati.")
@@ -68,6 +70,7 @@ def main() -> None:
         if refresh:
             load_predictions.clear()
             st.session_state.pop("llm_predictions", None)
+            st.session_state.pop("llm_requested_predictions", None)
 
     if page == "Config":
         render_config()
@@ -75,6 +78,16 @@ def main() -> None:
         render_manual_prediction()
     else:
         render_predictions(target_date, worldcup_only=page == "Mondiali 2026")
+
+
+def init_session_state() -> None:
+    if st.session_state.get("session_schema_version") == SESSION_SCHEMA_VERSION:
+        return
+    load_predictions.clear()
+    st.session_state["session_schema_version"] = SESSION_SCHEMA_VERSION
+    st.session_state.pop("llm_predictions", None)
+    st.session_state.pop("llm_requested_predictions", None)
+    st.session_state.pop("manual_prediction", None)
 
 
 def render_config() -> None:
@@ -89,6 +102,7 @@ def render_config() -> None:
     ]
     for name, ok in rows:
         st.write(f"{name}: {'OK' if ok else 'mancante'}")
+    st.write(f"Modello Gemini: `{cfg.gemini_model}`")
     st.info("Le chiavi non vengono mostrate. Se qualcosa risulta mancante, controlla .env o Streamlit secrets.")
 
 
@@ -124,11 +138,14 @@ def render_predictions(target_date: date, worldcup_only: bool) -> None:
 
 
 def render_prediction_card(prediction: MatchPrediction) -> None:
+    base_prediction = _without_gemini_output(prediction)
     prediction_key = _prediction_cache_key(prediction)
-    cached_prediction = st.session_state.get("llm_predictions", {}).get(prediction_key)
-    base_prediction = prediction
-    if cached_prediction:
+    requested = bool(st.session_state.get("llm_requested_predictions", {}).get(prediction_key))
+    cached_prediction = st.session_state.get("llm_predictions", {}).get(prediction_key) if requested else None
+    if requested and cached_prediction:
         prediction = cached_prediction
+    else:
+        prediction = base_prediction
 
     match = prediction.match
     with st.container(border=True):
@@ -202,6 +219,7 @@ def render_gemini_probability_button(
         prediction_to_enrich = deepcopy(base_prediction)
         with st.spinner(f"Calcolo Gemini per {prediction_to_enrich.match.label}..."):
             enriched_prediction = service.enrich_prediction_with_gemini(prediction_to_enrich)
+        st.session_state.setdefault("llm_requested_predictions", {})[prediction_key] = True
         st.session_state.setdefault("llm_predictions", {})[prediction_key] = enriched_prediction
         st.rerun()
     if has_model_probability:
@@ -221,6 +239,23 @@ def _prediction_cache_key(prediction: MatchPrediction) -> str:
         ]
     )
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def _without_gemini_output(prediction: MatchPrediction) -> MatchPrediction:
+    clean = deepcopy(prediction)
+    for pick in clean.picks:
+        pick.llm_probability = None
+    clean.llm_summary = None
+    clean.news_signals = []
+    clean.warnings = [warning for warning in clean.warnings if "gemini" not in warning.lower()]
+    one_x_two = [pick for pick in clean.picks if pick.market == "1X2"]
+    if one_x_two:
+        top = max(one_x_two, key=lambda pick: pick.probability)
+        clean.summary = (
+            f"Pick principale statistico: {top.selection} al {top.probability:.1%}. "
+            f"Risultato esatto statistico stimato: {clean.exact_score}."
+        )
+    return clean
 
 
 def render_manual_odds_inputs(prediction: MatchPrediction) -> dict[str, float]:
