@@ -15,7 +15,6 @@ class ResultSummary:
     match: str
     score: str
     winner: str
-    outcome: str
 
     def as_row(self) -> dict[str, str]:
         return {
@@ -23,7 +22,6 @@ class ResultSummary:
             "Partita": self.match,
             "Risultato": self.score,
             "Vincitore": self.winner,
-            "Esito": self.outcome,
         }
 
 
@@ -155,7 +153,7 @@ class HistoricalStatsBuilder:
             goals_for = int(row["home_score"] if is_home else row["away_score"])
             goals_against = int(row["away_score"] if is_home else row["home_score"])
             self._add_team_result(stats, goals_for, goals_against)
-            stats.results.append(self._team_result_summary(row, team, is_home, goals_for, goals_against))
+            stats.results.append(self._team_result_summary(row))
         return stats
 
     def _h2h_stats(self, home: str, away: str, n: int) -> HeadToHeadStats:
@@ -175,7 +173,7 @@ class HistoricalStatsBuilder:
             stats.over25 += int(home_goals + away_goals >= 3)
             stats.btts += int(home_goals > 0 and away_goals > 0)
             stats.score_counts[(home_goals, away_goals)] += 1
-            stats.results.append(self._h2h_result_summary(row, home, away, same_order, home_goals, away_goals))
+            stats.results.append(self._h2h_result_summary(row, same_order))
             if home_goals > away_goals:
                 stats.home_wins += 1
             elif home_goals == away_goals:
@@ -203,57 +201,35 @@ class HistoricalStatsBuilder:
     @staticmethod
     def _team_result_summary(
         row: dict[str, Any],
-        team: str,
-        is_home: bool,
-        goals_for: int,
-        goals_against: int,
     ) -> ResultSummary:
         home_team = str(row["home_team"])
         away_team = str(row["away_team"])
         home_score = int(row["home_score"])
         away_score = int(row["away_score"])
         winner = _winner_label(home_team, away_team, home_score, away_score)
-        if goals_for > goals_against:
-            outcome = "V"
-        elif goals_for == goals_against:
-            outcome = "N"
-        else:
-            outcome = "P"
         return ResultSummary(
             date=str(row["date"]),
             match=f"{home_team} vs {away_team}",
             score=f"{home_score}-{away_score}",
             winner=winner,
-            outcome=f"{outcome} {team}",
         )
 
     @staticmethod
     def _h2h_result_summary(
         row: dict[str, Any],
-        home: str,
-        away: str,
         same_order: bool,
-        home_goals: int,
-        away_goals: int,
     ) -> ResultSummary:
         source_home = str(row["home_team"])
         source_away = str(row["away_team"])
         source_home_score = int(row["home_score"])
         source_away_score = int(row["away_score"])
         winner = _winner_label(source_home, source_away, source_home_score, source_away_score)
-        if home_goals > away_goals:
-            outcome = f"V {home}"
-        elif home_goals == away_goals:
-            outcome = "N"
-        else:
-            outcome = f"V {away}"
         order_note = "" if same_order else " (ordine invertito)"
         return ResultSummary(
             date=str(row["date"]),
             match=f"{source_home} vs {source_away}{order_note}",
             score=f"{source_home_score}-{source_away_score}",
             winner=winner,
-            outcome=outcome,
         )
 
     @staticmethod

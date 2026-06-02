@@ -49,7 +49,7 @@ def compact_text_report(prediction: MatchPrediction) -> str:
             for row in rows[:5]:
                 lines.append(
                     f"  {row['Data']} | {row['Partita']} | {row['Risultato']} | "
-                    f"vincitore: {row['Vincitore']} | esito: {row['Esito']}"
+                    f"vincitore: {row['Vincitore']}"
                 )
     if prediction.warnings:
         lines.append("")

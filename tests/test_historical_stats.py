@@ -122,4 +122,4 @@ def test_historical_stats_builder():
     assert "Gol fatti" in stats.notes[0]
     assert "H2H" in stats.notes[2]
     h2h_rows = stats.result_tables("Germany", "Italy")["Scontri diretti"]
-    assert list(h2h_rows[0].keys()) == ["Data", "Partita", "Risultato", "Vincitore", "Esito"]
+    assert list(h2h_rows[0].keys()) == ["Data", "Partita", "Risultato", "Vincitore"]

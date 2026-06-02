@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date, datetime
+from datetime import date
 import hashlib
 from html import escape
 from pathlib import Path
@@ -17,13 +17,15 @@ import streamlit as st
 
 from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
 from config.settings import load_settings
+from features.backtest import BacktestReport
 from features.market_features import fair_odd, recommendation, value_score
+from features.team_strength import canonical_team_name
 from services.predictor import PredictionService
 from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "home-competitions-v5"
+SESSION_SCHEMA_VERSION = "calendar-backtest-v6"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
 VIEW_OPTIONS = ["Home", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
@@ -55,6 +57,12 @@ def require_login() -> bool:
 def load_predictions(target_date: date, competition_keys: tuple[str, ...]) -> tuple[list[MatchPrediction], list[str]]:
     service = PredictionService(settings())
     return service.predictions_for_date(target_date, competition_keys=competition_keys)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_backtest_report(target_date: date) -> BacktestReport:
+    service = PredictionService(settings())
+    return service.backtest_national_model(target_date)
 
 
 def main() -> None:
@@ -606,6 +614,64 @@ def render_global_styles() -> None:
             font-weight: 900;
         }
 
+        .backtest-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.7rem;
+            margin: 0.75rem 0 0.85rem;
+        }
+
+        .backtest-card {
+            border-radius: var(--radius);
+            border: 1px solid rgba(25,230,176,0.22);
+            background:
+                linear-gradient(180deg, rgba(244,251,247,0.065), rgba(244,251,247,0.025));
+            padding: 0.85rem;
+            min-height: 148px;
+        }
+
+        .backtest-market {
+            color: var(--teal);
+            font-size: 0.78rem;
+            font-weight: 900;
+            margin-bottom: 0.55rem;
+        }
+
+        .backtest-score {
+            color: var(--text);
+            font-size: 1.7rem;
+            line-height: 1.05;
+            font-weight: 950;
+        }
+
+        .backtest-label {
+            color: var(--muted);
+            font-size: 0.76rem;
+            margin-top: 0.24rem;
+        }
+
+        .backtest-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-top: 0.42rem;
+            color: #cbd8d4;
+            font-size: 0.78rem;
+        }
+
+        .backtest-badge {
+            width: fit-content;
+            max-width: 100%;
+            margin-top: 0.7rem;
+            border-radius: var(--radius);
+            border: 1px solid rgba(255,176,32,0.30);
+            background: rgba(255,176,32,0.08);
+            color: #ffe1a6;
+            padding: 0.28rem 0.42rem;
+            font-size: 0.72rem;
+            font-weight: 850;
+        }
+
         .control-panel-title {
             color: var(--teal);
             font-size: 0.78rem;
@@ -663,6 +729,10 @@ def render_global_styles() -> None:
                 grid-template-columns: 1fr;
             }
 
+            .backtest-grid {
+                grid-template-columns: 1fr;
+            }
+
             .hero-chip {
                 width: fit-content;
             }
@@ -713,11 +783,10 @@ def init_session_state() -> None:
     if st.session_state.get("session_schema_version") == SESSION_SCHEMA_VERSION:
         return
     load_predictions.clear()
+    load_backtest_report.clear()
     st.session_state["session_schema_version"] = SESSION_SCHEMA_VERSION
     st.session_state.setdefault("control_page", "Home")
     st.session_state.setdefault("control_date", date.today())
-    st.session_state.setdefault("control_date_text", date.today().isoformat())
-    st.session_state.setdefault("control_date_error", "")
     st.session_state.setdefault("selected_competitions", ["worldcup"])
     st.session_state.pop("llm_predictions", None)
     st.session_state.pop("llm_requested_predictions", None)
@@ -735,10 +804,12 @@ def render_control_panel() -> tuple[date, tuple[str, ...]]:
             unsafe_allow_html=True,
         )
         col_date, col_competitions = st.columns([0.85, 1.8])
-        col_date.text_input(
+        selected_date = col_date.date_input(
             "Data",
-            key="control_date_text",
-            placeholder="11-06, 2026-06-11 o 11/06/2026",
+            key="control_date",
+            min_value=date(2024, 1, 1),
+            max_value=date(2035, 12, 31),
+            format="YYYY/MM/DD",
         )
         selected_competitions = col_competitions.multiselect(
             "Campionati",
@@ -748,20 +819,10 @@ def render_control_panel() -> tuple[date, tuple[str, ...]]:
             placeholder="Scegli uno o piu campionati",
         )
 
-        parsed_date = _parse_date_text(st.session_state.get("control_date_text", ""))
-        if parsed_date:
-            st.session_state["control_date"] = parsed_date
-            st.session_state["control_date_error"] = ""
-        elif st.session_state.get("control_date_text"):
-            st.session_state["control_date_error"] = "Formato data non valido. Usa YYYY-MM-DD oppure DD/MM/YYYY."
-
-        target_date = st.session_state.get("control_date", date.today())
+        target_date = selected_date if isinstance(selected_date, date) else date.today()
         if "worldcup" in selected_competitions and target_date < WORLD_CUP_START:
             target_date = WORLD_CUP_START
             st.info("Per i Mondiali uso la prima data disponibile: 2026-06-11.")
-
-        if st.session_state.get("control_date_error"):
-            st.warning(st.session_state["control_date_error"])
 
     st.markdown("</div>", unsafe_allow_html=True)
     return target_date, tuple(selected_competitions)
@@ -782,29 +843,6 @@ def _selected_competitions_label(keys: tuple[str, ...]) -> str:
     if len(keys) <= 2:
         return ", ".join(_competition_label(key) for key in keys)
     return f"{len(keys)} campionati"
-
-
-def _parse_date_text(value: str) -> date | None:
-    cleaned = value.strip()
-    if not cleaned:
-        return None
-    for candidate in (cleaned, cleaned.replace("/", "-")):
-        try:
-            return date.fromisoformat(candidate)
-        except ValueError:
-            pass
-    for fmt in ("%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(cleaned, fmt).date()
-        except ValueError:
-            pass
-    for fmt in ("%d/%m", "%d-%m"):
-        try:
-            parsed = datetime.strptime(cleaned, fmt).date()
-            return parsed.replace(year=date.today().year)
-        except ValueError:
-            pass
-    return None
 
 
 def render_config() -> None:
@@ -857,6 +895,9 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
             for error in errors:
                 st.warning(error)
 
+    if "worldcup" in competition_keys:
+        render_backtest_panel(target_date)
+
     if not predictions:
         st.info("Nessuna partita trovata per questa data nelle competizioni configurate.")
         if "worldcup" in competition_keys:
@@ -867,6 +908,55 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
     render_section_heading(f"Pronostici del {target_date.isoformat()}", f"{len(predictions)} match | {competition_label}")
     for prediction in predictions:
         render_prediction_card(prediction)
+
+
+def render_backtest_panel(target_date: date) -> None:
+    with st.spinner("Misuro affidabilita modello sullo storico nazionale..."):
+        report = load_backtest_report(target_date)
+
+    render_section_heading("Affidabilita modello", f"{report.samples} partite storiche")
+    if not report.markets:
+        for note in report.notes:
+            st.info(note)
+        return
+
+    cards = []
+    for market in report.markets:
+        cards.append(
+            f"""
+            <div class="backtest-card">
+                <div class="backtest-market">{escape(market.market)}</div>
+                <div class="backtest-score">{market.hit_rate:.1%}</div>
+                <div class="backtest-label">hit-rate reale</div>
+                <div class="backtest-row"><span>Prob. media pick</span><strong>{market.avg_probability:.1%}</strong></div>
+                <div class="backtest-row"><span>Brier</span><strong>{market.brier_score:.3f}</strong></div>
+                <div class="backtest-row"><span>Gap calibrazione</span><strong>{market.calibration_gap:.1%}</strong></div>
+                <div class="backtest-badge">{escape(market.reliability)}</div>
+            </div>
+            """
+        )
+    st.markdown(f'<div class="backtest-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+    metrics_rows = [
+        {
+            "Mercato": market.market,
+            "Campione": market.samples,
+            "Hit-rate": f"{market.hit_rate:.1%}",
+            "Prob. media pick": f"{market.avg_probability:.1%}",
+            "Gap calibrazione": f"{market.calibration_gap:.1%}",
+            "Brier": f"{market.brier_score:.3f}",
+            "Affidabilita": market.reliability,
+        }
+        for market in report.markets
+    ]
+    with st.expander("Dettaglio backtest", expanded=False):
+        st.caption(f"Periodo campione: {report.start_date} -> {report.end_date}. Gemini non viene usato.")
+        st.dataframe(pd.DataFrame(metrics_rows), hide_index=True, width="stretch")
+        if report.recent_rows:
+            st.markdown("**Ultime partite verificate**")
+            st.dataframe(pd.DataFrame(report.recent_rows), hide_index=True, width="stretch")
+        for note in report.notes:
+            st.write(f"- {note}")
 
 
 def render_prediction_card(prediction: MatchPrediction) -> None:
@@ -1101,12 +1191,12 @@ def render_form_board(prediction: MatchPrediction) -> str:
 def _form_row(team_name: str, rows: list[dict[str, str]]) -> str:
     chips = []
     for row in rows:
-        outcome = str(row.get("Esito", "")).strip().upper()
-        if outcome.startswith("V"):
-            class_name, label = "win", "V"
-        elif outcome.startswith("N"):
+        winner = str(row.get("Vincitore", "")).strip()
+        if winner == "Pareggio":
             class_name, label = "draw", "N"
-        elif outcome.startswith("P"):
+        elif canonical_team_name(winner) == canonical_team_name(team_name):
+            class_name, label = "win", "V"
+        elif winner:
             class_name, label = "loss", "P"
         else:
             class_name, label = "draw", "-"

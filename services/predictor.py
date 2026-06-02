@@ -10,6 +10,7 @@ from data_sources.international_results import InternationalResultsClient
 from data_sources.national_elo import NationalEloClient
 from data_sources.openligadb import OpenLigaDBClient
 from data_sources.rss_italian_news import ItalianRssNewsClient
+from features.backtest import BacktestReport, HistoricalBacktester
 from features.historical_stats import HistoricalStatsBuilder, frame_is_usable
 from models.ensemble import EnsemblePredictor
 from nlp.gemini_client import GeminiClient
@@ -34,6 +35,7 @@ class PredictionService:
         self.news_extractor = NewsSignalExtractor(self.gemini)
         self.llm_probability = LLMMarketProbabilityEstimator(self.gemini)
         self.predictor = EnsemblePredictor()
+        self.backtester = HistoricalBacktester(self.predictor)
         self.sqlite_storage = SQLiteStorage(settings.sqlite_path)
         self.supabase_storage = SupabaseStorage(settings)
 
@@ -72,6 +74,10 @@ class PredictionService:
             away_team=away,
         )
         return self.predictor.predict(match)
+
+    def backtest_national_model(self, target_date: date, max_matches: int = 160) -> BacktestReport:
+        frame = self.international_results.load(target_date)
+        return self.backtester.run(frame, max_matches=max_matches)
 
     def enrich_prediction_with_gemini(self, prediction: MatchPrediction) -> MatchPrediction:
         if not self.settings.has_gemini:
