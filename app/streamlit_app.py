@@ -29,9 +29,9 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "calendar-compat-v8"
+SESSION_SCHEMA_VERSION = "gigi-v9"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
-VIEW_OPTIONS = ["Home", "Jarvis", "Predict manuale", "Config"]
+VIEW_OPTIONS = ["Home", "GiGi", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
 
 
@@ -71,6 +71,7 @@ def main() -> None:
     if not require_login():
         return
     init_session_state()
+    apply_pending_navigation()
 
     with st.sidebar:
         st.markdown('<div class="side-title">Filtro</div>', unsafe_allow_html=True)
@@ -84,13 +85,25 @@ def main() -> None:
     render_app_header(page)
     if page == "Config":
         render_config()
-    elif page == "Jarvis":
+    elif page == "GiGi":
         render_jarvis_page()
     elif page == "Predict manuale":
         render_manual_prediction()
     else:
         target_date, competition_keys = render_control_panel()
         render_predictions(target_date, competition_keys)
+
+
+def apply_pending_navigation() -> None:
+    next_page = st.session_state.pop("pending_control_page", None)
+    if next_page in VIEW_OPTIONS:
+        st.session_state["control_page"] = next_page
+    current_page = st.session_state.get("control_page", "Home")
+    if current_page in {"Jarvis", "GIGI"}:
+        current_page = "GiGi"
+    if current_page not in VIEW_OPTIONS:
+        current_page = "Home"
+    st.session_state["control_page"] = current_page
 
 
 def render_global_styles() -> None:
@@ -617,6 +630,34 @@ def render_global_styles() -> None:
             font-weight: 900;
         }
 
+        .gigi-message {
+            border-radius: var(--radius);
+            border: 1px solid rgba(244,251,247,0.10);
+            background: rgba(244,251,247,0.045);
+            padding: 0.7rem;
+            margin: 0.45rem 0;
+            color: #d9e7e2;
+            font-size: 0.88rem;
+            line-height: 1.45;
+        }
+
+        .gigi-message.gigi-user {
+            border-color: rgba(25,230,176,0.26);
+            background: rgba(25,230,176,0.075);
+        }
+
+        .gigi-message.gigi-assistant {
+            border-color: rgba(98,216,255,0.24);
+            background: rgba(98,216,255,0.065);
+        }
+
+        .gigi-role {
+            color: var(--teal);
+            font-size: 0.72rem;
+            font-weight: 900;
+            margin-bottom: 0.22rem;
+        }
+
         .control-panel-title {
             color: var(--teal);
             font-size: 0.78rem;
@@ -826,8 +867,8 @@ def render_jarvis_page() -> None:
     prediction = st.session_state.get("jarvis_prediction")
     prediction_key = st.session_state.get("jarvis_prediction_key", "")
     if not prediction:
-        render_section_heading("Jarvis", "nessuna partita")
-        st.info("Apri Jarvis dal pulsante dentro una scheda partita.")
+        render_section_heading("GiGi", "nessuna partita")
+        st.info("Apri GiGi dal pulsante dentro una scheda partita.")
         return
 
     messages = st.session_state.setdefault("jarvis_messages", [])
@@ -839,57 +880,90 @@ def render_jarvis_page() -> None:
         ),
         "",
     )
-    render_jarvis_console(prediction, last_answer)
 
-    col_back, col_match = st.columns([0.75, 2.4])
-    if col_back.button("Torna alle partite", key="jarvis_back_home"):
-        st.session_state["control_page"] = "Home"
-        st.rerun()
-    col_match.caption(f"Contesto attivo: {prediction.match.label}")
+    visual_col, chat_col = st.columns([2.1, 0.95], gap="medium")
+    with visual_col:
+        render_jarvis_console(prediction, last_answer)
 
-    for message in messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
+    with chat_col:
+        render_gigi_side_panel(prediction, messages)
 
-    render_jarvis_audio_input(prediction, prediction_key)
-    question = st.chat_input("Scrivi a Jarvis una domanda su questa partita...")
-    if question:
-        ask_jarvis_text(prediction, question)
+
+def render_gigi_side_panel(prediction: MatchPrediction, messages: list[dict[str, str]]) -> None:
+    with st.container(border=True):
+        st.markdown("### GiGi")
+        st.caption(f"Contesto: {prediction.match.label}")
+        if st.button("Torna alle partite", key="jarvis_back_home"):
+            st.session_state["pending_control_page"] = "Home"
+            st.rerun()
+
+        st.markdown("**Conversazione**")
+        if not messages:
+            st.caption("Registra una domanda oppure scrivila qui sotto.")
+        for message in messages[-10:]:
+            role = "Tu" if message["role"] == "user" else "GiGi"
+            css_class = "gigi-user" if message["role"] == "user" else "gigi-assistant"
+            st.markdown(
+                f"""
+                <div class="gigi-message {css_class}">
+                    <div class="gigi-role">{escape(role)}</div>
+                    <div>{escape(message["content"])}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        render_gigi_audio_input(prediction)
+
+        with st.form("gigi_text_form", clear_on_submit=True):
+            question = st.text_area("Scrivi", placeholder="Es. chi pensi che vincera?", height=92)
+            submitted = st.form_submit_button("Invia a GiGi")
+        if submitted and question.strip():
+            ask_jarvis_text(prediction, question)
+
+
+def render_gigi_audio_input(prediction: MatchPrediction) -> None:
+    if not hasattr(st, "audio_input"):
+        st.caption("Input vocale non disponibile: usa il campo scritto.")
+        return
+
+    st.markdown("**Voce**")
+    audio_key = f"gigi_audio_{prediction.match.id}_{len(st.session_state.get('jarvis_messages', []))}"
+    audio_value = st.audio_input("Parla con GiGi", key=audio_key, label_visibility="collapsed")
+    if audio_value is None:
+        st.caption("Premi il microfono, parla, poi termina: GiGi riceve l'audio automaticamente.")
+        return
+
+    audio_bytes = audio_value.getvalue()
+    if not audio_bytes:
+        return
+    audio_hash = hashlib.sha1(audio_bytes).hexdigest()
+    processed_key = f"gigi_audio_processed_{prediction.match.id}"
+    if st.session_state.get(processed_key) == audio_hash:
+        st.caption("Audio gia inviato.")
+        return
+    st.session_state[processed_key] = audio_hash
+    ask_jarvis_audio(prediction, audio_bytes, getattr(audio_value, "type", None) or "audio/wav")
 
 
 def render_jarvis_open_button(prediction: MatchPrediction, prediction_key: str) -> None:
     col_button, col_hint = st.columns([1.1, 3])
-    if col_button.button("Parla con Jarvis", key=f"jarvis_open_{prediction_key}"):
+    if col_button.button("Parla con GiGi", key=f"jarvis_open_{prediction_key}"):
         if st.session_state.get("jarvis_prediction_key") != prediction_key:
             st.session_state["jarvis_messages"] = []
             st.session_state["jarvis_speech_nonce"] = 0
         st.session_state["jarvis_prediction"] = deepcopy(prediction)
         st.session_state["jarvis_prediction_key"] = prediction_key
-        st.session_state["control_page"] = "Jarvis"
+        st.session_state["pending_control_page"] = "GiGi"
         st.rerun()
-    col_hint.caption("Chatta con Jarvis usando le statistiche di questa partita.")
-
-
-def render_jarvis_audio_input(prediction: MatchPrediction, prediction_key: str) -> None:
-    if not hasattr(st, "audio_input"):
-        st.caption("Input vocale non disponibile in questa versione Streamlit. Da telefono puoi usare il microfono della tastiera nel campo chat.")
-        return
-
-    with st.expander("Parla con Jarvis", expanded=False):
-        st.caption("Registra una domanda breve. Se il modello Gemini non supporta audio, scrivila nella chat.")
-        audio_key = f"jarvis_audio_{prediction_key}_{len(st.session_state.get('jarvis_messages', []))}"
-        audio_value = st.audio_input("Microfono", key=audio_key)
-        if audio_value is not None and st.button("Invia audio a Jarvis", key=f"{audio_key}_send"):
-            audio_bytes = audio_value.getvalue()
-            mime_type = getattr(audio_value, "type", None) or "audio/wav"
-            ask_jarvis_audio(prediction, audio_bytes, mime_type)
+    col_hint.caption("Chatta con GiGi usando le statistiche di questa partita.")
 
 
 def ask_jarvis_text(prediction: MatchPrediction, question: str) -> None:
     messages = st.session_state.setdefault("jarvis_messages", [])
     messages.append({"role": "user", "content": question})
     assistant = JarvisAssistant(GeminiClient(settings()))
-    with st.spinner("Jarvis sta analizzando la partita..."):
+    with st.spinner("GiGi sta analizzando la partita..."):
         reply = assistant.answer_text(prediction, question)
     messages.append({"role": "assistant", "content": reply.answer})
     for warning in reply.warnings:
@@ -902,7 +976,7 @@ def ask_jarvis_audio(prediction: MatchPrediction, audio_bytes: bytes, mime_type:
     messages = st.session_state.setdefault("jarvis_messages", [])
     messages.append({"role": "user", "content": "Domanda vocale registrata."})
     assistant = JarvisAssistant(GeminiClient(settings()))
-    with st.spinner("Jarvis sta ascoltando e analizzando..."):
+    with st.spinner("GiGi sta ascoltando e analizzando..."):
         reply = assistant.answer_audio(prediction, audio_bytes, mime_type)
     messages.append({"role": "assistant", "content": reply.answer})
     for warning in reply.warnings:
@@ -926,9 +1000,9 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
                 <small>{competition}</small>
             </div>
             <div class="hud-panel top-right">
-                <div class="hud-title">JARVIS OS</div>
+                <div class="hud-title">GiGi OS</div>
                 <div>voice synthesis: online</div>
-                <div>match context: locked</div>
+                <div>speech input: browser</div>
             </div>
             <div class="jarvis-core" id="jarvis-core">
                 <div class="ring r1"></div>
@@ -936,7 +1010,8 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
                 <div class="triangle"></div>
                 <div class="pulse"></div>
             </div>
-            <button class="speak-button" onclick="speakJarvis()">Ascolta Jarvis</button>
+            <button class="voice-unlock" id="voice-unlock" onclick="enableGigiVoice()">Attiva voce GiGi</button>
+            <div class="voice-status" id="voice-status">microfono nel pannello GiGi</div>
             <div class="wave-row">
                 <span></span><span></span><span></span><span></span><span></span><span></span>
                 <span></span><span></span><span></span><span></span><span></span><span></span>
@@ -945,7 +1020,8 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
         <style>
             .jarvis-stage {{
                 position: relative;
-                height: 330px;
+                height: 690px;
+                min-height: 68vh;
                 overflow: hidden;
                 border-radius: 8px;
                 border: 1px solid rgba(98,216,255,.35);
@@ -977,8 +1053,10 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
                 position: absolute;
                 inset: 0;
                 margin: auto;
-                width: 176px;
-                height: 176px;
+                width: min(34vw, 260px);
+                height: min(34vw, 260px);
+                min-width: 190px;
+                min-height: 190px;
                 border-radius: 50%;
                 display: grid;
                 place-items: center;
@@ -991,15 +1069,14 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
                 border: 2px solid rgba(98,216,255,.82);
                 box-shadow: inset 0 0 28px rgba(98,216,255,.22), 0 0 24px rgba(98,216,255,.28);
             }}
-            .r1 {{ animation: spin 8s linear infinite; border-style: dashed; }}
-            .r2 {{ inset: 22px; animation: spinReverse 5.5s linear infinite; border-color: rgba(25,230,176,.78); }}
+            .r1 {{ border-style: dashed; }}
+            .r2 {{ inset: 22px; border-color: rgba(25,230,176,.78); }}
             .triangle {{
                 width: 76px;
                 height: 76px;
                 background: linear-gradient(180deg, rgba(98,216,255,.95), rgba(25,230,176,.25));
                 clip-path: polygon(50% 5%, 95% 92%, 5% 92%);
                 box-shadow: 0 0 35px rgba(98,216,255,.8);
-                animation: breathe 1.35s ease-in-out infinite;
             }}
             .pulse {{
                 position: absolute;
@@ -1007,14 +1084,27 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
                 height: 118px;
                 border-radius: 50%;
                 border: 1px solid rgba(255,255,255,.3);
-                animation: pulse 1.8s ease-out infinite;
+                opacity: .32;
             }}
+            .jarvis-core.speaking .r1 {{ animation: spin 8s linear infinite; }}
+            .jarvis-core.speaking .r2 {{ animation: spinReverse 5.5s linear infinite; }}
             .jarvis-core.speaking .triangle {{ animation: talk 280ms ease-in-out infinite; }}
             .jarvis-core.speaking .pulse {{ animation: pulse 520ms ease-out infinite; }}
-            .speak-button {{
+            .voice-status {{
                 position: absolute;
                 left: 50%;
-                bottom: 28px;
+                bottom: 42px;
+                transform: translateX(-50%);
+                color: rgba(223,249,255,.72);
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 0;
+                text-align: center;
+            }}
+            .voice-unlock {{
+                position: absolute;
+                left: 50%;
+                bottom: 72px;
                 transform: translateX(-50%);
                 border: 1px solid rgba(25,230,176,.5);
                 border-radius: 8px;
@@ -1024,11 +1114,16 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
                 padding: 10px 14px;
                 cursor: pointer;
             }}
+            .voice-unlock.enabled {{
+                background: rgba(25,230,176,.10);
+                color: #19e6b0;
+                border-color: rgba(25,230,176,.25);
+            }}
             .wave-row {{
                 position: absolute;
                 left: 24px;
                 right: 24px;
-                bottom: 86px;
+                bottom: 122px;
                 display: flex;
                 gap: 7px;
                 justify-content: center;
@@ -1039,10 +1134,11 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
                 height: 18px;
                 border-radius: 999px;
                 background: #62d8ff;
-                animation: wave 1.05s ease-in-out infinite;
+                transform: scaleY(.45);
             }}
             .wave-row span:nth-child(2n) {{ animation-delay: .12s; background: #19e6b0; }}
             .wave-row span:nth-child(3n) {{ animation-delay: .22s; height: 26px; }}
+            .jarvis-stage.speaking .wave-row span {{ animation: wave 1.05s ease-in-out infinite; }}
             @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
             @keyframes spinReverse {{ to {{ transform: rotate(-360deg); }} }}
             @keyframes breathe {{ 0%,100% {{ transform: scale(.96); }} 50% {{ transform: scale(1.04); }} }}
@@ -1053,27 +1149,91 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
         <script>
             const jarvisText = {speech_json};
             const jarvisNonce = {nonce};
+            const stage = document.querySelector(".jarvis-stage");
             const core = document.getElementById("jarvis-core");
+            const voiceStatus = document.getElementById("voice-status");
+            const voiceUnlock = document.getElementById("voice-unlock");
+            const voiceEnabledKey = "gigi_voice_enabled";
+            function pickItalianVoice() {{
+                const voices = window.speechSynthesis.getVoices() || [];
+                return voices.find(v => v.lang === "it-IT" && /Microsoft|Google|Elsa|Isabella|Diego/i.test(v.name))
+                    || voices.find(v => v.lang === "it-IT")
+                    || voices.find(v => v.lang && v.lang.startsWith("it"))
+                    || null;
+            }}
             function speakJarvis() {{
                 if (!jarvisText || !("speechSynthesis" in window)) return;
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(jarvisText);
                 utterance.lang = "it-IT";
-                utterance.rate = 1.02;
-                utterance.pitch = .82;
-                utterance.onstart = () => core.classList.add("speaking");
-                utterance.onend = () => core.classList.remove("speaking");
-                utterance.onerror = () => core.classList.remove("speaking");
+                utterance.rate = 1.16;
+                utterance.pitch = .96;
+                utterance.volume = 1;
+                const voice = pickItalianVoice();
+                if (voice) utterance.voice = voice;
+                utterance.onstart = () => {{
+                    core.classList.add("speaking");
+                    stage.classList.add("speaking");
+                    voiceStatus.textContent = "GiGi sta parlando";
+                }};
+                const stopSpeaking = () => {{
+                    core.classList.remove("speaking");
+                    stage.classList.remove("speaking");
+                    voiceStatus.textContent = window.localStorage.getItem(voiceEnabledKey) === "1"
+                        ? "voce attiva: microfono nel pannello GiGi"
+                        : "premi Attiva voce GiGi";
+                }};
+                utterance.onend = stopSpeaking;
+                utterance.onerror = (event) => {{
+                    stopSpeaking();
+                    voiceStatus.textContent = "audio bloccato: premi Attiva voce GiGi";
+                    voiceUnlock.classList.remove("enabled");
+                    voiceUnlock.textContent = "Attiva voce GiGi";
+                    window.localStorage.removeItem(voiceEnabledKey);
+                }};
                 window.speechSynthesis.speak(utterance);
             }}
+            function markVoiceEnabled() {{
+                window.localStorage.setItem(voiceEnabledKey, "1");
+                voiceUnlock.classList.add("enabled");
+                voiceUnlock.textContent = "Voce attiva";
+                voiceStatus.textContent = "voce attiva: le risposte partiranno da sole";
+            }}
+            function enableGigiVoice() {{
+                if (!("speechSynthesis" in window)) {{
+                    voiceStatus.textContent = "sintesi vocale non supportata dal browser";
+                    return;
+                }}
+                markVoiceEnabled();
+                if (jarvisText) {{
+                    speakJarvis();
+                    return;
+                }}
+                const unlock = new SpeechSynthesisUtterance("Voce attiva.");
+                unlock.lang = "it-IT";
+                unlock.rate = 1.16;
+                unlock.pitch = .96;
+                const voice = pickItalianVoice();
+                if (voice) unlock.voice = voice;
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(unlock);
+            }}
+            if (window.localStorage.getItem(voiceEnabledKey) === "1") {{
+                markVoiceEnabled();
+            }}
             const autoKey = "jarvis_spoken_" + jarvisNonce;
-            if (jarvisText && jarvisNonce && !window.sessionStorage.getItem(autoKey)) {{
+            if (jarvisText && jarvisNonce && window.localStorage.getItem(voiceEnabledKey) === "1" && !window.sessionStorage.getItem(autoKey)) {{
                 window.sessionStorage.setItem(autoKey, "1");
-                setTimeout(speakJarvis, 450);
+                if (window.speechSynthesis.getVoices().length) {{
+                    setTimeout(speakJarvis, 250);
+                }} else {{
+                    window.speechSynthesis.onvoiceschanged = () => setTimeout(speakJarvis, 250);
+                    setTimeout(speakJarvis, 900);
+                }}
             }}
         </script>
         """,
-        height=360,
+        height=720,
         scrolling=False,
     )
 
@@ -1386,12 +1546,12 @@ def render_gemini_probability_button(
     prediction_key: str,
 ) -> None:
     has_model_probability = any(pick.llm_probability is not None for pick in displayed_prediction.picks)
-    button_label = "Ricalcola probabilita Gemini" if has_model_probability else "Calcola probabilita Gemini"
+    button_label = "Ricalcola probabilita" if has_model_probability else "Calcola probabilita"
     col_button, col_hint = st.columns([1.1, 3])
     if col_button.button(button_label, key=f"gemini_{prediction_key}"):
         service = PredictionService(settings())
         prediction_to_enrich = deepcopy(base_prediction)
-        with st.spinner(f"Calcolo Gemini per {prediction_to_enrich.match.label}..."):
+        with st.spinner(f"Calcolo probabilita per {prediction_to_enrich.match.label}..."):
             enriched_prediction = service.enrich_prediction_with_gemini(prediction_to_enrich)
         if not service.save_cached_gemini_prediction(prediction_key, enriched_prediction) and any(
             pick.llm_probability is not None for pick in enriched_prediction.picks
@@ -1400,9 +1560,9 @@ def render_gemini_probability_button(
         st.session_state.setdefault("llm_predictions", {})[prediction_key] = enriched_prediction
         st.rerun()
     if has_model_probability:
-        col_hint.caption("Analisi Gemini salvata.")
+        col_hint.caption("Analisi salvata.")
     else:
-        col_hint.caption("Gemini non calcolato.")
+        col_hint.caption("Probabilita non calcolata.")
 
 
 def _prediction_cache_key(prediction: MatchPrediction) -> str:

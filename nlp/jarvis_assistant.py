@@ -27,7 +27,7 @@ class JarvisAssistant:
         try:
             answer = self.gemini.generate_text(prompt)
         except Exception as exc:
-            return JarvisReply(_fallback_answer(prediction), [f"Jarvis Gemini non disponibile: {exc}"])
+            return JarvisReply(_fallback_answer(prediction), [f"GiGi Gemini non disponibile: {exc}"])
         return JarvisReply(answer.strip() or _fallback_answer(prediction))
 
     def answer_audio(self, prediction: MatchPrediction, audio_bytes: bytes, mime_type: str) -> JarvisReply:
@@ -37,7 +37,7 @@ class JarvisAssistant:
             return JarvisReply(_fallback_answer(prediction), ["Gemini non configurato: audio non trascrivibile."])
 
         prompt = (
-            "Trascrivi mentalmente la domanda audio dell'utente e rispondi come Jarvis in italiano. "
+            "Trascrivi mentalmente la domanda audio dell'utente e rispondi come GiGi in italiano. "
             "Usa solo il contesto partita qui sotto. Se il dato richiesto non esiste, dillo chiaramente.\n\n"
             f"{_prediction_context(prediction)}"
         )
@@ -46,14 +46,14 @@ class JarvisAssistant:
         except Exception as exc:
             return JarvisReply(
                 "Non riesco a interpretare questo audio con il modello attuale. Scrivimi la domanda in chat.",
-                [f"Audio Jarvis non disponibile: {exc}"],
+                [f"Audio GiGi non disponibile: {exc}"],
             )
         return JarvisReply(answer.strip() or "Ho ricevuto l'audio, ma non ho ottenuto una risposta utile.")
 
 
 def _jarvis_prompt(prediction: MatchPrediction, question: str) -> str:
     return (
-        "Sei Jarvis, assistente personale per analisi calcistica e betting responsabile.\n"
+        "Sei GiGi, assistente personale per analisi calcistica e betting responsabile.\n"
         "Rispondi in italiano, tono sicuro ma non assoluto, massimo 8-10 righe.\n"
         "Usa SOLO i dati della partita forniti. Non inventare infortuni, quote reali o notizie non presenti.\n"
         "Se l'utente chiede una quota consigliata, dai una soglia minima coerente con la probabilita/fair odd del modello, "
@@ -61,7 +61,7 @@ def _jarvis_prompt(prediction: MatchPrediction, question: str) -> str:
         "Se la domanda riguarda tiri o angoli, usa i mercati tiri/angoli stimati e ricorda che hanno confidenza bassa.\n\n"
         f"{_prediction_context(prediction)}\n\n"
         f"Domanda utente: {question}\n"
-        "Risposta Jarvis:"
+        "Risposta GiGi:"
     )
 
 
@@ -137,7 +137,7 @@ def _fallback_answer(prediction: MatchPrediction) -> str:
         return "Non ho abbastanza dati per dare un parere su questa partita."
     fair = 1 / top.average_probability if top.average_probability else 0
     return (
-        f"Jarvis offline: dal modello statistico il pick principale e' {top.selection} "
+        f"GiGi offline: dal modello statistico il pick principale e' {top.selection} "
         f"al {top.average_probability:.1%}. Quota fair circa {fair:.2f}. "
         f"Risultato esatto stimato: {prediction.exact_score}. "
         "Usa questa lettura come supporto probabilistico, non come certezza."
