@@ -74,8 +74,7 @@ class LLMMarketProbabilityEstimator:
             for row in rows:
                 lines.append(
                     f"- {row.get('Data', '')}: {row.get('Partita', '')} "
-                    f"{row.get('Risultato', '')}, vincitore {row.get('Vincitore', '')}, "
-                    f"esito {row.get('Esito', '')}"
+                    f"{row.get('Risultato', '')}, vincitore {row.get('Vincitore', '')}"
                 )
         return "\n".join(lines) or "Nessun risultato storico disponibile."
 
