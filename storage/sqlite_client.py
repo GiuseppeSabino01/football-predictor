@@ -183,3 +183,49 @@ class SQLiteStorage:
                     json.dumps(payload),
                 ),
             )
+
+    def insert_worldcup_simulation(self, run_id: str, generated_at: str, label: str, model: str, payload: dict) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                insert into worldcup_simulation_runs (
+                    run_id, generated_at, label, model, payload_json
+                )
+                values (?, ?, ?, ?, ?)
+                on conflict(run_id) do update set
+                    generated_at=excluded.generated_at,
+                    label=excluded.label,
+                    model=excluded.model,
+                    payload_json=excluded.payload_json
+                """,
+                (run_id, generated_at, label, model, json.dumps(payload)),
+            )
+
+    def list_worldcup_simulations(self, limit: int = 8) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                select run_id, generated_at, label, model, payload_json
+                from worldcup_simulation_runs
+                order by generated_at desc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+        simulations: list[dict] = []
+        for run_id, generated_at, label, model, payload_json in rows:
+            try:
+                payload = json.loads(payload_json)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                simulations.append(
+                    {
+                        "run_id": run_id,
+                        "generated_at": generated_at,
+                        "label": label,
+                        "model": model,
+                        "payload": payload,
+                    }
+                )
+        return simulations

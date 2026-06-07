@@ -13,7 +13,7 @@ from features.market_features import (
 )
 from features.news_features import apply_news_adjustments
 from features.team_strength import blend_probabilities, rating_based_1x2
-from models.poisson import both_teams_to_score, exact_score, over_under_25, score_matrix
+from models.poisson import both_teams_to_score, exact_score_for_outcome, over_under_25, score_matrix
 from models.shots_model import ShotsModel
 from schemas import MarketPick, Match, MatchPrediction, NewsSignal
 
@@ -95,15 +95,17 @@ class EnsemblePredictor:
             warnings.append("Nessun segnale news concreto estratto dalle fonti italiane disponibili.")
 
         top = max((pick for pick in picks if pick.market == "1X2"), key=lambda p: p.probability)
+        top_outcome = max(probs, key=probs.get)
+        predicted_score = exact_score_for_outcome(matrix, top_outcome)
         summary = (
             f"Pick principale: {top.selection} al {top.probability:.1%}. "
-            f"Risultato esatto stimato: {exact_score(matrix)}."
+            f"Risultato esatto stimato: {predicted_score}."
         )
         return MatchPrediction(
             match=match,
             generated_at=datetime.now(timezone.utc),
             picks=picks,
-            exact_score=exact_score(matrix),
+            exact_score=predicted_score,
             confidence=confidence,
             summary=summary,
             news_signals=news_signals,
@@ -140,12 +142,26 @@ class EnsemblePredictor:
 
         home = stats.home_recent
         away = stats.away_recent
+        home_level = stats.home_vs_away_level
+        away_level = stats.away_vs_home_level
         h2h = stats.h2h
-        home_xg = (home.avg_goals_for * 0.45) + (away.avg_goals_against * 0.35)
-        away_xg = (away.avg_goals_for * 0.45) + (home.avg_goals_against * 0.35)
+        recent_home_xg = (home.avg_goals_for * 0.45) + (away.avg_goals_against * 0.35)
+        recent_away_xg = (away.avg_goals_for * 0.45) + (home.avg_goals_against * 0.35)
+        home_xg = recent_home_xg
+        away_xg = recent_away_xg
+
+        if home_level.matches >= 2 or away_level.matches >= 2:
+            similar_home_xg = home_level.avg_goals_for if home_level.matches else recent_home_xg
+            if away_level.matches:
+                similar_home_xg = (similar_home_xg * 0.58) + (away_level.avg_goals_against * 0.42)
+            similar_away_xg = away_level.avg_goals_for if away_level.matches else recent_away_xg
+            if home_level.matches:
+                similar_away_xg = (similar_away_xg * 0.58) + (home_level.avg_goals_against * 0.42)
+            home_xg = (home_xg * 0.42) + (similar_home_xg * 0.58)
+            away_xg = (away_xg * 0.42) + (similar_away_xg * 0.58)
 
         if h2h.matches >= 2 and h2h.avg_home_goals is not None and h2h.avg_away_goals is not None:
-            h2h_weight = min(0.25, 0.08 + h2h.matches * 0.025)
+            h2h_weight = min(0.46, 0.18 + h2h.matches * 0.055)
             home_xg = (home_xg * (1 - h2h_weight)) + (h2h.avg_home_goals * h2h_weight)
             away_xg = (away_xg * (1 - h2h_weight)) + (h2h.avg_away_goals * h2h_weight)
 
@@ -158,8 +174,11 @@ class EnsemblePredictor:
         if away.conceded_rate >= 0.80:
             home_xg += 0.10
         form_edge = (home.points_per_game - away.points_per_game) / 3
-        home_xg += form_edge * 0.22
-        away_xg -= form_edge * 0.22
+        similar_edge = 0.0
+        if home_level.matches and away_level.matches:
+            similar_edge = (home_level.points_per_game - away_level.points_per_game) / 3
+        home_xg += (form_edge * 0.13) + (similar_edge * 0.22)
+        away_xg -= (form_edge * 0.13) + (similar_edge * 0.22)
 
         return max(0.25, min(3.8, home_xg)), max(0.25, min(3.8, away_xg))
 

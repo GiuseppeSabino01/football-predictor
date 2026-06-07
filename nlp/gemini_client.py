@@ -42,20 +42,26 @@ class GeminiClient:
         return self._extract_text(payload).strip()
 
     def _generate_content(self, parts: list[dict[str, Any]]) -> dict[str, Any]:
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{self.settings.gemini_model}:generateContent"
-        )
-        response = requests.post(
-            url,
-            params={"key": self.settings.gemini_api_key},
-            json={"contents": [{"parts": parts}]},
-            timeout=self.settings.request_timeout_seconds,
-            verify=self.settings.verify_ssl,
-        )
-        if response.status_code >= 400:
-            raise RuntimeError(f"Gemini error {response.status_code}: {response.text[:240]}")
-        return response.json()
+        errors: list[str] = []
+        for model in self.settings.gemini_fallback_models:
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent"
+            )
+            response = requests.post(
+                url,
+                params={"key": self.settings.gemini_api_key},
+                json={"contents": [{"parts": parts}]},
+                timeout=self.settings.request_timeout_seconds,
+                verify=self.settings.verify_ssl,
+            )
+            if response.status_code < 400:
+                return response.json()
+            errors.append(f"{model}: {response.status_code}")
+            if response.status_code not in {400, 403, 404, 429, 503}:
+                break
+        detail = "; ".join(errors) or "nessun modello tentato"
+        raise RuntimeError(f"Gemini error: {detail}")
 
     @staticmethod
     def _extract_text(payload: dict[str, Any]) -> str:

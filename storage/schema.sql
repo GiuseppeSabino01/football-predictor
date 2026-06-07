@@ -56,3 +56,11 @@ create table if not exists llm_prediction_cache (
     generated_at text not null,
     payload_json text not null
 );
+
+create table if not exists worldcup_simulation_runs (
+    run_id text primary key,
+    generated_at text not null,
+    label text not null,
+    model text not null,
+    payload_json text not null
+);

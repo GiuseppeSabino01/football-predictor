@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date
+from datetime import date, datetime
 import hashlib
 import inspect
 import json
 from html import escape
 from pathlib import Path
 import sys
+from typing import Any
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -25,13 +26,14 @@ from features.team_strength import canonical_team_name
 from nlp.gemini_client import GeminiClient
 from nlp.jarvis_assistant import JarvisAssistant
 from services.predictor import PredictionService
+from services.worldcup_simulator import KNOCKOUT_SOURCE_URL, SCHEDULE_SOURCE_URL, WorldCupSimulator
 from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
 SESSION_SCHEMA_VERSION = "gigi-v9"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
-VIEW_OPTIONS = ["Home", "GiGi", "Predict manuale", "Config"]
+VIEW_OPTIONS = ["Home", "Road To New York", "GiGi", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
 
 
@@ -85,6 +87,8 @@ def main() -> None:
     render_app_header(page)
     if page == "Config":
         render_config()
+    elif page == "Road To New York":
+        render_road_to_new_york()
     elif page == "GiGi":
         render_jarvis_page()
     elif page == "Predict manuale":
@@ -682,6 +686,452 @@ def render_global_styles() -> None:
             display: none;
         }
 
+        .road-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: var(--radius);
+            border: 1px solid rgba(98,216,255,0.34);
+            background:
+                radial-gradient(circle at 18% 28%, rgba(25,230,176,0.30), transparent 26%),
+                radial-gradient(circle at 82% 24%, rgba(244,83,138,0.22), transparent 28%),
+                linear-gradient(135deg, rgba(8,10,11,0.92), rgba(14,22,24,0.96));
+            box-shadow: 0 22px 70px rgba(0,0,0,0.42), inset 0 0 60px rgba(98,216,255,0.08);
+            padding: 1.05rem;
+            margin: 0.2rem 0 1rem;
+        }
+
+        .road-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(90deg, rgba(98,216,255,0.10) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(25,230,176,0.08) 1px, transparent 1px);
+            background-size: 52px 52px;
+            opacity: 0.45;
+        }
+
+        .road-hero-inner {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.3fr) minmax(230px, 0.7fr);
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .road-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 2rem;
+            line-height: 1.04;
+            font-weight: 950;
+        }
+
+        .road-subtitle {
+            color: #cde8e2;
+            margin: 0.5rem 0 0;
+            line-height: 1.5;
+        }
+
+        .road-cup {
+            min-height: 140px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(255,176,32,0.28);
+            background:
+                conic-gradient(from 180deg, rgba(255,176,32,0.18), rgba(25,230,176,0.16), rgba(98,216,255,0.14), rgba(244,83,138,0.16), rgba(255,176,32,0.18));
+            display: grid;
+            place-items: center;
+            text-align: center;
+            animation: cupGlow 4.8s ease-in-out infinite;
+        }
+
+        .road-cup-team {
+            color: #fff6db;
+            font-size: 1.35rem;
+            font-weight: 950;
+            line-height: 1.1;
+            padding: 0.7rem;
+        }
+
+        .road-cup-label {
+            color: rgba(255,246,219,0.72);
+            font-size: 0.78rem;
+            font-weight: 850;
+            margin-bottom: 0.3rem;
+        }
+
+        .road-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.65rem;
+            margin: 0.75rem 0 1rem;
+        }
+
+        .road-metric {
+            border-radius: var(--radius);
+            border: 1px solid rgba(244,251,247,0.11);
+            background: linear-gradient(180deg, rgba(244,251,247,0.07), rgba(244,251,247,0.025));
+            padding: 0.8rem;
+        }
+
+        .road-metric span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.74rem;
+            font-weight: 800;
+            margin-bottom: 0.25rem;
+        }
+
+        .road-metric strong {
+            color: var(--text);
+            font-size: 1.05rem;
+            overflow-wrap: anywhere;
+        }
+
+        .road-bracket {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(190px, 1fr));
+            gap: 0.7rem;
+            overflow-x: auto;
+            padding: 0.2rem 0 0.7rem;
+        }
+
+        .road-bracket-classic {
+            display: grid;
+            grid-template-columns:
+                minmax(230px, 230px) minmax(230px, 230px) minmax(230px, 230px) minmax(230px, 230px)
+                minmax(250px, 250px)
+                minmax(230px, 230px) minmax(230px, 230px) minmax(230px, 230px) minmax(230px, 230px);
+            gap: 1.35rem;
+            overflow-x: auto;
+            padding: 0.35rem 0.2rem 1.1rem;
+            align-items: stretch;
+            scroll-padding-left: 1rem;
+        }
+
+        .road-bracket-shell {
+            border-radius: var(--radius);
+            border: 1px solid rgba(98,216,255,0.18);
+            background:
+                linear-gradient(90deg, rgba(25,230,176,0.06), transparent 16%, transparent 84%, rgba(244,83,138,0.06)),
+                rgba(244,251,247,0.018);
+            padding: 0.75rem;
+            overflow: hidden;
+        }
+
+        .road-bracket-hint {
+            color: var(--muted);
+            font-size: 0.74rem;
+            margin: 0 0 0.5rem;
+        }
+
+        .road-round {
+            min-width: 230px;
+            display: block;
+        }
+
+        .road-round-body {
+            --card-h: 128px;
+            --pair-gap: 1.15rem;
+            --pair-block-gap: 1.7rem;
+            display: grid;
+            gap: var(--pair-block-gap);
+            padding-top: 0.75rem;
+        }
+
+        .road-round.depth-1 .road-round-body {
+            padding-top: calc((var(--card-h) + var(--pair-gap)) / 2);
+            gap: calc((var(--card-h) * 2) + var(--pair-gap) + (var(--pair-block-gap) * 2));
+        }
+
+        .road-round.depth-2 .road-round-body {
+            padding-top: calc(((var(--card-h) * 3) + (var(--pair-gap) * 2) + var(--pair-block-gap)) / 2);
+            gap: calc((var(--card-h) * 5) + (var(--pair-gap) * 3) + (var(--pair-block-gap) * 5));
+        }
+
+        .road-round.depth-3 .road-round-body {
+            padding-top: calc(((var(--card-h) * 7) + (var(--pair-gap) * 4) + (var(--pair-block-gap) * 3)) / 2);
+            gap: 0;
+        }
+
+        .road-round-title {
+            color: var(--cyan);
+            font-size: 0.78rem;
+            font-weight: 950;
+            text-transform: uppercase;
+            letter-spacing: 0;
+            border-bottom: 1px solid rgba(98,216,255,0.24);
+            padding-bottom: 0.35rem;
+        }
+
+        .road-round.side-right .road-round-title {
+            text-align: right;
+        }
+
+        .road-pair {
+            position: relative;
+            display: grid;
+            gap: var(--pair-gap);
+        }
+
+        .road-round.depth-2 .road-pair {
+            gap: calc((var(--card-h) * 2) + var(--pair-gap) + (var(--pair-block-gap) * 2));
+        }
+
+        .road-pair::after {
+            content: "";
+            position: absolute;
+            top: calc(var(--card-h) / 2);
+            bottom: calc(var(--card-h) / 2);
+            width: 1px;
+            background: linear-gradient(180deg, rgba(98,216,255,0.10), rgba(98,216,255,0.58), rgba(98,216,255,0.10));
+            box-shadow: 0 0 12px rgba(98,216,255,0.20);
+        }
+
+        .road-round.side-left .road-pair::after {
+            right: -1.35rem;
+        }
+
+        .road-round.side-right .road-pair::after {
+            left: -1.35rem;
+        }
+
+        .road-pair.single::after {
+            display: none;
+        }
+
+        .road-card {
+            position: relative;
+            overflow: visible;
+            border-radius: var(--radius);
+            border: 1px solid rgba(244,251,247,0.12);
+            background: linear-gradient(180deg, rgba(20,29,31,0.96), rgba(8,10,11,0.96));
+            padding: 0.7rem;
+            height: var(--card-h);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .road-card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--teal);
+            box-shadow: 0 0 18px rgba(25,230,176,0.60);
+        }
+
+        .road-round.side-right .road-card::before {
+            left: auto;
+            right: 0;
+        }
+
+        .road-card::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 1.35rem;
+            height: 1px;
+            background: rgba(98,216,255,0.28);
+        }
+
+        .road-round.side-left .road-card::after {
+            right: -1.35rem;
+        }
+
+        .road-round.side-right .road-card::after {
+            left: -1.35rem;
+        }
+
+        .road-card.final-card::before {
+            background: var(--amber);
+            box-shadow: 0 0 22px rgba(255,176,32,0.60);
+        }
+
+        .road-final-column {
+            min-width: 250px;
+            display: grid;
+            align-content: center;
+            gap: 0.85rem;
+            position: relative;
+            padding-top: 7rem;
+        }
+
+        .road-final-column::before {
+            content: "";
+            position: absolute;
+            top: 2.6rem;
+            bottom: 1rem;
+            left: 50%;
+            width: 1px;
+            background: linear-gradient(180deg, transparent, rgba(255,176,32,0.45), transparent);
+        }
+
+        .road-final-title {
+            position: relative;
+            z-index: 1;
+            color: #ffe5ad;
+            text-align: center;
+            font-size: 0.78rem;
+            font-weight: 950;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,176,32,0.24);
+            border-radius: var(--radius);
+            background: rgba(255,176,32,0.10);
+            padding: 0.5rem;
+        }
+
+        .road-final-column .road-card {
+            z-index: 1;
+            border-color: rgba(255,176,32,0.28);
+            box-shadow: 0 0 36px rgba(255,176,32,0.08);
+        }
+
+        .road-final-column .road-card::after {
+            display: none;
+        }
+
+        .road-match-no {
+            color: var(--muted);
+            font-size: 0.72rem;
+            font-weight: 850;
+            margin-bottom: 0.35rem;
+        }
+
+        .road-source {
+            color: rgba(98,216,255,0.92);
+            font-size: 0.66rem;
+            font-weight: 760;
+            letter-spacing: 0;
+            margin: -0.12rem 0 0.38rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .road-team-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.55rem;
+            color: var(--text);
+            font-size: 0.88rem;
+            font-weight: 850;
+            line-height: 1.25;
+            margin: 0.2rem 0;
+            min-width: 0;
+        }
+
+        .road-team-row span:first-child {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .road-team-row.winner {
+            color: var(--teal);
+        }
+
+        .road-score {
+            color: #dcece7;
+            white-space: nowrap;
+        }
+
+        .road-resolution {
+            color: var(--muted);
+            font-size: 0.72rem;
+            margin-top: 0.42rem;
+            line-height: 1.35;
+        }
+
+        .road-history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 0.6rem;
+            margin: 0.5rem 0 0.9rem;
+        }
+
+        .road-history-card {
+            border-radius: var(--radius);
+            border: 1px solid rgba(98,216,255,0.18);
+            background: rgba(98,216,255,0.055);
+            padding: 0.72rem;
+        }
+
+        .road-history-card b {
+            color: var(--cyan);
+        }
+
+        .road-group-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 0.95rem;
+        }
+
+        .road-group-card {
+            border-radius: var(--radius);
+            border: 1px solid rgba(244,251,247,0.12);
+            background: linear-gradient(180deg, rgba(244,251,247,0.055), rgba(244,251,247,0.025));
+            padding: 0.78rem;
+        }
+
+        .road-group-title {
+            color: var(--teal);
+            font-size: 0.86rem;
+            font-weight: 950;
+            margin-bottom: 0.5rem;
+        }
+
+        .road-mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+
+        .road-mini-table th,
+        .road-mini-table td {
+            padding: 0.32rem 0.28rem;
+            border-bottom: 1px solid rgba(244,251,247,0.08);
+            color: #d9e7e2;
+            text-align: right;
+        }
+
+        .road-mini-table th:first-child,
+        .road-mini-table td:first-child {
+            text-align: left;
+        }
+
+        .road-mini-table th {
+            color: var(--muted);
+            font-size: 0.68rem;
+            font-weight: 850;
+        }
+
+        .road-mini-match {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.45rem;
+            color: #cfe0db;
+            font-size: 0.74rem;
+            padding: 0.32rem 0;
+            border-bottom: 1px solid rgba(244,251,247,0.06);
+        }
+
+        .road-mini-match-score {
+            color: var(--amber);
+            font-weight: 900;
+        }
+
+        @keyframes cupGlow {
+            0%, 100% { box-shadow: inset 0 0 26px rgba(255,176,32,0.12), 0 0 20px rgba(25,230,176,0.06); }
+            50% { box-shadow: inset 0 0 44px rgba(255,176,32,0.24), 0 0 34px rgba(98,216,255,0.14); }
+        }
+
         @media (max-width: 760px) {
             .main .block-container {
                 padding-left: 0.75rem;
@@ -713,6 +1163,33 @@ def render_global_styles() -> None:
 
             .viz-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .road-hero-inner {
+                grid-template-columns: 1fr;
+            }
+
+            .road-title {
+                font-size: 1.55rem;
+            }
+
+            .road-bracket {
+                grid-template-columns: repeat(6, minmax(180px, 1fr));
+            }
+
+            .road-bracket-classic {
+                grid-template-columns:
+                    repeat(4, minmax(210px, 210px))
+                    minmax(230px, 230px)
+                    repeat(4, minmax(210px, 210px));
+            }
+
+            .road-round.depth-1,
+            .road-round.depth-2,
+            .road-round.depth-3,
+            .road-final-column {
+                padding-top: 0;
+                gap: 0.55rem;
             }
 
             .hero-chip {
@@ -769,6 +1246,7 @@ def init_session_state() -> None:
     st.session_state.setdefault("control_page", "Home")
     st.session_state.setdefault("control_date", date.today())
     st.session_state.setdefault("selected_competitions", ["worldcup"])
+    st.session_state.setdefault("road_manual_overrides", {})
     st.session_state.pop("llm_predictions", None)
     st.session_state.pop("llm_requested_predictions", None)
     st.session_state.pop("manual_prediction", None)
@@ -1241,6 +1719,453 @@ def render_jarvis_console(prediction: MatchPrediction, last_answer: str) -> None
 def _jarvis_speech_text(answer: str) -> str:
     cleaned = " ".join(answer.replace("Warning:", "").split())
     return cleaned[:900]
+
+
+def render_road_to_new_york() -> None:
+    service = WorldCupSimulator(settings())
+    history = service.list_simulations(12)
+    if "road_payload" not in st.session_state and history:
+        st.session_state["road_payload"] = history[0]["payload"]
+    payload = st.session_state.get("road_payload")
+
+    with st.container(border=True):
+        st.markdown(
+            """
+            <div class="control-panel-title">Road To New York</div>
+            <div class="control-panel-caption">
+                Simula gironi, migliori terze, tabellone ufficiale e vincitore del Mondiale.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        control_a, control_b, control_c, control_d = st.columns([1.1, 1.05, 1.45, 0.9])
+        simulation_engine = control_b.selectbox(
+            "Motore",
+            ["Statistiche", "LLM"],
+            index=0,
+            key="road_simulation_engine",
+            help="Statistiche e' veloce e non consuma token. LLM usa Gemini per stimare i risultati.",
+        )
+        use_llm = simulation_engine == "LLM"
+        if control_a.button("Ricalcola simulazione", type="primary", key="road_recalculate"):
+            spinner_text = (
+                "Simulo gironi, migliori terze e bracket con Gemini..."
+                if use_llm
+                else "Simulo gironi, migliori terze e bracket con modello statistico..."
+            )
+            with st.spinner(spinner_text):
+                payload = service.simulate(
+                    manual_overrides=st.session_state.get("road_manual_overrides", {}),
+                    label=f"Road To New York {simulation_engine}",
+                    save=True,
+                    use_llm=use_llm,
+                )
+            st.session_state["road_payload"] = payload
+            st.rerun()
+
+        selected_run = None
+        if history:
+            row_by_id = {str(row["run_id"]): row for row in history}
+            selected_run = control_c.selectbox(
+                "Versione salvata",
+                list(row_by_id.keys()),
+                format_func=lambda run_id: _road_history_label(row_by_id[str(run_id)]),
+                key="road_selected_run",
+            )
+            if control_d.button("Carica versione", key="road_load_version"):
+                st.session_state["road_payload"] = row_by_id[str(selected_run)]["payload"]
+                st.rerun()
+        else:
+            control_c.caption("Nessuna simulazione salvata.")
+            control_d.caption("Premi ricalcola per crearne una.")
+
+        st.markdown(
+            f"""
+            <div class="road-source">
+                Fonti tabellone: <a href="{KNOCKOUT_SOURCE_URL}" target="_blank">FIFA knockout bracket</a> |
+                <a href="{SCHEDULE_SOURCE_URL}" target="_blank">FIFA match schedule</a>.
+                Con Statistiche non consumi token. Con LLM l'app usa Gemini e, se un modello esaurisce quota,
+                prova i modelli fallback configurati.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if not payload:
+        st.info("Premi `Ricalcola simulazione` per generare il primo Road To New York.")
+        return
+
+    render_road_hero(payload, history)
+    render_road_groups(payload, service)
+    render_road_bracket(payload)
+    render_road_details(payload)
+
+
+def render_road_hero(payload: dict[str, Any], history: list[dict[str, Any]]) -> None:
+    champion = str(payload.get("champion") or "Da simulare")
+    runner_up = str(payload.get("runner_up") or "-")
+    third_place = str(payload.get("third_place") or "-")
+    generated_at = _format_run_datetime(str(payload.get("generated_at", "")))
+    mode = "LLM" if payload.get("simulation_mode") == "llm" else "Statistiche"
+    knockout_count = len(payload.get("knockout") or [])
+    group_count = len(payload.get("groups") or {})
+    st.markdown(
+        f"""
+        <div class="road-hero">
+            <div class="road-hero-inner">
+                <div>
+                    <p class="app-kicker">Road To New York</p>
+                    <h2 class="road-title">Simulazione Mondiale 2026</h2>
+                    <p class="road-subtitle">
+                        Gironi calcolati in tabella, migliori terze ordinate per criteri sportivi,
+                        eliminazione diretta con supplementari e rigori.
+                    </p>
+                </div>
+                <div class="road-cup">
+                    <div>
+                        <div class="road-cup-label">Campione previsto</div>
+                        <div class="road-cup-team">{escape(champion)}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="road-metrics">
+            <div class="road-metric"><span>Finalista</span><strong>{escape(runner_up)}</strong></div>
+            <div class="road-metric"><span>Terzo posto</span><strong>{escape(third_place)}</strong></div>
+            <div class="road-metric"><span>Gironi</span><strong>{group_count}</strong></div>
+            <div class="road-metric"><span>Match knockout</span><strong>{knockout_count}</strong></div>
+            <div class="road-metric"><span>Motore</span><strong>{escape(mode)}</strong></div>
+            <div class="road-metric"><span>Generata</span><strong>{escape(generated_at)}</strong></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if history:
+        render_road_history_average(history)
+
+
+def render_road_history_average(history: list[dict[str, Any]]) -> None:
+    counts: dict[str, int] = {}
+    finalists: dict[str, int] = {}
+    valid_payloads = 0
+    for row in history:
+        payload = row.get("payload") or {}
+        champion = payload.get("champion")
+        runner_up = payload.get("runner_up")
+        if champion:
+            valid_payloads += 1
+            counts[str(champion)] = counts.get(str(champion), 0) + 1
+        for team in (champion, runner_up):
+            if team:
+                finalists[str(team)] = finalists.get(str(team), 0) + 1
+    if not valid_payloads:
+        return
+    champion_rows = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:4]
+    finalist_rows = sorted(finalists.items(), key=lambda item: (-item[1], item[0]))[:4]
+    cards = []
+    for title, rows in (("Previsione media campione", champion_rows), ("Presenza in finale", finalist_rows)):
+        values = "".join(
+            f"<div><b>{escape(team)}</b> - {count}/{valid_payloads}</div>"
+            for team, count in rows
+        )
+        cards.append(f'<div class="road-history-card"><b>{escape(title)}</b>{values}</div>')
+    st.markdown(f'<div class="road-history-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+
+def render_road_groups(payload: dict[str, Any], service: WorldCupSimulator) -> None:
+    groups = payload.get("groups") or {}
+    if not groups:
+        st.warning("Nessun girone disponibile nella simulazione.")
+        return
+
+    render_section_heading("Gironi simulati", "classifiche calcolate")
+    cards = []
+    for group in "ABCDEFGHIJKL":
+        group_payload = groups.get(group)
+        if group_payload:
+            cards.append(_road_group_card(group, group_payload))
+    st.markdown(f'<div class="road-group-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+    with st.expander("Modifica manuale risultati gironi", expanded=False):
+        render_road_manual_editor(payload, service)
+
+    third_rankings = payload.get("third_rankings") or []
+    if third_rankings:
+        with st.expander("Migliori terze", expanded=False):
+            rows = [
+                {
+                    "Rank": row.get("third_rank"),
+                    "Gruppo": row.get("group"),
+                    "Squadra": row.get("team"),
+                    "Pt": row.get("points"),
+                    "GF": row.get("goals_for"),
+                    "GS": row.get("goals_against"),
+                    "DR": row.get("goal_difference"),
+                }
+                for row in third_rankings
+            ]
+            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+
+def _road_group_card(group: str, group_payload: dict[str, Any]) -> str:
+    standings = group_payload.get("standings", [])
+    table_rows = []
+    for row in standings:
+        table_rows.append(
+            "<tr>"
+            f"<td>{int(row.get('position', 0))}. {escape(str(row.get('team', '-')))}</td>"
+            f"<td>{int(row.get('points', 0))}</td>"
+            f"<td>{int(row.get('goals_for', 0))}</td>"
+            f"<td>{int(row.get('goals_against', 0))}</td>"
+            f"<td>{int(row.get('goal_difference', 0)):+d}</td>"
+            "</tr>"
+        )
+    matches = []
+    for row in group_payload.get("matches", []):
+        label = f"{row.get('home_team')} vs {row.get('away_team')}"
+        matches.append(
+            '<div class="road-mini-match">'
+            f'<span>{escape(label)}</span>'
+            f'<span class="road-mini-match-score">{escape(str(row.get("score_90", "-")))}</span>'
+            "</div>"
+        )
+    return (
+        '<div class="road-group-card">'
+        f'<div class="road-group-title">Gruppo {escape(group)}</div>'
+        '<table class="road-mini-table">'
+        "<thead><tr><th>Squadra</th><th>Pt</th><th>GF</th><th>GS</th><th>DR</th></tr></thead>"
+        f"<tbody>{''.join(table_rows)}</tbody>"
+        "</table>"
+        f"<div>{''.join(matches)}</div>"
+        "</div>"
+    )
+
+
+def render_road_manual_editor(payload: dict[str, Any], service: WorldCupSimulator) -> None:
+    rows = _road_manual_rows(payload)
+    if not rows:
+        st.info("Nessuna partita modificabile.")
+        return
+    st.caption("Modifica i gol dei gironi: il bracket viene ricostruito e salvato come nuova versione.")
+    edited = st.data_editor(
+        pd.DataFrame(rows),
+        hide_index=True,
+        use_container_width=True,
+        disabled=["match_id", "Data", "Gruppo", "Partita", "Casa", "Trasferta"],
+        key=f"road_manual_editor_{payload.get('run_id', 'draft')}",
+    )
+    if st.button("Applica modifiche e ricalcola bracket", key="road_apply_manual", type="primary"):
+        overrides = _road_overrides_from_editor(edited)
+        st.session_state["road_manual_overrides"] = overrides
+        use_llm = st.session_state.get("road_simulation_engine", "Statistiche") == "LLM"
+        with st.spinner("Ricalcolo con risultati manuali..."):
+            new_payload = service.simulate(
+                manual_overrides=overrides,
+                label="Road To New York manuale",
+                save=True,
+                use_llm=use_llm,
+            )
+        st.session_state["road_payload"] = new_payload
+        st.rerun()
+
+
+def _road_manual_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for group, group_payload in sorted((payload.get("groups") or {}).items()):
+        for match in group_payload.get("matches", []):
+            rows.append(
+                {
+                    "match_id": match.get("match_id"),
+                    "Data": match.get("date"),
+                    "Gruppo": group,
+                    "Partita": f"{match.get('home_team')} vs {match.get('away_team')}",
+                    "Casa": match.get("home_team"),
+                    "Trasferta": match.get("away_team"),
+                    "Gol casa": int(match.get("home_goals", 0)),
+                    "Gol trasferta": int(match.get("away_goals", 0)),
+                }
+            )
+    return rows
+
+
+def _road_overrides_from_editor(edited: pd.DataFrame) -> dict[str, dict[str, int]]:
+    overrides: dict[str, dict[str, int]] = {}
+    for _, row in edited.iterrows():
+        match_id = str(row.get("match_id") or "")
+        if not match_id:
+            continue
+        overrides[match_id] = {
+            "home_goals": max(0, int(row.get("Gol casa") or 0)),
+            "away_goals": max(0, int(row.get("Gol trasferta") or 0)),
+        }
+    return overrides
+
+
+def render_road_bracket(payload: dict[str, Any]) -> None:
+    knockout = payload.get("knockout") or []
+    if not knockout:
+        st.warning("Bracket non disponibile.")
+        return
+    render_section_heading("Bracket ufficiale simulato", "FIFA 2026")
+    by_round: dict[str, list[dict[str, Any]]] = {}
+    for match in knockout:
+        by_round.setdefault(str(match.get("round", "")), []).append(match)
+    r32 = sorted(
+        by_round.get("Sedicesimi", []) + by_round.get("Trentaduesimi", []),
+        key=lambda item: int(item.get("match_no", 0)),
+    )
+    r16 = sorted(by_round.get("Ottavi", []), key=lambda item: int(item.get("match_no", 0)))
+    qf = sorted(by_round.get("Quarti", []), key=lambda item: int(item.get("match_no", 0)))
+    sf = sorted(by_round.get("Semifinale", []), key=lambda item: int(item.get("match_no", 0)))
+    final = sorted(by_round.get("Finale", []), key=lambda item: int(item.get("match_no", 0)))
+    third = sorted(by_round.get("Terzo posto", []), key=lambda item: int(item.get("match_no", 0)))
+    r32_by_no = {int(match.get("match_no", 0)): match for match in r32}
+    r16_by_no = {int(match.get("match_no", 0)): match for match in r16}
+    qf_by_no = {int(match.get("match_no", 0)): match for match in qf}
+    sf_by_no = {int(match.get("match_no", 0)): match for match in sf}
+
+    left_r32 = _road_matches_in_order(r32_by_no, [74, 77, 73, 75, 83, 84, 81, 82])
+    left_r16 = _road_matches_in_order(r16_by_no, [89, 90, 93, 94])
+    left_qf = _road_matches_in_order(qf_by_no, [97, 98])
+    left_sf = _road_matches_in_order(sf_by_no, [101])
+    right_r32 = _road_matches_in_order(r32_by_no, [76, 78, 79, 80, 86, 88, 85, 87])
+    right_r16 = _road_matches_in_order(r16_by_no, [91, 92, 95, 96])
+    right_qf = _road_matches_in_order(qf_by_no, [99, 100])
+    right_sf = _road_matches_in_order(sf_by_no, [102])
+
+    center_cards = ['<div class="road-final-column"><div class="road-final-title">Finale</div>']
+    if final:
+        center_cards.append(_road_match_card(final[0]))
+    if third:
+        center_cards.append('<div class="road-final-title">Terzo posto</div>')
+        center_cards.append(_road_match_card(third[0]))
+    center_cards.append("</div>")
+
+    html_columns = [
+        _road_round_column("Sedicesimi", left_r32, "left", 0),
+        _road_round_column("Ottavi", left_r16, "left", 1),
+        _road_round_column("Quarti", left_qf, "left", 2),
+        _road_round_column("Semifinale", left_sf, "left", 3),
+        "".join(center_cards),
+        _road_round_column("Semifinale", right_sf, "right", 3),
+        _road_round_column("Quarti", right_qf, "right", 2),
+        _road_round_column("Ottavi", right_r16, "right", 1),
+        _road_round_column("Sedicesimi", right_r32, "right", 0),
+    ]
+    st.markdown(
+        '<div class="road-bracket-shell">'
+        '<div class="road-bracket-hint">Scorri orizzontalmente per vedere tutto il tabellone.</div>'
+        f'<div class="road-bracket-classic">{"".join(html_columns)}</div>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _road_matches_in_order(index: dict[int, dict[str, Any]], order: list[int]) -> list[dict[str, Any]]:
+    ordered = [index[match_no] for match_no in order if match_no in index]
+    used = set(order)
+    ordered.extend(match for match_no, match in sorted(index.items()) if match_no not in used)
+    return ordered
+
+
+def _road_round_column(round_name: str, rows: list[dict[str, Any]], side: str, depth: int) -> str:
+    cards = _road_pair_cards(rows)
+    title = escape(round_name)
+    return (
+        f'<div class="road-round side-{escape(side)} depth-{depth}">'
+        f'<div class="road-round-title">{title}</div>'
+        f'<div class="road-round-body">{cards}</div>'
+        "</div>"
+    )
+
+
+def _road_pair_cards(rows: list[dict[str, Any]]) -> str:
+    pairs = []
+    for index in range(0, len(rows), 2):
+        chunk = rows[index : index + 2]
+        pair_class = "road-pair single" if len(chunk) == 1 else "road-pair"
+        cards = "".join(_road_match_card(row) for row in chunk)
+        pairs.append(f'<div class="{pair_class}">{cards}</div>')
+    return "".join(pairs)
+
+
+def _road_match_card(match: dict[str, Any]) -> str:
+    home = str(match.get("home_team") or "-")
+    away = str(match.get("away_team") or "-")
+    winner = str(match.get("qualified_team") or "")
+    score = str(match.get("score_90") or "-")
+    score_aet = str(match.get("score_aet") or "-")
+    penalties = str(match.get("penalties") or "-")
+    resolution = str(match.get("resolution") or "90")
+    round_name = str(match.get("round") or "")
+    source_a = str(match.get("source_a") or "")
+    source_b = str(match.get("source_b") or "")
+    source_line = ""
+    if source_a or source_b:
+        source_line = f'<div class="road-source">{escape(source_a)} + {escape(source_b)}</div>'
+    details = [f"{escape(resolution)}"]
+    if score_aet != "-":
+        details.append(f"dts {escape(score_aet)}")
+    if penalties != "-":
+        details.append(f"rig {escape(penalties)}")
+    if match.get("venue"):
+        details.append(escape(str(match.get("venue"))))
+    final_class = " final-card" if round_name == "Finale" else ""
+    home_class = " winner" if winner == home else ""
+    away_class = " winner" if winner == away else ""
+    return (
+        f'<div class="road-card{final_class}">'
+        f'<div class="road-match-no">M{int(match.get("match_no", 0)):03d} | {escape(str(match.get("date", "")))}</div>'
+        f"{source_line}"
+        f'<div class="road-team-row{home_class}"><span>{escape(home)}</span><span class="road-score">{escape(score.split("-")[0] if "-" in score else "-")}</span></div>'
+        f'<div class="road-team-row{away_class}"><span>{escape(away)}</span><span class="road-score">{escape(score.split("-")[1] if "-" in score else "-")}</span></div>'
+        f'<div class="road-resolution">{" | ".join(details)}</div>'
+        "</div>"
+    )
+
+
+def render_road_details(payload: dict[str, Any]) -> None:
+    knockout = payload.get("knockout") or []
+    if knockout:
+        with st.expander("Dettaglio partite knockout", expanded=False):
+            rows = [
+                {
+                    "M": match.get("match_no"),
+                    "Round": match.get("round"),
+                    "Partita": f"{match.get('home_team')} vs {match.get('away_team')}",
+                    "90'": match.get("score_90"),
+                    "DTS": match.get("score_aet"),
+                    "Rigori": match.get("penalties"),
+                    "Passa": match.get("qualified_team"),
+                    "Motivo": match.get("reason"),
+                }
+                for match in knockout
+            ]
+            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+    warnings = payload.get("warnings") or []
+    if warnings:
+        with st.expander("Warning simulazione", expanded=False):
+            for warning in warnings:
+                st.warning(warning)
+
+
+def _road_history_label(row: dict[str, Any]) -> str:
+    payload = row.get("payload") or {}
+    champion = payload.get("champion") or "senza campione"
+    mode = "LLM" if payload.get("simulation_mode") == "llm" else "Statistiche"
+    generated_at = _format_run_datetime(str(row.get("generated_at", "")))
+    return f"{generated_at} | {mode} | {champion}"
+
+
+def _format_run_datetime(value: str) -> str:
+    if not value:
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+    return parsed.strftime("%d/%m/%y %H:%M")
 
 
 def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> None:

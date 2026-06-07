@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from features.team_strength import canonical_team_name
+from features.team_strength import FALLBACK_NATIONAL_ELO, canonical_team_name
 
 
 @dataclass(slots=True)
@@ -114,6 +114,8 @@ class HeadToHeadStats:
 class MatchHistoricalStats:
     home_recent: TeamRecentStats
     away_recent: TeamRecentStats
+    home_vs_away_level: TeamRecentStats
+    away_vs_home_level: TeamRecentStats
     h2h: HeadToHeadStats
     notes: list[str]
 
@@ -125,6 +127,8 @@ class MatchHistoricalStats:
         return {
             f"Ultime partite {home_label}": [result.as_row() for result in self.home_recent.results],
             f"Ultime partite {away_label}": [result.as_row() for result in self.away_recent.results],
+            f"{home_label} vs livello {away_label}": [result.as_row() for result in self.home_vs_away_level.results],
+            f"{away_label} vs livello {home_label}": [result.as_row() for result in self.away_vs_home_level.results],
             "Scontri diretti": [result.as_row() for result in self.h2h.results],
         }
 
@@ -135,14 +139,33 @@ class HistoricalStatsBuilder:
         self.results["home_canonical"] = self.results["home_team"].map(canonical_team_name)
         self.results["away_canonical"] = self.results["away_team"].map(canonical_team_name)
 
-    def build(self, home_team: str, away_team: str, recent_n: int = 10, h2h_n: int = 8) -> MatchHistoricalStats:
+    def build(
+        self,
+        home_team: str,
+        away_team: str,
+        recent_n: int = 10,
+        h2h_n: int = 8,
+        team_ratings: dict[str, int] | None = None,
+    ) -> MatchHistoricalStats:
         home = canonical_team_name(home_team)
         away = canonical_team_name(away_team)
+        ranking = _rating_ranking(team_ratings)
         home_recent = self._recent_team_stats(home, recent_n)
         away_recent = self._recent_team_stats(away, recent_n)
+        home_vs_away_level = self._similar_level_stats(home, away, ranking, recent_n)
+        away_vs_home_level = self._similar_level_stats(away, home, ranking, recent_n)
         h2h = self._h2h_stats(home, away, h2h_n)
-        notes = self._notes(home_team, away_team, home_recent, away_recent, h2h)
-        return MatchHistoricalStats(home_recent, away_recent, h2h, notes)
+        notes = self._notes(
+            home_team,
+            away_team,
+            home_recent,
+            away_recent,
+            home_vs_away_level,
+            away_vs_home_level,
+            h2h,
+            ranking,
+        )
+        return MatchHistoricalStats(home_recent, away_recent, home_vs_away_level, away_vs_home_level, h2h, notes)
 
     def _recent_team_stats(self, team: str, n: int) -> TeamRecentStats:
         mask = (self.results["home_canonical"] == team) | (self.results["away_canonical"] == team)
@@ -180,6 +203,38 @@ class HistoricalStatsBuilder:
                 stats.draws += 1
             else:
                 stats.away_wins += 1
+        return stats
+
+    def _similar_level_stats(
+        self,
+        team: str,
+        reference_opponent: str,
+        ranking: dict[str, int],
+        n: int,
+    ) -> TeamRecentStats:
+        reference_rank = ranking.get(reference_opponent)
+        stats = TeamRecentStats(team=team)
+        if reference_rank is None:
+            return stats
+        low, high = _rank_window(reference_rank)
+        mask_team = (self.results["home_canonical"] == team) | (self.results["away_canonical"] == team)
+        rows = self.results[mask_team].sort_values("date", ascending=False)
+        selected = []
+        for row in rows.to_dict("records"):
+            is_home = row["home_canonical"] == team
+            opponent = row["away_canonical"] if is_home else row["home_canonical"]
+            opponent_rank = ranking.get(opponent)
+            if opponent_rank is None or not (low <= opponent_rank <= high):
+                continue
+            selected.append(row)
+            if len(selected) >= n:
+                break
+        for row in selected:
+            is_home = row["home_canonical"] == team
+            goals_for = int(row["home_score"] if is_home else row["away_score"])
+            goals_against = int(row["away_score"] if is_home else row["home_score"])
+            self._add_team_result(stats, goals_for, goals_against)
+            stats.results.append(self._team_result_summary(row))
         return stats
 
     @staticmethod
@@ -238,12 +293,31 @@ class HistoricalStatsBuilder:
         away_label: str,
         home: TeamRecentStats,
         away: TeamRecentStats,
+        home_vs_away_level: TeamRecentStats,
+        away_vs_home_level: TeamRecentStats,
         h2h: HeadToHeadStats,
+        ranking: dict[str, int],
     ) -> list[str]:
         notes = [
             _team_form_note(home_label, home),
             _team_form_note(away_label, away),
         ]
+        notes.append(
+            _similar_level_note(
+                home_label,
+                away_label,
+                home_vs_away_level,
+                ranking.get(canonical_team_name(away_label)),
+            )
+        )
+        notes.append(
+            _similar_level_note(
+                away_label,
+                home_label,
+                away_vs_home_level,
+                ranking.get(canonical_team_name(home_label)),
+            )
+        )
         if h2h.matches:
             notes.append(
                 f"H2H {home_label} vs {away_label}: {h2h.matches} precedenti, "
@@ -286,3 +360,36 @@ def _team_form_note(label: str, stats: TeamRecentStats) -> str:
 
 def _optional_avg(value: float | None) -> str:
     return f"{value:.2f}" if value is not None else "-"
+
+
+def _rating_ranking(ratings: dict[str, int] | None) -> dict[str, int]:
+    merged = dict(FALLBACK_NATIONAL_ELO)
+    if ratings:
+        for team, rating in ratings.items():
+            merged[canonical_team_name(team)] = int(rating)
+    ordered = sorted(merged.items(), key=lambda item: (-item[1], item[0]))
+    return {team: index for index, (team, _) in enumerate(ordered, start=1)}
+
+
+def _rank_window(rank: int, spread: int = 5) -> tuple[int, int]:
+    if rank <= spread:
+        return 1, spread * 2
+    return max(1, rank - spread), rank + spread
+
+
+def _similar_level_note(label: str, opponent_label: str, stats: TeamRecentStats, opponent_rank: int | None) -> str:
+    if opponent_rank is None:
+        return f"{label}: ranking/ELO di riferimento per {opponent_label} non disponibile."
+    low, high = _rank_window(opponent_rank)
+    if not stats.matches:
+        return (
+            f"{label}: nessuna partita recente trovata contro nazionali di fascia simile a {opponent_label} "
+            f"(ranking {opponent_rank}, range {low}-{high})."
+        )
+    return (
+        f"{label} vs nazionali simili a {opponent_label} "
+        f"(ranking {opponent_rank}, range {low}-{high}): ultime {stats.matches}, "
+        f"{stats.wins} vinte, {stats.draws} pareggiate, {stats.losses} perse. "
+        f"Gol fatti {stats.goals_for} ({stats.avg_goals_for:.2f}/partita), "
+        f"gol subiti {stats.goals_against} ({stats.avg_goals_against:.2f}/partita)."
+    )

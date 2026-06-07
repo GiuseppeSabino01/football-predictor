@@ -80,13 +80,16 @@ class OpenLigaDBClient:
         self.settings = settings
 
     def worldcup_matches_for_date(self, target_date: date) -> list[Match]:
-        rows = self._get("/getmatchdata/wm26/2026")
-        matches = [self._parse_match(row) for row in rows]
+        matches = self.worldcup_matches()
         return [
             match
             for match in matches
             if match.match_date.astimezone(self.settings.local_timezone).date() == target_date
         ]
+
+    def worldcup_matches(self) -> list[Match]:
+        rows = self._get("/getmatchdata/wm26/2026")
+        return [self._parse_match(row) for row in rows]
 
     def _get(self, endpoint: str) -> list[dict[str, Any]]:
         response = requests.get(
@@ -103,7 +106,7 @@ class OpenLigaDBClient:
     def _parse_match(row: dict[str, Any]) -> Match:
         team1 = row.get("team1") or {}
         team2 = row.get("team2") or {}
-        group = row.get("matchGroup") or {}
+        group = row.get("matchGroup") or row.get("group") or {}
         raw_date = row.get("matchDateTimeUTC") or row.get("matchDateTime")
         return Match(
             id=f"openligadb-{row.get('matchID')}",

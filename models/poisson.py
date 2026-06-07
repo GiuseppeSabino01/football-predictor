@@ -23,6 +23,21 @@ def exact_score(matrix: dict[tuple[int, int], float]) -> str:
     return f"{home_goals}-{away_goals}"
 
 
+def exact_score_for_outcome(matrix: dict[tuple[int, int], float], outcome: str) -> str:
+    if outcome == "home":
+        candidates = {score: prob for score, prob in matrix.items() if score[0] > score[1]}
+    elif outcome == "away":
+        candidates = {score: prob for score, prob in matrix.items() if score[0] < score[1]}
+    elif outcome == "draw":
+        candidates = {score: prob for score, prob in matrix.items() if score[0] == score[1]}
+    else:
+        candidates = {}
+    if not candidates:
+        return exact_score(matrix)
+    home_goals, away_goals = max(candidates, key=candidates.get)
+    return f"{home_goals}-{away_goals}"
+
+
 def over_under_25(matrix: dict[tuple[int, int], float]) -> dict[str, float]:
     over = sum(prob for (home, away), prob in matrix.items() if home + away > 2.5)
     return {"Over 2.5": over, "Under 2.5": 1 - over}
@@ -31,4 +46,3 @@ def over_under_25(matrix: dict[tuple[int, int], float]) -> dict[str, float]:
 def both_teams_to_score(matrix: dict[tuple[int, int], float]) -> dict[str, float]:
     yes = sum(prob for (home, away), prob in matrix.items() if home > 0 and away > 0)
     return {"Goal": yes, "No Goal": 1 - yes}
-

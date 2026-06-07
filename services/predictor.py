@@ -235,7 +235,11 @@ class PredictionService:
                 lineups = self.api_football.lineups_for_fixture(match.id)
             except Exception:
                 lineups = []
-        historical_stats = stats_builder.build(match.home_team, match.away_team) if stats_builder else None
+        historical_stats = (
+            stats_builder.build(match.home_team, match.away_team, team_ratings=team_ratings)
+            if stats_builder
+            else None
+        )
         prediction = self.predictor.predict(
             match,
             odds_rows=odds_rows,

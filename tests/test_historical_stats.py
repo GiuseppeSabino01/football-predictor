@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 
 from data_sources.openligadb import _team_name
-from features.historical_stats import HistoricalStatsBuilder
+from features.historical_stats import HistoricalStatsBuilder, _rank_window
 from features.team_strength import canonical_team_name, national_elo_for, rating_based_1x2
 
 
@@ -120,6 +120,39 @@ def test_historical_stats_builder():
     assert stats.away_recent.scored_rate == 1.0
     assert "vinte" in stats.notes[0]
     assert "Gol fatti" in stats.notes[0]
-    assert "H2H" in stats.notes[2]
+    assert any("H2H" in note for note in stats.notes)
     h2h_rows = stats.result_tables("Germany", "Italy")["Scontri diretti"]
     assert list(h2h_rows[0].keys()) == ["Data", "Partita", "Risultato", "Vincitore"]
+
+
+def test_rank_window_matches_requested_ranges():
+    assert _rank_window(40) == (35, 45)
+    assert _rank_window(3) == (1, 10)
+
+
+def test_historical_stats_builder_uses_similar_rank_opponents():
+    frame = pd.DataFrame(
+        [
+            {"date": date(2026, 1, 1), "home_team": "Brazil", "away_team": "Haiti", "home_score": 3, "away_score": 0},
+            {"date": date(2025, 1, 1), "home_team": "Brazil", "away_team": "Team40", "home_score": 4, "away_score": 0},
+            {"date": date(2024, 1, 1), "home_team": "Brazil", "away_team": "Team80", "home_score": 1, "away_score": 1},
+            {"date": date(2025, 6, 1), "home_team": "Haiti", "away_team": "Team1", "home_score": 0, "away_score": 2},
+            {"date": date(2024, 6, 1), "home_team": "Haiti", "away_team": "Team60", "home_score": 2, "away_score": 1},
+        ]
+    )
+    ratings = {
+        "Brazil": 2200,
+        "Team1": 2190,
+        "Team40": 1700,
+        "Haiti": 1690,
+        "Team60": 1500,
+        "Team80": 1300,
+    }
+
+    stats = HistoricalStatsBuilder(frame).build("Brazil", "Haiti", team_ratings=ratings)
+
+    assert stats.home_vs_away_level.matches == 2
+    assert stats.home_vs_away_level.goals_for == 7
+    assert stats.away_vs_home_level.matches == 2
+    assert stats.away_vs_home_level.goals_for == 0
+    assert any("vs nazionali simili" in note for note in stats.notes)

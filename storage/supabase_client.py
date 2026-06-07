@@ -73,3 +73,53 @@ class SupabaseStorage:
         except Exception:
             return False
         return True
+
+    def insert_worldcup_simulation(self, run_id: str, generated_at: str, label: str, model: str, payload: dict) -> bool:
+        if not self.client:
+            return False
+        row = {
+            "run_id": run_id,
+            "generated_at": generated_at,
+            "label": label,
+            "model": model,
+            "payload_json": payload,
+        }
+        try:
+            self.client.table("worldcup_simulation_runs").insert(row).execute()
+        except Exception:
+            return False
+        return True
+
+    def list_worldcup_simulations(self, limit: int = 8) -> list[dict[str, Any]]:
+        if not self.client:
+            return []
+        try:
+            response = (
+                self.client.table("worldcup_simulation_runs")
+                .select("run_id, generated_at, label, model, payload_json")
+                .order("generated_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+        except Exception:
+            return []
+        rows = getattr(response, "data", None) or []
+        simulations: list[dict[str, Any]] = []
+        for row in rows:
+            payload = row.get("payload_json")
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except json.JSONDecodeError:
+                    payload = None
+            if isinstance(payload, dict):
+                simulations.append(
+                    {
+                        "run_id": row.get("run_id", ""),
+                        "generated_at": row.get("generated_at", ""),
+                        "label": row.get("label", ""),
+                        "model": row.get("model", ""),
+                        "payload": payload,
+                    }
+                )
+        return simulations

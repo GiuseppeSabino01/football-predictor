@@ -34,6 +34,7 @@ def _as_bool(value: str) -> bool:
 class Settings:
     gemini_api_key: str
     gemini_model: str
+    gemini_fallback_models: tuple[str, ...]
     api_football_key: str
     api_football_free_mode: bool
     football_data_org_key: str
@@ -66,9 +67,17 @@ class Settings:
 
 def load_settings() -> Settings:
     load_dotenv(ROOT_DIR / ".env", override=False)
+    gemini_model = _get_secret("GEMINI_MODEL", "gemini-3.1-flash-lite")
     settings = Settings(
         gemini_api_key=_get_secret("GEMINI_API_KEY"),
-        gemini_model=_get_secret("GEMINI_MODEL", "gemini-3.1-flash-lite"),
+        gemini_model=gemini_model,
+        gemini_fallback_models=_model_list(
+            _get_secret(
+                "GEMINI_FALLBACK_MODELS",
+                "gemini-2.5-flash-lite,gemini-2.0-flash-lite,gemini-1.5-flash",
+            ),
+            gemini_model,
+        ),
         api_football_key=_get_secret("API_FOOTBALL_KEY"),
         api_football_free_mode=_as_bool(_get_secret("API_FOOTBALL_FREE_MODE", "true")),
         football_data_org_key=_get_secret("FOOTBALL_DATA_ORG_KEY"),
@@ -88,3 +97,13 @@ def load_settings() -> Settings:
         except Exception:
             pass
     return settings
+
+
+def _model_list(raw: str, primary: str) -> tuple[str, ...]:
+    models = [primary]
+    models.extend(part.strip() for part in raw.split(",") if part.strip())
+    deduped: list[str] = []
+    for model in models:
+        if model not in deduped:
+            deduped.append(model)
+    return tuple(deduped)
