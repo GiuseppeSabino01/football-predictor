@@ -312,6 +312,7 @@ class WorldCupSimulator:
                 result = parsed.get(prediction.match.id)
                 if not result:
                     continue
+                result = _rebalance_low_information_score(prediction, result)
                 if knockout:
                     result = _normalize_knockout_result(prediction, result)
                 results[prediction.match.id] = result
@@ -451,6 +452,7 @@ class WorldCupSimulator:
         result = _parse_llm_result(payload, prediction, knockout)
         if not result:
             return fallback
+        result = _rebalance_low_information_score(prediction, result)
         if knockout:
             return _normalize_knockout_result(prediction, result)
         return result
@@ -660,6 +662,50 @@ def _fallback_result(prediction: MatchPrediction, knockout: bool) -> SimulatedRe
                 result.penalties_home, result.penalties_away = 5, 4
             else:
                 result.penalties_home, result.penalties_away = 4, 5
+    return result
+
+
+def _rebalance_low_information_score(prediction: MatchPrediction, result: SimulatedResult) -> SimulatedResult:
+    if result.reason in {"Risultato modificato manualmente.", "Risultato reale OpenLigaDB."}:
+        return result
+
+    one_x_two = [pick for pick in prediction.picks if pick.market == "1X2"]
+    home_probability = _selection_probability(one_x_two, prediction.match.home_team, 0.37)
+    draw_probability = _selection_probability(one_x_two, "Pareggio", 0.29)
+    away_probability = _selection_probability(one_x_two, prediction.match.away_team, 0.34)
+    favorite_probability = max(home_probability, away_probability)
+    edge = abs(home_probability - away_probability)
+    score_total = result.home_goals_90 + result.away_goals_90
+    favorite_is_home = home_probability >= away_probability
+    favorite_is_winning = (
+        result.home_goals_90 > result.away_goals_90
+        if favorite_is_home
+        else result.away_goals_90 > result.home_goals_90
+    )
+    too_flat = (
+        result.home_goals_90 == result.away_goals_90
+        and edge >= 0.12
+        and favorite_probability >= draw_probability + 0.10
+    ) or (
+        score_total <= 1
+        and favorite_probability >= 0.44
+        and favorite_is_winning
+    )
+    if not too_flat:
+        return result
+
+    home_goals, away_goals = _fallback_score_from_probabilities(prediction)
+    if (home_goals, away_goals) == (result.home_goals_90, result.away_goals_90):
+        return result
+    result.home_goals_90 = home_goals
+    result.away_goals_90 = away_goals
+    result.home_goals_aet = None
+    result.away_goals_aet = None
+    result.penalties_home = None
+    result.penalties_away = None
+    result.resolution = "90"
+    suffix = "Ribilanciato per evitare risultato troppo conservativo."
+    result.reason = f"{result.reason} {suffix}".strip() if result.reason else suffix
     return result
 
 

@@ -12,6 +12,7 @@ from services.worldcup_simulator import (
     _group_standings,
     _normalize_knockout_result,
     _official_group_for_team,
+    _rebalance_low_information_score,
     _slot_source_label,
     _third_rankings,
 )
@@ -239,6 +240,38 @@ def test_fallback_score_does_not_clone_low_goal_favorite_exact_score():
 
     assert home > away
     assert (home, away) != (1, 0)
+
+
+def test_rebalance_low_information_score_adjusts_llm_low_goal_favorite_result():
+    prediction = MatchPrediction(
+        match=Match(
+            id="m-llm-low-goal",
+            source="test",
+            competition="FIFA World Cup 2026",
+            season=2026,
+            match_date=datetime(2026, 7, 3, tzinfo=timezone.utc),
+            home_team="Inghilterra",
+            away_team="Capo Verde",
+        ),
+        generated_at=datetime(2026, 6, 8, tzinfo=timezone.utc),
+        picks=[
+            MarketPick("1X2", "Inghilterra", 0.56),
+            MarketPick("1X2", "Pareggio", 0.25),
+            MarketPick("1X2", "Capo Verde", 0.19),
+            MarketPick("Over/Under 2.5", "Over 2.5", 0.54),
+            MarketPick("Goal/No Goal", "Goal", 0.50),
+        ],
+        exact_score="1-0",
+        confidence="media",
+        summary="test",
+    )
+    result = SimulatedResult(home_goals_90=1, away_goals_90=0, reason="Gemini.")
+
+    adjusted = _rebalance_low_information_score(prediction, result)
+
+    assert adjusted.home_goals_90 > adjusted.away_goals_90
+    assert (adjusted.home_goals_90, adjusted.away_goals_90) != (1, 0)
+    assert "Ribilanciato" in adjusted.reason
 
 
 def test_slot_source_labels_explain_bracket_origins():
