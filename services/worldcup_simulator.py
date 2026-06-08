@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from config.settings import Settings
+from features.team_strength import canonical_team_name
 from nlp.gemini_client import GeminiClient
 from schemas import Match, MatchPrediction
 from services.predictor import PredictionService
@@ -22,6 +23,73 @@ SCHEDULE_SOURCE_URL = (
     "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/"
     "articles/match-schedule-fixtures-results-teams-stadiums"
 )
+
+OFFICIAL_WORLD_CUP_TEAM_GROUPS = {
+    "Mexico": "A",
+    "South Africa": "A",
+    "South Korea": "A",
+    "Czech Republic": "A",
+    "Denmark": "A",
+    "Ireland": "A",
+    "North Macedonia": "A",
+    "Canada": "B",
+    "Switzerland": "B",
+    "Qatar": "B",
+    "Italy": "B",
+    "Wales": "B",
+    "Bosnia and Herzegovina": "B",
+    "Northern Ireland": "B",
+    "Brazil": "C",
+    "Morocco": "C",
+    "Haiti": "C",
+    "Scotland": "C",
+    "United States": "D",
+    "Australia": "D",
+    "Paraguay": "D",
+    "Turkey": "D",
+    "Romania": "D",
+    "Slovakia": "D",
+    "Kosovo": "D",
+    "Germany": "E",
+    "Curacao": "E",
+    "Ivory Coast": "E",
+    "Ecuador": "E",
+    "Netherlands": "F",
+    "Japan": "F",
+    "Tunisia": "F",
+    "Sweden": "F",
+    "Ukraine": "F",
+    "Poland": "F",
+    "Albania": "F",
+    "Belgium": "G",
+    "Egypt": "G",
+    "Iran": "G",
+    "New Zealand": "G",
+    "Spain": "H",
+    "Cape Verde": "H",
+    "Saudi Arabia": "H",
+    "Uruguay": "H",
+    "France": "I",
+    "Senegal": "I",
+    "Norway": "I",
+    "Iraq": "I",
+    "Bolivia": "I",
+    "Suriname": "I",
+    "Argentina": "J",
+    "Algeria": "J",
+    "Austria": "J",
+    "Jordan": "J",
+    "Portugal": "K",
+    "Uzbekistan": "K",
+    "Colombia": "K",
+    "DR Congo": "K",
+    "Jamaica": "K",
+    "New Caledonia": "K",
+    "England": "L",
+    "Croatia": "L",
+    "Ghana": "L",
+    "Panama": "L",
+}
 
 
 @dataclass(slots=True)
@@ -608,7 +676,13 @@ def _fallback_score_from_probabilities(prediction: MatchPrediction) -> tuple[int
         home, away = parsed
         edge = abs(home_probability - away_probability)
         favorite_probability = max(home_probability, away_probability)
-        if home != away or edge < 0.10 or favorite_probability < draw_probability + 0.08:
+        total_goals = home + away
+        low_goal_favorite_score = home != away and total_goals <= 1 and favorite_probability >= 0.44
+        balanced_match = edge < 0.10 or favorite_probability < draw_probability + 0.08
+        if home == away:
+            if balanced_match:
+                return home, away
+        elif not low_goal_favorite_score or balanced_match:
             return home, away
 
     seed = hashlib.sha1(
@@ -628,11 +702,15 @@ def _fallback_score_from_probabilities(prediction: MatchPrediction) -> tuple[int
     favorite_goals = 1
     if favorite_probability >= 0.48 or over_probability >= 0.52:
         favorite_goals += 1
-    if favorite_probability >= 0.62 or (over_probability >= 0.64 and rng.random() < 0.55):
+    if favorite_probability >= 0.58 and rng.random() < 0.45:
+        favorite_goals += 1
+    if favorite_probability >= 0.66 or (over_probability >= 0.64 and rng.random() < 0.55):
         favorite_goals += 1
     underdog_goals = 0
-    if goal_probability >= 0.50 and over_probability >= 0.43:
-        underdog_goals = 1 if rng.random() < 0.72 else 0
+    if goal_probability >= 0.46 and over_probability >= 0.40:
+        underdog_goals = 1 if rng.random() < min(0.78, 0.38 + goal_probability * 0.55) else 0
+    if over_probability >= 0.62 and goal_probability >= 0.55 and rng.random() < 0.18:
+        underdog_goals += 1
     if favorite_goals == underdog_goals:
         favorite_goals += 1
 
@@ -920,6 +998,9 @@ def _is_group_stage_match(match: Match) -> bool:
 def _build_group_lookup(matches: list[Match]) -> dict[str, str]:
     if not matches:
         return {}
+    official_lookup = _official_group_lookup(matches)
+    if len(official_lookup) == len(matches):
+        return official_lookup
     parent: dict[str, str] = {}
 
     def find(team: str) -> str:
@@ -959,7 +1040,26 @@ def _build_group_lookup(matches: list[Match]) -> dict[str, str]:
         group = group_by_root.get(find(match.home_team))
         if group:
             lookup[match.id] = group
+    lookup.update(official_lookup)
     return lookup
+
+
+def _official_group_lookup(matches: list[Match]) -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for match in matches:
+        home_group = _official_group_for_team(match.home_team)
+        away_group = _official_group_for_team(match.away_team)
+        if home_group and away_group and home_group == away_group:
+            lookup[match.id] = home_group
+        elif home_group and away_group and home_group != away_group:
+            raw_group = _group_letter(match)
+            if raw_group:
+                lookup[match.id] = raw_group
+    return lookup
+
+
+def _official_group_for_team(team: str) -> str | None:
+    return OFFICIAL_WORLD_CUP_TEAM_GROUPS.get(canonical_team_name(team))
 
 
 def _actual_result(match: Match) -> SimulatedResult | None:

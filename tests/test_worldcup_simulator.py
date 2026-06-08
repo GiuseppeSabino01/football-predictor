@@ -3,15 +3,78 @@ from datetime import datetime, timezone
 
 from schemas import Match, MatchPrediction, MarketPick
 from services.worldcup_simulator import (
+    NEXT_ROUNDS,
+    ROUND_OF_32,
     SimulatedResult,
     _assign_thirds,
     _build_group_lookup,
     _fallback_score_from_probabilities,
     _group_standings,
     _normalize_knockout_result,
+    _official_group_for_team,
     _slot_source_label,
     _third_rankings,
 )
+
+
+def test_worldcup_knockout_bracket_matches_fifa_official_slots():
+    expected_round_of_32 = {
+        73: (("group", "A", 2), ("group", "B", 2)),
+        74: (("group", "E", 1), ("third", "ABCDF")),
+        75: (("group", "F", 1), ("group", "C", 2)),
+        76: (("group", "C", 1), ("group", "F", 2)),
+        77: (("group", "I", 1), ("third", "CDFGH")),
+        78: (("group", "E", 2), ("group", "I", 2)),
+        79: (("group", "A", 1), ("third", "CEFHI")),
+        80: (("group", "L", 1), ("third", "EHIJK")),
+        81: (("group", "D", 1), ("third", "BEFIJ")),
+        82: (("group", "G", 1), ("third", "AEHIJ")),
+        83: (("group", "K", 2), ("group", "L", 2)),
+        84: (("group", "H", 1), ("group", "J", 2)),
+        85: (("group", "B", 1), ("third", "EFGIJ")),
+        86: (("group", "J", 1), ("group", "H", 2)),
+        87: (("group", "K", 1), ("third", "DEIJL")),
+        88: (("group", "D", 2), ("group", "G", 2)),
+    }
+    expected_next_rounds = {
+        89: (74, 77),
+        90: (73, 75),
+        91: (76, 78),
+        92: (79, 80),
+        93: (83, 84),
+        94: (81, 82),
+        95: (86, 88),
+        96: (85, 87),
+        97: (89, 90),
+        98: (93, 94),
+        99: (91, 92),
+        100: (95, 96),
+        101: (97, 98),
+        102: (99, 100),
+    }
+
+    actual_round_of_32 = {int(slot["match_no"]): (slot["a"], slot["b"]) for slot in ROUND_OF_32}
+    actual_next_rounds = {int(slot["match_no"]): (slot["a"], slot["b"]) for slot in NEXT_ROUNDS}
+
+    assert actual_round_of_32 == expected_round_of_32
+    assert actual_next_rounds == expected_next_rounds
+
+
+def test_official_worldcup_groups_drive_spain_france_bracket_side():
+    assert _official_group_for_team("Spagna") == "H"
+    assert _official_group_for_team("Francia") == "I"
+
+    france_match = next(slot for slot in ROUND_OF_32 if slot["a"] == ("group", "I", 1))
+    spain_match = next(slot for slot in ROUND_OF_32 if slot["a"] == ("group", "H", 1))
+    next_rounds = {slot["match_no"]: (slot["a"], slot["b"]) for slot in NEXT_ROUNDS}
+
+    assert france_match["match_no"] == 77
+    assert spain_match["match_no"] == 84
+    assert next_rounds[89] == (74, 77)
+    assert next_rounds[93] == (83, 84)
+    assert next_rounds[97] == (89, 90)
+    assert next_rounds[98] == (93, 94)
+    assert next_rounds[101] == (97, 98)
 
 
 def test_group_standings_orders_by_points_goal_difference_and_goals_for():
@@ -146,6 +209,36 @@ def test_fallback_score_uses_market_probabilities_instead_of_default_draw():
 
     assert home > away
     assert (home, away) != (1, 1)
+
+
+def test_fallback_score_does_not_clone_low_goal_favorite_exact_score():
+    prediction = MatchPrediction(
+        match=Match(
+            id="m-low-goal",
+            source="test",
+            competition="FIFA World Cup 2026",
+            season=2026,
+            match_date=datetime(2026, 7, 3, tzinfo=timezone.utc),
+            home_team="Inghilterra",
+            away_team="Capo Verde",
+        ),
+        generated_at=datetime(2026, 6, 8, tzinfo=timezone.utc),
+        picks=[
+            MarketPick("1X2", "Inghilterra", 0.56),
+            MarketPick("1X2", "Pareggio", 0.25),
+            MarketPick("1X2", "Capo Verde", 0.19),
+            MarketPick("Over/Under 2.5", "Over 2.5", 0.54),
+            MarketPick("Goal/No Goal", "Goal", 0.50),
+        ],
+        exact_score="1-0",
+        confidence="media",
+        summary="test",
+    )
+
+    home, away = _fallback_score_from_probabilities(prediction)
+
+    assert home > away
+    assert (home, away) != (1, 0)
 
 
 def test_slot_source_labels_explain_bracket_origins():

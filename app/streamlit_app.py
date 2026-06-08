@@ -811,6 +811,82 @@ def render_global_styles() -> None:
             scroll-padding-left: 1rem;
         }
 
+        .road-bracket-canvas {
+            --road-card-w: 150px;
+            --road-card-h: 96px;
+            position: relative;
+            width: 1680px;
+            height: 965px;
+            margin: 0 auto;
+            overflow: visible;
+        }
+
+        .road-bracket-canvas svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            pointer-events: none;
+        }
+
+        .road-bracket-line {
+            stroke: rgba(98,216,255,0.48);
+            stroke-width: 1.4;
+            filter: drop-shadow(0 0 4px rgba(98,216,255,0.24));
+        }
+
+        .road-node {
+            position: absolute;
+            width: var(--road-card-w);
+        }
+
+        .road-node .road-card {
+            height: var(--road-card-h);
+            min-height: var(--road-card-h);
+            padding: 0.52rem;
+        }
+
+        .road-node .road-card.final-card {
+            box-shadow: 0 0 34px rgba(255,176,32,0.14);
+            border-color: rgba(255,176,32,0.42);
+        }
+
+        .road-node .road-match-no {
+            font-size: 0.63rem;
+            margin-bottom: 0.18rem;
+        }
+
+        .road-node .road-source {
+            display: none;
+        }
+
+        .road-node .road-team-row {
+            font-size: 0.78rem;
+            margin: 0.14rem 0;
+        }
+
+        .road-node .road-resolution {
+            font-size: 0.63rem;
+            margin-top: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .road-node .road-card::after {
+            display: none;
+        }
+
+        .road-node-label {
+            position: absolute;
+            color: var(--cyan);
+            font-size: 0.7rem;
+            font-weight: 950;
+            text-transform: uppercase;
+            letter-spacing: 0;
+        }
+
         .road-bracket-shell {
             border-radius: var(--radius);
             border: 1px solid rgba(98,216,255,0.18);
@@ -2033,29 +2109,22 @@ def render_road_bracket(payload: dict[str, Any]) -> None:
     right_qf = _road_matches_in_order(qf_by_no, [99, 100])
     right_sf = _road_matches_in_order(sf_by_no, [102])
 
-    center_cards = ['<div class="road-final-column"><div class="road-final-title">Finale</div>']
-    if final:
-        center_cards.append(_road_match_card(final[0]))
-    if third:
-        center_cards.append('<div class="road-final-title">Terzo posto</div>')
-        center_cards.append(_road_match_card(third[0]))
-    center_cards.append("</div>")
-
-    html_columns = [
-        _road_round_column("Sedicesimi", left_r32, "left", 0),
-        _road_round_column("Ottavi", left_r16, "left", 1),
-        _road_round_column("Quarti", left_qf, "left", 2),
-        _road_round_column("Semifinale", left_sf, "left", 3),
-        "".join(center_cards),
-        _road_round_column("Semifinale", right_sf, "right", 3),
-        _road_round_column("Quarti", right_qf, "right", 2),
-        _road_round_column("Ottavi", right_r16, "right", 1),
-        _road_round_column("Sedicesimi", right_r32, "right", 0),
-    ]
+    html_canvas = _road_bracket_canvas(
+        left_r32=left_r32,
+        left_r16=left_r16,
+        left_qf=left_qf,
+        left_sf=left_sf,
+        right_r32=right_r32,
+        right_r16=right_r16,
+        right_qf=right_qf,
+        right_sf=right_sf,
+        final=final,
+        third=third,
+    )
     st.markdown(
         '<div class="road-bracket-shell">'
         '<div class="road-bracket-hint">Scorri orizzontalmente per vedere tutto il tabellone.</div>'
-        f'<div class="road-bracket-classic">{"".join(html_columns)}</div>'
+        f"{html_canvas}"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -2066,6 +2135,156 @@ def _road_matches_in_order(index: dict[int, dict[str, Any]], order: list[int]) -
     used = set(order)
     ordered.extend(match for match_no, match in sorted(index.items()) if match_no not in used)
     return ordered
+
+
+def _road_bracket_canvas(
+    *,
+    left_r32: list[dict[str, Any]],
+    left_r16: list[dict[str, Any]],
+    left_qf: list[dict[str, Any]],
+    left_sf: list[dict[str, Any]],
+    right_r32: list[dict[str, Any]],
+    right_r16: list[dict[str, Any]],
+    right_qf: list[dict[str, Any]],
+    right_sf: list[dict[str, Any]],
+    final: list[dict[str, Any]],
+    third: list[dict[str, Any]],
+) -> str:
+    card_w = 150
+    card_h = 96
+    positions: dict[int, tuple[int, int]] = {}
+    cards: list[str] = []
+    lines: list[str] = []
+
+    y_r32 = [34, 142, 274, 382, 514, 622, 754, 862]
+    y_r16 = [88, 328, 568, 808]
+    y_qf = [208, 688]
+    y_sf = [448]
+
+    def add_rows(rows: list[dict[str, Any]], x: int, y_values: list[int]) -> None:
+        for row, y in zip(rows, y_values):
+            match_no = int(row.get("match_no", 0))
+            positions[match_no] = (x, y)
+            cards.append(
+                f'<div class="road-node" style="left:{x}px; top:{y}px;">'
+                f"{_road_match_card(row)}"
+                "</div>"
+            )
+
+    add_rows(left_r32, 20, y_r32)
+    add_rows(left_r16, 205, y_r16)
+    add_rows(left_qf, 390, y_qf)
+    add_rows(left_sf, 575, y_sf)
+    add_rows(right_sf, 955, y_sf)
+    add_rows(right_qf, 1140, y_qf)
+    add_rows(right_r16, 1325, y_r16)
+    add_rows(right_r32, 1510, y_r32)
+
+    if final:
+        positions[104] = (765, 392)
+        cards.append(
+            '<div class="road-node" style="left:765px; top:392px;">'
+            f"{_road_match_card(final[0])}"
+            "</div>"
+        )
+    if third:
+        cards.append(
+            '<div class="road-node" style="left:765px; top:556px;">'
+            f"{_road_match_card(third[0])}"
+            "</div>"
+        )
+
+    labels = [
+        (20, 6, "Sedicesimi"),
+        (205, 60, "Ottavi"),
+        (390, 180, "Quarti"),
+        (575, 420, "Semifinale"),
+        (792, 362, "Finale"),
+        (955, 420, "Semifinale"),
+        (1140, 180, "Quarti"),
+        (1325, 60, "Ottavi"),
+        (1510, 6, "Sedicesimi"),
+    ]
+    for x, y, label in labels:
+        cards.append(f'<div class="road-node-label" style="left:{x}px; top:{y}px;">{escape(label)}</div>')
+
+    left_edges = [
+        (74, 89),
+        (77, 89),
+        (73, 90),
+        (75, 90),
+        (83, 93),
+        (84, 93),
+        (81, 94),
+        (82, 94),
+        (89, 97),
+        (90, 97),
+        (93, 98),
+        (94, 98),
+        (97, 101),
+        (98, 101),
+        (101, 104),
+    ]
+    right_edges = [
+        (76, 91),
+        (78, 91),
+        (79, 92),
+        (80, 92),
+        (86, 95),
+        (88, 95),
+        (85, 96),
+        (87, 96),
+        (91, 99),
+        (92, 99),
+        (95, 100),
+        (96, 100),
+        (99, 102),
+        (100, 102),
+        (102, 104),
+    ]
+    for source, target in left_edges:
+        segment = _road_connector_line(positions, source, target, card_w, card_h, side="left")
+        if segment:
+            lines.append(segment)
+    for source, target in right_edges:
+        segment = _road_connector_line(positions, source, target, card_w, card_h, side="right")
+        if segment:
+            lines.append(segment)
+
+    return (
+        '<div class="road-bracket-classic">'
+        '<div class="road-bracket-canvas">'
+        f'<svg viewBox="0 0 1680 965" preserveAspectRatio="none">{"".join(lines)}</svg>'
+        f'{"".join(cards)}'
+        "</div>"
+        "</div>"
+    )
+
+
+def _road_connector_line(
+    positions: dict[int, tuple[int, int]],
+    source: int,
+    target: int,
+    card_w: int,
+    card_h: int,
+    *,
+    side: str,
+) -> str:
+    if source not in positions or target not in positions:
+        return ""
+    source_x, source_y = positions[source]
+    target_x, target_y = positions[target]
+    source_mid_y = source_y + card_h / 2
+    target_mid_y = target_y + card_h / 2
+    if side == "left":
+        x1 = source_x + card_w
+        x2 = target_x
+    else:
+        x1 = source_x
+        x2 = target_x + card_w
+    mid_x = (x1 + x2) / 2
+    points = f"{x1},{source_mid_y} {mid_x},{source_mid_y} {mid_x},{target_mid_y} {x2},{target_mid_y}"
+    return f'<polyline class="road-bracket-line" fill="none" points="{points}" />'
 
 
 def _road_round_column(round_name: str, rows: list[dict[str, Any]], side: str, depth: int) -> str:
