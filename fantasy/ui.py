@@ -5,9 +5,19 @@ from html import escape
 from typing import Any
 
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from st_aggrid import AgGrid, JsCode
 
+from fantasy.analytics import (
+    PERCENTILE_METRICS,
+    number as analytics_number,
+    optional_number as analytics_optional_number,
+    pareto_frontier,
+    player_derived_stats,
+    role_percentiles,
+)
 from config.settings import Settings
 from fantasy.catalog import catalog_dataframe, make_player, merge_catalog
 from fantasy.official_catalog import (
@@ -73,7 +83,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v16 · Contrasto fasce e valori")
+    st.caption("Fantacalcio · Build 2026.08.18 v17 · Player Intelligence Lab")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -470,6 +480,8 @@ def _render_preparation(
     if refresh_column.button("Aggiorna ora", use_container_width=True, key="refresh_official_catalog"):
         st.session_state.pop("fantasy_official_catalog_session", None)
         st.rerun()
+
+    _render_top_players_visual_lab(catalog, league)
 
     if not catalog:
         st.info("Il listone e in aggiornamento. Riprova tra poco.")
@@ -1524,6 +1536,329 @@ def _render_role_advisors(
                     st.rerun()
 
 
+ROLE_CHART_COLORS = {
+    "P": "#ffb020",
+    "D": "#19e6b0",
+    "C": "#62d8ff",
+    "A": "#f4538a",
+}
+
+PLAYER_RANKING_METRICS = {
+    "Fanta Score": "fantasy_score",
+    "Fantamedia attesa": "expected_fantasy_average",
+    "Gol attesi": "expected_goals",
+    "Assist attesi": "expected_assists",
+    "Propensione bonus": "bonus",
+    "Titolarita": "starter_probability",
+    "Affidabilita": "reliability",
+    "Potenziale": "potential",
+    "Valore": "value",
+}
+
+PLOTLY_CONFIG = {
+    "displayModeBar": False,
+    "responsive": True,
+    "scrollZoom": False,
+}
+
+
+def _render_top_players_visual_lab(
+    catalog: list[dict[str, Any]], league: dict[str, Any]
+) -> None:
+    if not catalog:
+        return
+    with st.expander("✦ Player Intelligence Lab · esplora i migliori", expanded=False):
+        st.caption(
+            "Tre letture avanzate del listone: costellazione dei bonus, frontiera qualita/prezzo "
+            "e impronta multidimensionale. Passa sul grafico per leggere tutti i valori."
+        )
+        role_column, metric_column, starter_column = st.columns([0.8, 1.2, 1])
+        role_filter = role_column.selectbox(
+            "Reparto",
+            ["Tutti", "P", "D", "C", "A"],
+            format_func=lambda value: "Tutti i ruoli" if value == "Tutti" else ROLE_LABELS[value],
+            key=f"visual_lab_role_{league['id']}",
+        )
+        metric_label = metric_column.selectbox(
+            "Evidenzia i top per",
+            list(PLAYER_RANKING_METRICS),
+            key=f"visual_lab_metric_{league['id']}",
+        )
+        minimum_starter = starter_column.slider(
+            "Titolarita minima",
+            0,
+            100,
+            40,
+            step=5,
+            key=f"visual_lab_starter_{league['id']}",
+        )
+
+        filtered = [
+            player
+            for player in catalog
+            if (role_filter == "Tutti" or str(player.get("role")) == role_filter)
+            and analytics_number(player.get("starter_probability")) >= minimum_starter
+        ]
+        if not filtered:
+            st.info("Nessun giocatore corrisponde ai filtri scelti.")
+            return
+        metric_field = PLAYER_RANKING_METRICS[metric_label]
+        top_players = sorted(
+            filtered,
+            key=lambda player: analytics_number(player.get(metric_field), -1),
+            reverse=True,
+        )[:18]
+        frame = _players_analytics_frame(filtered)
+        top_ids = {str(player.get("id")) for player in top_players}
+        frame["Top selezionato"] = frame["_id"].isin(top_ids)
+
+        constellation_tab, frontier_tab, fingerprint_tab = st.tabs(
+            ["Costellazione bonus", "Frontiera del valore", "Impronta top player"]
+        )
+        with constellation_tab:
+            _render_bonus_constellation(
+                frame,
+                metric_label,
+                metric_field,
+                top_ids,
+                key=f"constellation_{league['id']}",
+            )
+        with frontier_tab:
+            _render_value_frontier(
+                filtered,
+                frame,
+                metric_label,
+                top_ids,
+                key=f"frontier_{league['id']}",
+            )
+        with fingerprint_tab:
+            _render_parallel_fingerprint(
+                top_players,
+                metric_label,
+                metric_field,
+                key=f"fingerprint_{league['id']}",
+            )
+
+
+def _players_analytics_frame(players: list[dict[str, Any]]) -> pd.DataFrame:
+    rows = []
+    for player in players:
+        derived = player_derived_stats(player)
+        rows.append(
+            {
+                "_id": str(player.get("id") or ""),
+                "Giocatore": str(player.get("name") or ""),
+                "Squadra": str(player.get("team") or ""),
+                "Ruolo": str(player.get("role") or ""),
+                "Quotazione": analytics_number(player.get("quote")),
+                "FM attesa": analytics_number(player.get("expected_fantasy_average")),
+                "Gol attesi": analytics_number(player.get("expected_goals")),
+                "Assist attesi": analytics_number(player.get("expected_assists")),
+                "Bonus attesi": analytics_number(derived.get("expected_bonus_points")),
+                "Bonus per presenza": analytics_number(derived.get("expected_bonus_per_appearance")),
+                "Propensione bonus": analytics_number(player.get("bonus")),
+                "Titolarita": analytics_number(player.get("starter_probability")),
+                "Affidabilita": analytics_number(player.get("reliability")),
+                "Potenziale": analytics_number(player.get("potential")),
+                "Rischio": analytics_number(player.get("risk")),
+                "Valore": analytics_number(player.get("value")),
+                "Fanta Score": analytics_number(player.get("fantasy_score")),
+                "Presenze attese": max(analytics_number(player.get("expected_appearances")), 3),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _plotly_base_layout(*, height: int = 560) -> dict[str, Any]:
+    return {
+        "height": height,
+        "margin": {"l": 34, "r": 26, "t": 48, "b": 42},
+        "paper_bgcolor": "rgba(0,0,0,0)",
+        "plot_bgcolor": "rgba(8,10,11,.3)",
+        "font": {"family": "Inter, system-ui, sans-serif", "color": "#dce8e3"},
+        "hoverlabel": {"bgcolor": "#111718", "font_color": "#f4fbf7", "bordercolor": "#19e6b0"},
+        "legend": {"orientation": "h", "y": 1.08, "x": 0},
+    }
+
+
+def _render_bonus_constellation(
+    frame: pd.DataFrame,
+    metric_label: str,
+    metric_field: str,
+    top_ids: set[str],
+    *,
+    key: str,
+) -> None:
+    display_metric = {
+        "fantasy_score": "Fanta Score",
+        "expected_fantasy_average": "FM attesa",
+        "expected_goals": "Gol attesi",
+        "expected_assists": "Assist attesi",
+        "bonus": "Propensione bonus",
+        "starter_probability": "Titolarita",
+        "reliability": "Affidabilita",
+        "potential": "Potenziale",
+        "value": "Valore",
+    }[metric_field]
+    chart = frame.copy()
+    chart["Metrica selezionata"] = chart[display_metric]
+    chart["Etichetta"] = chart.apply(
+        lambda row: row["Giocatore"] if row["_id"] in top_ids else "", axis=1
+    )
+    figure = px.scatter(
+        chart,
+        x="Gol attesi",
+        y="Assist attesi",
+        size="Presenze attese",
+        color="Metrica selezionata",
+        color_continuous_scale=["#19322d", "#19e6b0", "#ffb020", "#f4538a"],
+        text="Etichetta",
+        hover_name="Giocatore",
+        hover_data={
+            "Squadra": True,
+            "Ruolo": True,
+            "FM attesa": ":.2f",
+            "Bonus attesi": ":.1f",
+            "Titolarita": ":.0f",
+            "Affidabilita": ":.0f",
+            "Metrica selezionata": ":.2f",
+            "Presenze attese": False,
+            "Etichetta": False,
+            "_id": False,
+        },
+        labels={"Metrica selezionata": metric_label},
+        size_max=30,
+    )
+    figure.update_traces(
+        marker={"line": {"width": 1, "color": "rgba(244,251,247,.45)"}, "opacity": 0.8},
+        textposition="top center",
+        textfont={"size": 10, "color": "#f4fbf7"},
+    )
+    figure.add_vline(
+        x=float(chart["Gol attesi"].median()),
+        line_dash="dot",
+        line_color="rgba(244,251,247,.24)",
+    )
+    figure.add_hline(
+        y=float(chart["Assist attesi"].median()),
+        line_dash="dot",
+        line_color="rgba(244,251,247,.24)",
+    )
+    figure.update_layout(
+        **_plotly_base_layout(),
+        title={"text": f"<b>Costellazione dei top · {metric_label}</b><br><sup>In alto a destra vivono i profili piu completi nei bonus</sup>", "x": 0.01},
+        coloraxis_colorbar={"title": metric_label, "thickness": 10},
+    )
+    figure.update_xaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
+    figure.update_yaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
+    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+
+
+def _render_value_frontier(
+    players: list[dict[str, Any]],
+    frame: pd.DataFrame,
+    metric_label: str,
+    top_ids: set[str],
+    *,
+    key: str,
+) -> None:
+    chart = frame[frame["Quotazione"] > 0].copy()
+    chart["Etichetta"] = chart.apply(
+        lambda row: row["Giocatore"] if row["_id"] in top_ids else "", axis=1
+    )
+    figure = px.scatter(
+        chart,
+        x="Quotazione",
+        y="FM attesa",
+        size="Bonus attesi",
+        color="Ruolo",
+        color_discrete_map=ROLE_CHART_COLORS,
+        text="Etichetta",
+        hover_name="Giocatore",
+        hover_data={
+            "Squadra": True,
+            "Bonus attesi": ":.1f",
+            "Gol attesi": ":.1f",
+            "Assist attesi": ":.1f",
+            "Titolarita": ":.0f",
+            "Affidabilita": ":.0f",
+            "Etichetta": False,
+            "_id": False,
+        },
+        size_max=32,
+    )
+    frontier = pareto_frontier(players)
+    if frontier:
+        figure.add_trace(
+            go.Scatter(
+                x=[analytics_number(player.get("quote")) for player in frontier],
+                y=[analytics_number(player.get("expected_fantasy_average")) for player in frontier],
+                mode="lines+markers",
+                name="Frontiera efficiente",
+                line={"color": "#ffb020", "width": 3, "shape": "spline"},
+                marker={"size": 8, "symbol": "diamond", "color": "#ffb020"},
+                customdata=[[str(player.get("name") or "")] for player in frontier],
+                hovertemplate="%{customdata[0]}<br>Q %{x:.0f}<br>FM %{y:.2f}<extra>Frontiera</extra>",
+            )
+        )
+    figure.update_traces(
+        marker={"line": {"width": 1, "color": "rgba(244,251,247,.38)"}, "opacity": 0.78},
+        textposition="top center",
+        selector={"mode": "markers+text"},
+    )
+    figure.update_layout(
+        **_plotly_base_layout(),
+        title={"text": f"<b>Frontiera qualita/prezzo</b><br><sup>La linea ambra evidenzia chi offre piu FM senza pagare crediti inutili · top per {metric_label}</sup>", "x": 0.01},
+    )
+    figure.update_xaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
+    figure.update_yaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
+    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+
+
+def _render_parallel_fingerprint(
+    players: list[dict[str, Any]],
+    metric_label: str,
+    metric_field: str,
+    *,
+    key: str,
+) -> None:
+    if not players:
+        st.info("Non ci sono giocatori sufficienti per il confronto multidimensionale.")
+        return
+    names = [str(player.get("name") or "") for player in players]
+    values = [analytics_number(player.get(metric_field)) for player in players]
+    dimensions = [
+        dict(range=[0, max(9, max(analytics_number(p.get("expected_fantasy_average")) for p in players))], label="FM", values=[analytics_number(p.get("expected_fantasy_average")) for p in players]),
+        dict(range=[0, max(1, max(analytics_number(p.get("expected_goals")) for p in players))], label="Gol", values=[analytics_number(p.get("expected_goals")) for p in players]),
+        dict(range=[0, max(1, max(analytics_number(p.get("expected_assists")) for p in players))], label="Assist", values=[analytics_number(p.get("expected_assists")) for p in players]),
+        dict(range=[0, 100], label="Titolarita", values=[analytics_number(p.get("starter_probability")) for p in players]),
+        dict(range=[0, 100], label="Affidabilita", values=[analytics_number(p.get("reliability")) for p in players]),
+        dict(range=[0, 100], label="Potenziale", values=[analytics_number(p.get("potential")) for p in players]),
+        dict(range=[0, 100], label="Integrita", values=[100 - analytics_number(p.get("risk")) for p in players]),
+        dict(range=[0, 100], label="Valore", values=[analytics_number(p.get("value")) for p in players]),
+    ]
+    figure = go.Figure(
+        data=go.Parcoords(
+            line={
+                "color": values,
+                "colorscale": [[0, "#19322d"], [0.5, "#19e6b0"], [0.8, "#ffb020"], [1, "#f4538a"]],
+                "showscale": True,
+                "colorbar": {"title": metric_label, "thickness": 10},
+            },
+            dimensions=dimensions,
+            labelfont={"color": "#f4fbf7", "size": 12},
+            tickfont={"color": "#9dafaa", "size": 10},
+            rangefont={"color": "#9dafaa", "size": 9},
+        )
+    )
+    figure.update_layout(
+        **_plotly_base_layout(height=590),
+        title={"text": f"<b>Impronta dei migliori {len(players)}</b><br><sup>Ogni linea e un giocatore: segui il profilo sulle otto dimensioni</sup>", "x": 0.01},
+    )
+    st.caption("Giocatori inclusi: " + " · ".join(names))
+    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+
+
 def _render_player_detail(
     player: dict[str, Any],
     league: dict[str, Any],
@@ -1531,6 +1866,8 @@ def _render_player_detail(
     storage: FantasyWorkspaceStorage,
 ) -> None:
     role = str(player.get("role", ""))
+    catalog = workspace.get("catalog", [])
+    derived = player_derived_stats(player)
     role_names = {"P": "Portiere", "D": "Difensore", "C": "Centrocampista", "A": "Attaccante"}
     st.markdown(
         f"""
@@ -1565,19 +1902,35 @@ def _render_player_detail(
         _save_workspace(workspace, storage)
         st.rerun()
 
-    projection_tab, season_tab, advanced_tab, profile_tab = st.tabs(
-        ["Proiezione 26/27", "Stagione 25/26", "Dati avanzati", "Profilo & listone"]
+    visual_tab, projection_tab, season_tab, advanced_tab, profile_tab = st.tabs(
+        [
+            "Identikit visuale",
+            "Proiezione 26/27",
+            "Stagione 25/26",
+            "Dati avanzati",
+            "Profilo & asta",
+        ]
     )
+    with visual_tab:
+        _render_player_visuals(player, catalog)
     with projection_tab:
         _render_stat_grid([
             ("Presenze attese", player.get("expected_appearances"), 0),
+            ("Disponibilita attesa", derived.get("expected_availability"), 0, "%"),
             ("Gol attesi", player.get("expected_goals"), 1),
             ("Assist attesi", player.get("expected_assists"), 1),
+            ("Partecipazioni gol", derived.get("expected_goal_involvements"), 1),
+            ("Punti bonus attesi", derived.get("expected_bonus_points"), 1),
+            ("Gol attesi / presenza", derived.get("expected_goals_per_appearance"), 2),
+            ("Assist attesi / presenza", derived.get("expected_assists_per_appearance"), 2),
+            ("Bonus attesi / presenza", derived.get("expected_bonus_per_appearance"), 2),
             ("Fantamedia attesa", player.get("expected_fantasy_average"), 2),
+            ("Variazione FM", derived.get("fantasy_average_delta"), 2),
+            ("Titolarita", player.get("starter_probability"), 0, "%"),
             ("Affidabilita", player.get("reliability"), 0),
-            ("Bonus", player.get("bonus"), 0),
+            ("Propensione bonus", player.get("bonus"), 0),
             ("Potenziale", player.get("potential"), 0),
-            ("Rischio", player.get("risk"), 0),
+            ("Rischio infortuni", player.get("risk"), 0),
             ("Valore", player.get("value"), 0),
             ("Fanta Score", player.get("fantasy_score"), 0),
         ])
@@ -1588,12 +1941,21 @@ def _render_player_detail(
             ("Fantamedia", player.get("fantasy_average_previous"), 2),
             ("Gol", player.get("goals_previous"), 0),
             ("Assist", player.get("assists_previous"), 0),
+            ("Partecipazioni gol", derived.get("previous_goal_involvements"), 0),
+            ("Punti bonus", derived.get("previous_bonus_points"), 0),
+            ("Gol / presenza", derived.get("goals_per_appearance"), 2),
+            ("Assist / presenza", derived.get("assists_per_appearance"), 2),
+            ("Bonus / presenza", derived.get("bonus_points_per_appearance"), 2),
             ("Rigori segnati", player.get("penalties_scored"), 0),
             ("Rigori tirati", player.get("penalties_taken"), 0),
+            ("Conversione rigori", derived.get("penalty_conversion"), 0, "%"),
             ("Ammonizioni", player.get("yellow_cards"), 0),
             ("Espulsioni", player.get("red_cards"), 0),
+            ("Cartellini / presenza", derived.get("cards_per_appearance"), 2),
             ("Gol subiti", player.get("goals_conceded"), 0),
+            ("Gol subiti / presenza", derived.get("goals_conceded_per_appearance"), 2),
             ("Rigori parati", player.get("penalties_saved"), 0),
+            ("Goal prevented", player.get("goals_prevented"), 2),
         ])
     with advanced_tab:
         goals_minus_xg = player.get("goals_minus_xg")
@@ -1605,13 +1967,19 @@ def _render_player_detail(
         _render_stat_grid([
             ("xG", player.get("xg_previous"), 2),
             ("xA", player.get("xa_previous"), 2),
+            ("xGI · xG + xA", derived.get("xgi_previous"), 2),
+            ("xG / presenza", derived.get("xg_per_appearance"), 2),
+            ("xA / presenza", derived.get("xa_per_appearance"), 2),
             ("Gol - xG", goals_minus_xg, 2),
             ("Assist - xA", assists_minus_xa, 2),
             ("Goal prevented", player.get("goals_prevented"), 2),
+            ("Copertura dati", derived.get("data_coverage"), 0, "%"),
         ])
+        _render_role_percentile_strip(player, catalog)
         st.caption(
             "xG, xA e Goal prevented provengono dall'analisi [FotMob](https://www.fotmob.com/leagues/55/overview/serie-a). I tracking fisici "
-            "(km percorsi, sprint e velocita) non sono pubblicati in modo completo e uniforme per tutti i giocatori."
+            "(km percorsi, sprint e velocita) sono mostrabili solo quando una fonte pubblica dati uniformi e verificabili: "
+            "non vengono stimati artificialmente."
         )
     with profile_tab:
         penalty_labels = {1: "Prima scelta", 2: "Seconda scelta"}
@@ -1620,7 +1988,14 @@ def _render_player_detail(
             ("Ruolo Mantra", player.get("mantra_role"), None),
             ("Quotazione iniziale", player.get("initial_quote"), 0),
             ("Quotazione attuale", player.get("quote"), 0),
+            ("Variazione quotazione", derived.get("current_quote_delta"), 0),
+            ("Quotazione prevista", player.get("predicted_quote"), 0),
+            ("Delta quotazione prevista", derived.get("predicted_quote_delta"), 0),
             ("FVM / 1000", player.get("fvm"), 0),
+            ("FVM / credito", derived.get("fvm_per_credit"), 2),
+            ("FM attesa / credito", derived.get("fantasy_average_per_credit"), 3),
+            ("Bonus attesi / credito", derived.get("expected_bonus_per_credit"), 2),
+            ("Score / credito", derived.get("score_per_credit"), 2),
             ("Rigorista", penalty_labels.get(_int_or_none(player.get("penalty_taker")), "No"), None),
             ("Piazzati", penalty_labels.get(_int_or_none(player.get("set_pieces")), "No"), None),
             ("Stato 26/27", player.get("status"), None),
@@ -1631,12 +2006,214 @@ def _render_player_detail(
         ])
 
 
-def _render_stat_grid(items: list[tuple[str, Any, int | None]]) -> None:
+def _render_player_visuals(player: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
+    player_id = str(player.get("id") or player.get("name") or "player")
+    radar_tab, peers_tab, evolution_tab = st.tabs(
+        ["DNA nel ruolo", "Mappa dei concorrenti", "Storico → proiezione"]
+    )
+    with radar_tab:
+        _render_player_radar(player, catalog, key=f"player_radar_{player_id}")
+    with peers_tab:
+        _render_player_peer_map(player, catalog, key=f"player_peers_{player_id}")
+    with evolution_tab:
+        _render_player_dumbbell(player, key=f"player_evolution_{player_id}")
+
+
+def _render_player_radar(
+    player: dict[str, Any], catalog: list[dict[str, Any]], *, key: str
+) -> None:
+    percentiles = role_percentiles(player, catalog)
+    labels = [label for _, label, _ in PERCENTILE_METRICS]
+    values = [analytics_number(percentiles.get(field)) for field, _, _ in PERCENTILE_METRICS]
+    labels_closed = [*labels, labels[0]]
+    values_closed = [*values, values[0]]
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatterpolar(
+            r=[50] * len(labels_closed),
+            theta=labels_closed,
+            mode="lines",
+            line={"color": "rgba(244,251,247,.22)", "dash": "dot", "width": 1},
+            name="Mediana ruolo",
+            hoverinfo="skip",
+        )
+    )
+    figure.add_trace(
+        go.Scatterpolar(
+            r=values_closed,
+            theta=labels_closed,
+            mode="lines+markers",
+            fill="toself",
+            fillcolor="rgba(25,230,176,.18)",
+            line={"color": "#19e6b0", "width": 3},
+            marker={"size": 8, "color": "#f4fbf7", "line": {"color": "#19e6b0", "width": 2}},
+            name=str(player.get("name") or "Giocatore"),
+            hovertemplate="%{theta}: percentile %{r:.0f}<extra></extra>",
+        )
+    )
+    figure.update_layout(
+        **_plotly_base_layout(height=540),
+        title={"text": f"<b>DNA di {escape(str(player.get('name') or ''))}</b><br><sup>Percentile rispetto agli altri {ROLE_LABELS.get(str(player.get('role')), 'giocatori')}</sup>", "x": 0.01},
+        polar={
+            "bgcolor": "rgba(8,10,11,.24)",
+            "radialaxis": {"range": [0, 100], "tickvals": [25, 50, 75, 100], "gridcolor": "rgba(244,251,247,.12)", "showline": False},
+            "angularaxis": {"gridcolor": "rgba(244,251,247,.10)"},
+        },
+        showlegend=False,
+    )
+    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+    st.caption("Un valore 80 significa che il giocatore supera l'80% dei pari ruolo. Integrita e il rischio infortuni invertito.")
+
+
+def _render_player_peer_map(
+    player: dict[str, Any], catalog: list[dict[str, Any]], *, key: str
+) -> None:
+    role = str(player.get("role") or "")
+    peers = [row for row in catalog if str(row.get("role") or "") == role]
+    frame = _players_analytics_frame(peers)
+    if frame.empty:
+        st.info("Non ci sono confronti disponibili per questo ruolo.")
+        return
+    frame["Selezionato"] = frame["_id"].eq(str(player.get("id") or ""))
+    frame["Etichetta"] = frame.apply(
+        lambda row: row["Giocatore"]
+        if row["Selezionato"] or row["Fanta Score"] >= frame["Fanta Score"].quantile(.92)
+        else "",
+        axis=1,
+    )
+    figure = px.scatter(
+        frame,
+        x="Bonus per presenza",
+        y="FM attesa",
+        size="Presenze attese",
+        color="Affidabilita",
+        color_continuous_scale=["#f4538a", "#ffb020", "#19e6b0"],
+        text="Etichetta",
+        hover_name="Giocatore",
+        hover_data={
+            "Squadra": True,
+            "Gol attesi": ":.1f",
+            "Assist attesi": ":.1f",
+            "Titolarita": ":.0f",
+            "Rischio": ":.0f",
+            "Etichetta": False,
+            "Selezionato": False,
+            "_id": False,
+        },
+        size_max=26,
+    )
+    selected = frame[frame["Selezionato"]]
+    if not selected.empty:
+        figure.add_trace(
+            go.Scatter(
+                x=selected["Bonus per presenza"],
+                y=selected["FM attesa"],
+                mode="markers+text",
+                text=selected["Giocatore"],
+                textposition="bottom center",
+                marker={"size": 25, "symbol": "star", "color": "#f4fbf7", "line": {"color": "#f4538a", "width": 3}},
+                name="Giocatore selezionato",
+                hoverinfo="skip",
+            )
+        )
+    figure.add_vline(x=float(frame["Bonus per presenza"].median()), line_dash="dot", line_color="rgba(244,251,247,.22)")
+    figure.add_hline(y=float(frame["FM attesa"].median()), line_dash="dot", line_color="rgba(244,251,247,.22)")
+    figure.update_traces(textposition="top center", selector={"mode": "markers+text"})
+    figure.update_layout(
+        **_plotly_base_layout(),
+        title={"text": "<b>Mappa dei concorrenti diretti</b><br><sup>La stella e il giocatore selezionato; in alto a destra bonus e rendimento si incontrano</sup>", "x": 0.01},
+        coloraxis_colorbar={"title": "Affidabilita", "thickness": 10},
+    )
+    figure.update_xaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
+    figure.update_yaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
+    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+
+
+def _render_player_dumbbell(player: dict[str, Any], *, key: str) -> None:
+    metrics = [
+        ("Presenze", player.get("appearances_previous"), player.get("expected_appearances")),
+        ("Gol", player.get("goals_previous"), player.get("expected_goals")),
+        ("Assist", player.get("assists_previous"), player.get("expected_assists")),
+        ("Fantamedia", player.get("fantasy_average_previous"), player.get("expected_fantasy_average")),
+    ]
+    available = [
+        (label, analytics_optional_number(previous), analytics_optional_number(expected))
+        for label, previous, expected in metrics
+        if analytics_optional_number(previous) is not None and analytics_optional_number(expected) is not None
+    ]
+    if not available:
+        st.info("Non ci sono dati storici e previsionali sufficienti per questa evoluzione.")
+        return
+    figure = go.Figure()
+    for index, (label, previous, expected) in enumerate(available):
+        figure.add_trace(
+            go.Scatter(
+                x=[previous, expected],
+                y=[label, label],
+                mode="lines",
+                line={"color": "rgba(244,251,247,.24)", "width": 5},
+                showlegend=False,
+                hoverinfo="skip",
+            )
+        )
+    figure.add_trace(
+        go.Scatter(
+            x=[previous for _, previous, _ in available],
+            y=[label for label, _, _ in available],
+            mode="markers+text",
+            text=[f"{previous:.1f}" for _, previous, _ in available],
+            textposition="middle left",
+            marker={"size": 15, "color": "#8e9b96"},
+            name="2025/26",
+            hovertemplate="%{y}: %{x:.2f}<extra>2025/26</extra>",
+        )
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=[expected for _, _, expected in available],
+            y=[label for label, _, _ in available],
+            mode="markers+text",
+            text=[f"{expected:.1f}" for _, _, expected in available],
+            textposition="middle right",
+            marker={"size": 17, "color": "#19e6b0", "line": {"width": 2, "color": "#f4fbf7"}},
+            name="Proiezione 26/27",
+            hovertemplate="%{y}: %{x:.2f}<extra>Proiezione 26/27</extra>",
+        )
+    )
+    figure.update_layout(
+        **_plotly_base_layout(height=470),
+        title={"text": "<b>Traiettoria attesa</b><br><sup>Il collegamento mostra la distanza tra ultima stagione e proiezione</sup>", "x": 0.01},
+        xaxis={"gridcolor": "rgba(244,251,247,.08)", "zeroline": False},
+        yaxis={"gridcolor": "rgba(244,251,247,.06)", "categoryorder": "array", "categoryarray": [label for label, _, _ in reversed(available)]},
+    )
+    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+
+
+def _render_role_percentile_strip(player: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
+    percentiles = role_percentiles(player, catalog)
     cards = []
-    for label, value, decimals in items:
+    for field, label, _ in PERCENTILE_METRICS:
+        value = percentiles.get(field)
+        if value is None:
+            continue
+        tone = "elite" if value >= 80 else "good" if value >= 60 else "average" if value >= 40 else "weak"
+        cards.append(
+            f'<div class="fantasy-percentile {tone}"><span>{escape(label)}</span>'
+            f'<strong>P{value:.0f}</strong><i style="--value:{max(0, min(value, 100)):.0f}%"></i></div>'
+        )
+    if cards:
+        st.markdown("#### Percentili nel ruolo")
+        st.markdown(f'<div class="fantasy-percentile-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+
+def _render_stat_grid(items: list[tuple]) -> None:
+    cards = []
+    for item in items:
+        label, value, decimals = item[:3]
+        suffix = item[3] if len(item) > 3 else ""
         display = (
             escape(str("—" if value is None or value == "" else value))
-            if decimals is None else _format_stat(value, decimals)
+            if decimals is None else _format_stat(value, decimals, suffix)
         )
         cards.append(
             f'<div class="fantasy-stat-card"><span>{escape(label)}</span><strong>{display}</strong></div>'
@@ -2442,6 +3019,15 @@ def render_fantasy_styles() -> None:
         .fantasy-stat-card { min-height:72px; display:flex; flex-direction:column; justify-content:center; gap:.25rem; padding:.65rem .75rem; border:1px solid rgba(244,251,247,.1); border-radius:9px; background:linear-gradient(140deg,rgba(244,251,247,.045),rgba(8,10,11,.35)); }
         .fantasy-stat-card span { color:#899791; font-size:.72rem; }
         .fantasy-stat-card strong { color:#f4fbf7; font-size:1.05rem; overflow-wrap:anywhere; }
+        .fantasy-percentile-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.55rem; margin:.55rem 0 1rem; }
+        .fantasy-percentile { position:relative; overflow:hidden; min-height:74px; display:grid; grid-template-columns:1fr auto; align-items:start; gap:.5rem; padding:.72rem .8rem 1rem; border:1px solid rgba(244,251,247,.1); border-radius:10px; background:rgba(14,18,19,.82); }
+        .fantasy-percentile span { color:#9ba9a4; font-size:.72rem; }
+        .fantasy-percentile strong { color:#f4fbf7; font-size:1.05rem; }
+        .fantasy-percentile i { position:absolute; left:0; bottom:0; width:var(--value); height:4px; background:#62d8ff; box-shadow:0 0 16px currentColor; }
+        .fantasy-percentile.elite i { background:#19e6b0; }
+        .fantasy-percentile.good i { background:#62d8ff; }
+        .fantasy-percentile.average i { background:#ffb020; }
+        .fantasy-percentile.weak i { background:#f4538a; }
         .fantasy-role-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.55rem; margin:.8rem 0 1.15rem; }
         .fantasy-role-card { display:grid; grid-template-columns:auto 1fr; gap:.1rem .6rem; align-items:center; padding:.7rem; border:1px solid rgba(244,251,247,.12); border-radius:9px; background:rgba(244,251,247,.035); }
         .fantasy-role-card>span { grid-row:1/3; width:35px; height:35px; display:grid; place-items:center; border-radius:50%; color:#08100e; background:#19e6b0; font-weight:950; }
@@ -2541,6 +3127,7 @@ def render_fantasy_styles() -> None:
             .fantasy-player-score { grid-column:1/3; flex-direction:row; align-items:center; gap:.5rem; }
             .fantasy-player-score strong { font-size:1.35rem; }
             .fantasy-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .fantasy-percentile-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-table-heading span { display:none; }
             .fantasy-selection-bar { align-items:flex-start; }
             .fantasy-selection-bar span { display:none; }
