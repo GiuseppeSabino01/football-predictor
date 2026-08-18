@@ -41,6 +41,7 @@ WORKSPACE_SESSION_KEY = "fantasy_workspace"
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
+    st.caption("Fantacalcio · Player Board v2 · build 2026.08.18")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
