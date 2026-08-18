@@ -73,7 +73,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v14 · Renderer scouting stabile")
+    st.caption("Fantacalcio · Build 2026.08.18 v15 · Barre scouting native")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -797,19 +797,30 @@ def _tier_option_label(tier: dict[str, Any]) -> str:
     return f"{marker} {str(tier.get('name') or 'Fascia')}"
 
 
-def _auction_metric_renderer(color: str, suffix: str = "") -> JsCode:
-    safe_suffix = json.dumps(suffix)
+def _auction_metric_style(color: str) -> JsCode:
     return JsCode(
         f"""function(params) {{
             const raw = Number(params.value);
-            if (!Number.isFinite(raw)) return '—';
+            if (!Number.isFinite(raw)) return {{}};
             const value = Math.max(0, Math.min(100, raw));
-            const label = Math.round(value) + {safe_suffix};
-            return '<div style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:flex-end;padding:0 2px;box-sizing:border-box;">'
-                + '<span style="position:absolute;left:2px;right:2px;bottom:4px;height:4px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;">'
-                + '<i style="display:block;height:100%;width:' + value + '%;border-radius:999px;background:{color};box-shadow:0 0 8px {color};"></i>'
-                + '</span><b style="position:relative;color:inherit;font-size:11px;font-weight:800;">'
-                + label + '</b></div>';
+            return {{
+                backgroundImage: 'linear-gradient(90deg, {color} 0%, {color} ' + value + '%, rgba(255,255,255,.08) ' + value + '%, rgba(255,255,255,.08) 100%)',
+                backgroundSize: 'calc(100% - 8px) 4px',
+                backgroundPosition: 'center calc(100% - 4px)',
+                backgroundRepeat: 'no-repeat',
+                fontWeight: '800',
+                textAlign: 'right'
+            }};
+        }}"""
+    )
+
+
+def _auction_metric_formatter(suffix: str = "") -> JsCode:
+    safe_suffix = json.dumps(suffix)
+    return JsCode(
+        f"""function(params) {{
+            const value = Number(params.value);
+            return Number.isFinite(value) ? Math.round(value) + {safe_suffix} : '—';
         }}"""
     )
 
@@ -1015,39 +1026,46 @@ def _render_auction_catalog_editor(
                 "field": "Bonus",
                 "headerName": "Propensione bonus",
                 "width": 132,
-                "cellRenderer": _auction_metric_renderer("#ffb020"),
+                "cellStyle": _auction_metric_style("#ffb020"),
+                "valueFormatter": _auction_metric_formatter(),
             },
             {
                 "field": "Titolarita",
                 "headerName": "Titolarità",
                 "width": 105,
-                "cellRenderer": _auction_metric_renderer("#19e6b0", "%"),
+                "cellStyle": _auction_metric_style("#19e6b0"),
+                "valueFormatter": _auction_metric_formatter("%"),
             },
             {
                 "field": "Affidabilita",
                 "headerName": "Affidabilità",
                 "width": 112,
-                "cellRenderer": _auction_metric_renderer("#62d8ff"),
+                "cellStyle": _auction_metric_style("#62d8ff"),
+                "valueFormatter": _auction_metric_formatter(),
             },
             {
                 "field": "Rischio infortuni",
                 "width": 125,
-                "cellRenderer": _auction_metric_renderer("#f4538a"),
+                "cellStyle": _auction_metric_style("#f4538a"),
+                "valueFormatter": _auction_metric_formatter(),
             },
             {
                 "field": "Potenziale",
                 "width": 105,
-                "cellRenderer": _auction_metric_renderer("#b895ff"),
+                "cellStyle": _auction_metric_style("#b895ff"),
+                "valueFormatter": _auction_metric_formatter(),
             },
             {
                 "field": "Valore",
                 "width": 90,
-                "cellRenderer": _auction_metric_renderer("#7de39d"),
+                "cellStyle": _auction_metric_style("#7de39d"),
+                "valueFormatter": _auction_metric_formatter(),
             },
             {
                 "field": "Indice",
                 "width": 90,
-                "cellRenderer": _auction_metric_renderer("#19e6b0"),
+                "cellStyle": _auction_metric_style("#19e6b0"),
+                "valueFormatter": _auction_metric_formatter(),
             },
             {"field": "Fascia", "width": 90},
         ],
