@@ -2,11 +2,18 @@ import pytest
 
 from fantasy.catalog import make_player
 from fantasy.service import (
+    GAME_MODE_AUCTION,
     GAME_MODE_LIST,
     add_purchase,
     add_purchases_batch,
+    auction_manager_summary,
+    auction_managers,
+    auction_price_board,
     create_league,
+    delete_league,
+    list_trade_analysis,
     new_workspace,
+    record_auction_purchase,
     remove_purchase,
     reset_preferred_xi,
     role_balance_recommendation,
@@ -251,3 +258,109 @@ def test_top_xi_uses_most_expensive_players_compatible_with_formation() -> None:
     assert summary["expected_goals_total"] == 11
     assert summary["expected_assists_total"] == 5.5
     assert summary["expected_fantasy_average_sum"] == 66
+
+
+def test_list_trade_analysis_preserves_roles_cost_and_budget() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Swap Lab",
+        initial_budget=20,
+        participants=None,
+        game_mode=GAME_MODE_LIST,
+        roster_slots={"P": 0, "D": 1, "C": 1, "A": 0},
+    )
+    owned = [
+        make_player(name="D low", team="Roma", role="D", quote=8, expected_goals=1),
+        make_player(name="C low", team="Roma", role="C", quote=12, expected_goals=1),
+    ]
+    candidates = [
+        make_player(
+            name="D high", team="Milan", role="D", quote=10,
+            expected_goals=5, expected_assists=4, starter_probability=90,
+        ),
+        make_player(
+            name="C high", team="Milan", role="C", quote=10,
+            expected_goals=5, expected_assists=4, starter_probability=90,
+        ),
+    ]
+    for player in owned:
+        player.update({"expected_fantasy_average": 5.5, "reliability": 60, "risk": 30})
+        add_purchase(league, player, player["quote"])
+    for player in candidates:
+        player.update({"expected_fantasy_average": 7.0, "reliability": 90, "risk": 5})
+
+    analysis = list_trade_analysis(league, [*owned, *candidates])
+
+    assert analysis["ready"] is True
+    trade = analysis["trades"][0]
+    assert trade["outgoing_total"] == trade["incoming_total"] == 20
+    assert trade["projected_spent"] <= league["initial_budget"]
+    assert sorted(row["role"] for row in trade["outgoing"]) == sorted(
+        row["role"] for row in trade["incoming"]
+    )
+    assert {row["name"] for row in trade["incoming"]} == {"D high", "C high"}
+
+
+def test_auction_tracks_every_manager_and_updates_comparable_prices() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Asta live",
+        initial_budget=500,
+        participants=3,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 1, "D": 1, "C": 1, "A": 2},
+    )
+    lautaro = make_player(name="Lautaro", team="Inter", role="A", quote=35)
+    douvikas = make_player(name="Douvikas", team="Como", role="A", quote=25)
+    perrone = make_player(name="Perrone", team="Como", role="C", quote=15)
+    lautaro.update({"fvm": 200, "tier": "Top", "expected_fantasy_average": 7.5})
+    douvikas.update({"fvm": 160, "tier": "Top", "expected_fantasy_average": 7.0})
+    perrone.update({"fvm": 100, "tier": "Buono", "expected_fantasy_average": 6.5})
+    managers = auction_managers(league)
+
+    record_auction_purchase(league, managers[1]["id"], lautaro, 85)
+    prices = auction_price_board(league, [lautaro, douvikas, perrone])
+
+    assert auction_manager_summary(league, managers[1]["id"])["remaining_budget"] == 415
+    assert prices[douvikas["id"]]["comparables"] == 1
+    assert prices[douvikas["id"]]["updated"] != prices[douvikas["id"]]["initial"]
+    assert prices[perrone["id"]]["comparables"] == 0
+
+
+def test_strategic_auction_price_stops_one_above_richest_opponent() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Credito avversari",
+        initial_budget=80,
+        participants=3,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 0, "D": 0, "C": 0, "A": 1},
+    )
+    filler_a = make_player(name="Spesa A", team="Roma", role="A", quote=1)
+    filler_b = make_player(name="Spesa B", team="Milan", role="A", quote=1)
+    target = make_player(name="Douvikas", team="Como", role="A", quote=25)
+    filler_a.update({"fvm": 10, "tier": "Scommessa"})
+    filler_b.update({"fvm": 10, "tier": "Scommessa"})
+    target.update({"fvm": 600, "tier": "Top"})
+    managers = auction_managers(league)
+    record_auction_purchase(league, managers[1]["id"], filler_a, 50)
+    record_auction_purchase(league, managers[2]["id"], filler_b, 50)
+
+    estimate = auction_price_board(league, [filler_a, filler_b, target])[target["id"]]
+
+    assert estimate["highest_opponent_credit"] == 30
+    assert estimate["strategic"] == 31
+
+
+def test_delete_league_keeps_other_fantacalci() -> None:
+    workspace = new_workspace()
+    first = create_league(workspace, "Da eliminare")
+    second = create_league(workspace, "Da conservare")
+
+    delete_league(workspace, first["id"])
+
+    assert [league["name"] for league in workspace["leagues"]] == ["Da conservare"]
+    assert workspace["active_league_id"] == second["id"]
