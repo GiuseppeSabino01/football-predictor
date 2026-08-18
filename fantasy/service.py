@@ -102,7 +102,9 @@ def create_league(
         "analysis": "",
         "preferred_xi": [],
         "preferred_xi_customized": False,
+        "preferred_formation": None,
         "sasa_analysis": "",
+        "sasa_analysis_version": 0,
         "created_at": now,
         "updated_at": now,
     }
@@ -170,7 +172,7 @@ def update_league_settings(
         for purchase in league.get("purchases", []):
             if purchase.get("quote") is not None:
                 purchase["price"] = _number(purchase.get("quote"))
-    league["sasa_analysis"] = ""
+    _invalidate_sasa(league)
 
 
 def delete_league(workspace: dict[str, Any], league_id: str) -> None:
@@ -231,7 +233,7 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
     league.setdefault("purchases", []).append(purchase)
     league["watchlist"] = [item for item in league.get("watchlist", []) if item != player_id]
     league["analysis"] = ""
-    league["sasa_analysis"] = ""
+    _invalidate_sasa(league)
     league["updated_at"] = utc_now()
     return purchase
 
@@ -401,7 +403,7 @@ def _median(values) -> float:
 def remove_purchase(league: dict[str, Any], player_id: str) -> None:
     league["purchases"] = [row for row in league.get("purchases", []) if row.get("player_id") != player_id]
     league["analysis"] = ""
-    league["sasa_analysis"] = ""
+    _invalidate_sasa(league)
     league["preferred_xi"] = [
         item for item in league.get("preferred_xi", []) if item != player_id
     ]
@@ -411,7 +413,7 @@ def remove_purchase(league: dict[str, Any], player_id: str) -> None:
 
 
 def selected_top_xi(league: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return the saved XI, or the 11 most expensive purchases by default."""
+    """Return the saved XI, or the most expensive valid formation by default."""
     purchases = league.get("purchases", [])
     by_id = {str(row.get("player_id")): row for row in purchases}
     if league.get("preferred_xi_customized"):
@@ -421,6 +423,10 @@ def selected_top_xi(league: dict[str, Any]) -> list[dict[str, Any]]:
             if str(player_id) in by_id
         ][:11]
         return [by_id[player_id] for player_id in selected_ids]
+    formation = top_xi_formation(league)
+    formation_players = top_xi_for_formation(league, formation)
+    if len(formation_players) == 11:
+        return formation_players
     return sorted(
         purchases,
         key=lambda row: (
@@ -432,24 +438,79 @@ def selected_top_xi(league: dict[str, Any]) -> list[dict[str, Any]]:
     )[:11]
 
 
-def set_preferred_xi(league: dict[str, Any], player_ids: list[str]) -> None:
+def top_xi_formation(league: dict[str, Any]) -> str:
+    preferred = str(league.get("preferred_formation") or "")
+    if preferred in FORMATIONS:
+        return preferred
+    candidates = [
+        (
+            sum(_number(row.get("price")) for row in top_xi_for_formation(league, formation)),
+            formation,
+        )
+        for formation in FORMATIONS
+        if len(top_xi_for_formation(league, formation)) == 11
+    ]
+    return max(candidates, default=(0.0, "4-3-3"))[1]
+
+
+def top_xi_for_formation(league: dict[str, Any], formation: str) -> list[dict[str, Any]]:
+    required = FORMATIONS.get(formation)
+    if not required:
+        return []
+    players: list[dict[str, Any]] = []
+    for role in ("A", "C", "D", "P"):
+        role_players = sorted(
+            (row for row in league.get("purchases", []) if row.get("role") == role),
+            key=lambda row: (
+                _number(row.get("price")),
+                _number(row.get("fantasy_score")),
+                str(row.get("name", "")),
+            ),
+            reverse=True,
+        )
+        players.extend(role_players[: int(required.get(role, 0))])
+    return players
+
+
+def set_preferred_xi(
+    league: dict[str, Any],
+    player_ids: list[str],
+    *,
+    formation: str | None = None,
+) -> None:
     clean_ids = list(dict.fromkeys(str(player_id) for player_id in player_ids))
-    expected_size = min(11, len(league.get("purchases", [])))
-    if len(clean_ids) != expected_size:
-        raise ValueError(f"Seleziona esattamente {expected_size} giocatori per la Top 11.")
+    if len(clean_ids) != 11:
+        raise ValueError("Seleziona esattamente 11 giocatori per la Top 11.")
     purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
     if any(player_id not in purchased_ids for player_id in clean_ids):
         raise ValueError("La Top 11 puo contenere solo giocatori della tua rosa.")
+    if formation is not None:
+        required = FORMATIONS.get(formation)
+        if not required:
+            raise ValueError("Modulo non riconosciuto.")
+        by_id = {str(row.get("player_id")): row for row in league.get("purchases", [])}
+        role_counts = {role: 0 for role in ROLE_LABELS}
+        for player_id in clean_ids:
+            role = str(by_id[player_id].get("role", ""))
+            if role in role_counts:
+                role_counts[role] += 1
+        if any(role_counts[role] != int(required.get(role, 0)) for role in ROLE_LABELS):
+            raise ValueError(f"I giocatori scelti non rispettano il modulo {formation}.")
+        league["preferred_formation"] = formation
     league["preferred_xi"] = clean_ids
     league["preferred_xi_customized"] = True
-    league["sasa_analysis"] = ""
+    _invalidate_sasa(league)
     league["updated_at"] = utc_now()
 
 
-def reset_preferred_xi(league: dict[str, Any]) -> None:
+def reset_preferred_xi(league: dict[str, Any], *, formation: str | None = None) -> None:
+    if formation is not None:
+        if formation not in FORMATIONS:
+            raise ValueError("Modulo non riconosciuto.")
+        league["preferred_formation"] = formation
     league["preferred_xi"] = []
     league["preferred_xi_customized"] = False
-    league["sasa_analysis"] = ""
+    _invalidate_sasa(league)
     league["updated_at"] = utc_now()
 
 
@@ -459,6 +520,10 @@ def top_xi_summary(league: dict[str, Any]) -> dict[str, Any]:
         "players": players,
         "player_ids": [str(row.get("player_id")) for row in players],
         "count": len(players),
+        "formation": top_xi_formation(league),
+        "expected_goals_total": _known_sum(players, "expected_goals"),
+        "expected_assists_total": _known_sum(players, "expected_assists"),
+        "expected_fantasy_average_sum": _known_sum(players, "expected_fantasy_average"),
         "expected_goals_average": _known_average(players, "expected_goals"),
         "expected_assists_average": _known_average(players, "expected_assists"),
         "expected_fantasy_average": _known_average(players, "expected_fantasy_average"),
@@ -476,7 +541,7 @@ def set_captain(league: dict[str, Any], player_id: str | None) -> None:
     else:
         league["captain_player_id"] = player_id
     league["analysis"] = ""
-    league["sasa_analysis"] = ""
+    _invalidate_sasa(league)
     league["updated_at"] = utc_now()
 
 
@@ -578,7 +643,9 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("analysis", "")
     league.setdefault("preferred_xi", [])
     league.setdefault("preferred_xi_customized", False)
+    league.setdefault("preferred_formation", None)
     league.setdefault("sasa_analysis", "")
+    league.setdefault("sasa_analysis_version", 0)
     league.setdefault("updated_at", utc_now())
 
 
@@ -605,3 +672,17 @@ def _known_average(players: list[dict[str, Any]], field: str) -> float | None:
         if (number := _optional_number(player.get(field))) is not None
     ]
     return sum(values) / len(values) if values else None
+
+
+def _known_sum(players: list[dict[str, Any]], field: str) -> float | None:
+    values = [
+        number
+        for player in players
+        if (number := _optional_number(player.get(field))) is not None
+    ]
+    return sum(values) if values else None
+
+
+def _invalidate_sasa(league: dict[str, Any]) -> None:
+    league["sasa_analysis"] = ""
+    league["sasa_analysis_version"] = 0
