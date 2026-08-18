@@ -17,6 +17,7 @@ ROLE_LABELS = {
     "C": "Centrocampisti",
     "A": "Attaccanti",
 }
+AUCTION_TIER_COLORS = {"red", "orange", "yellow", "green", "blue", "purple", "gray"}
 FORMATIONS = {
     "4-3-3": {"P": 1, "D": 4, "C": 3, "A": 3},
     "4-4-2": {"P": 1, "D": 4, "C": 4, "A": 2},
@@ -101,6 +102,8 @@ def create_league(
         "purchases": [],
         "auction_managers": _new_auction_managers(int(participants or 0))
         if game_mode == GAME_MODE_AUCTION else [],
+        "auction_tiers": [],
+        "auction_player_tiers": {},
         "watchlist": [],
         "analysis": "",
         "preferred_xi": [],
@@ -238,6 +241,46 @@ def rename_auction_manager(league: dict[str, Any], manager_id: str, name: str) -
     league["updated_at"] = utc_now()
 
 
+def create_auction_tier(league: dict[str, Any], name: str, color: str) -> dict[str, Any]:
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        raise ValueError("Le fasce personalizzate sono disponibili solo per l'asta.")
+    clean_name = name.strip()
+    clean_color = color.strip().lower()
+    if not clean_name:
+        raise ValueError("Inserisci un nome per la fascia.")
+    if clean_color not in AUCTION_TIER_COLORS:
+        raise ValueError("Colore della fascia non riconosciuto.")
+    tiers = league.setdefault("auction_tiers", [])
+    if any(str(tier.get("name", "")).strip().casefold() == clean_name.casefold() for tier in tiers):
+        raise ValueError("Esiste gia una fascia con questo nome.")
+    tier = {"id": uuid4().hex, "name": clean_name, "color": clean_color}
+    tiers.append(tier)
+    league["updated_at"] = utc_now()
+    return tier
+
+
+def delete_auction_tier(league: dict[str, Any], tier_id: str) -> None:
+    clean_id = str(tier_id)
+    league["auction_tiers"] = [
+        tier for tier in league.get("auction_tiers", []) if str(tier.get("id")) != clean_id
+    ]
+    assignments = league.setdefault("auction_player_tiers", {})
+    league["auction_player_tiers"] = {
+        str(player_id): assigned_tier
+        for player_id, assigned_tier in assignments.items()
+        if str(assigned_tier) != clean_id
+    }
+    league["updated_at"] = utc_now()
+
+
+def auction_player_tier(league: dict[str, Any], player_id: str) -> dict[str, Any] | None:
+    tier_id = str(league.get("auction_player_tiers", {}).get(str(player_id)) or "")
+    return next(
+        (tier for tier in league.get("auction_tiers", []) if str(tier.get("id")) == tier_id),
+        None,
+    )
+
+
 def auction_manager_summary(league: dict[str, Any], manager_id: str) -> dict[str, Any]:
     manager = next((row for row in auction_managers(league) if row.get("id") == manager_id), None)
     if not manager:
@@ -350,7 +393,10 @@ def update_auction_assignments(
         price = _number(change.get("price"))
         if price < 0:
             raise ValueError("Il prezzo non puo essere negativo.")
-        _apply_auction_assignment(draft, player, clean_manager_id, price)
+        if bool(change.get("update_assignment", True)):
+            _apply_auction_assignment(draft, player, clean_manager_id, price)
+        if "tier_id" in change:
+            _apply_auction_player_tier(draft, player_id, change.get("tier_id"))
     league.clear()
     league.update(draft)
 
@@ -389,6 +435,22 @@ def _apply_auction_assignment(
     if current_manager_id:
         remove_auction_purchase(league, current_manager_id, player_id)
     record_auction_purchase(league, manager_id, player, price)
+
+
+def _apply_auction_player_tier(
+    league: dict[str, Any], player_id: str, tier_id: Any
+) -> None:
+    clean_tier_id = str(tier_id) if tier_id else None
+    if clean_tier_id and not any(
+        str(tier.get("id")) == clean_tier_id for tier in league.get("auction_tiers", [])
+    ):
+        raise ValueError("Fascia personalizzata non trovata.")
+    assignments = league.setdefault("auction_player_tiers", {})
+    if clean_tier_id:
+        assignments[str(player_id)] = clean_tier_id
+    else:
+        assignments.pop(str(player_id), None)
+    league["updated_at"] = utc_now()
 
 
 def auction_price_board(
@@ -510,21 +572,7 @@ def _initial_auction_price(player: dict[str, Any], budget: float) -> float:
 
 def _auction_comparable_group(player: dict[str, Any]) -> tuple[str, str]:
     role = str(player.get("role", "")).upper()
-    tier = str(player.get("tier") or "").strip().casefold()
-    if tier:
-        return role, tier
-    score = player_score(player)
-    if score >= 75:
-        band = "elite"
-    elif score >= 62:
-        band = "top"
-    elif score >= 48:
-        band = "buono"
-    elif score >= 32:
-        band = "rotazione"
-    else:
-        band = "scommessa"
-    return role, band
+    return role, "intero reparto"
 
 
 def _robust_average(values: list[float]) -> float:
@@ -1179,6 +1227,24 @@ def _normalize_league(league: dict[str, Any]) -> None:
             manager.setdefault("purchases", [])
     else:
         league["auction_managers"] = []
+    league.setdefault("auction_tiers", [])
+    league.setdefault("auction_player_tiers", {})
+    if not isinstance(league["auction_tiers"], list):
+        league["auction_tiers"] = []
+    if not isinstance(league["auction_player_tiers"], dict):
+        league["auction_player_tiers"] = {}
+    valid_tier_ids = set()
+    for tier in league["auction_tiers"]:
+        tier.setdefault("id", uuid4().hex)
+        tier.setdefault("name", "Fascia")
+        if str(tier.get("color", "")).lower() not in AUCTION_TIER_COLORS:
+            tier["color"] = "gray"
+        valid_tier_ids.add(str(tier["id"]))
+    league["auction_player_tiers"] = {
+        str(player_id): str(tier_id)
+        for player_id, tier_id in league["auction_player_tiers"].items()
+        if str(tier_id) in valid_tier_ids
+    }
     league.setdefault("watchlist", [])
     league.setdefault("analysis", "")
     league.setdefault("preferred_xi", [])
