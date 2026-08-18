@@ -394,20 +394,28 @@ def _related_news(
     return [item for _, item in sorted(ranked, key=lambda row: row[0], reverse=True)]
 
 
-def _physical_risk_reason(player: dict[str, Any], risk: float, status: str) -> str:
-    reasons = [f"indice di rischio {risk:.0f}/100"]
-    expected_appearances = number(player.get("expected_appearances"))
-    reliability = number(player.get("reliability"))
-    starter = number(player.get("starter_probability"))
-    if status:
-        reasons.append(f"stato listone: {status}")
-    if expected_appearances and expected_appearances < 27:
-        reasons.append(f"solo {expected_appearances:.0f} presenze attese")
-    if reliability and reliability < 70:
-        reasons.append(f"affidabilita {reliability:.0f}/100")
-    if starter and starter < 60:
-        reasons.append(f"titolarita {starter:.0f}%")
-    return ", ".join(reasons)
+def _is_published_news(item: dict[str, Any]) -> bool:
+    title = str(item.get("title") or "").strip()
+    source = str(item.get("source") or "").strip()
+    url = str(item.get("url") or "").strip()
+    return bool(title and source and url.startswith("http") and item.get("verified") is True)
+
+
+def _news_alert_kind(item: dict[str, Any]) -> tuple[str, str]:
+    searchable = " ".join(
+        [str(item.get("title") or ""), str(item.get("summary") or "")]
+    ).casefold()
+    if "squal" in searchable:
+        return "Squalifica", "high"
+    if any(
+        keyword in searchable
+        for keyword in (
+            "infortun", "lesion", "problema muscolare", "operazione", "operato",
+            "stop", "indispon", "out", "salta", "recupero", "allenamento a parte",
+        )
+    ):
+        return "Disponibilita", "high"
+    return "Notizia", "news"
 
 
 def build_roster_alerts(
@@ -420,106 +428,43 @@ def build_roster_alerts(
     relevant = [
         _enrich_purchase(row, catalog_by_id) for row in league.get("purchases", [])
     ] + [catalog_by_id[player_id] for player_id in watched_ids if player_id in catalog_by_id]
-    available_news = news_items or []
+    available_news = [item for item in (news_items or []) if _is_published_news(item)]
     alerts: list[dict[str, Any]] = []
-    seen_players: set[str] = set()
     used_news_urls: set[str] = set()
-    for player in relevant:
-        player_id = str(player.get("player_id") or player.get("id") or "")
-        if player_id in seen_players:
+    for item in available_news:
+        url = str(item.get("url") or "")
+        if url in used_news_urls:
             continue
-        seen_players.add(player_id)
-        name = str(player.get("name") or "Giocatore")
-        risk = number(player.get("risk"))
-        starter = number(player.get("starter_probability"))
-        status = str(player.get("status") or "").strip()
-        related_news = _related_news(player, available_news)
-        evidence = related_news[0] if related_news else None
-        if risk >= 40:
-            reason = _physical_risk_reason(player, risk, status)
-            if evidence:
-                evidence_title = str(evidence.get("title") or "")
-                evidence_summary = str(evidence.get("summary") or "").strip()
-                if evidence_summary and evidence_summary.casefold() != evidence_title.casefold():
-                    reason = f"{reason}. {evidence_summary}"
-                source = str(evidence.get("source") or "Fantacalcio.it")
-                url = evidence.get("url")
-                if url:
-                    used_news_urls.add(str(url))
-            else:
-                evidence_title = ""
-                source = "Modello statistico"
-                url = None
-                reason = (
-                    f"{reason}. Non risulta una notizia recente verificata associata: "
-                    "il segnale deriva dagli indicatori del giocatore."
-                )
-            alerts.append(
-                {
-                    "id": _alert_id(
-                        league.get("id"), player_id, "risk", round(risk),
-                        (evidence or {}).get("url"),
-                    ),
-                    "severity": "high" if risk >= 60 else "medium",
-                    "title": f"Rischio fisico: {name}",
-                    "message": reason,
-                    "evidence_title": evidence_title,
-                    "has_news": bool(evidence),
-                    "player_id": player_id,
-                    "source": source,
-                    "url": url,
-                }
-            )
-        if starter and starter < 55:
-            alerts.append(
-                {
-                    "id": _alert_id(league.get("id"), player_id, "starter", round(starter)),
-                    "severity": "medium",
-                    "title": f"Titolarita da monitorare: {name}",
-                    "message": f"Probabilita di titolarita {starter:.0f}%. Valuta un'alternativa nella Top 11.",
-                    "player_id": player_id,
-                    "source": "Analisi rosa",
-                    "url": None,
-                }
-            )
-        lowered_status = status.casefold()
-        if status and any(word in lowered_status for word in ("infortun", "squal", "dubb", "indispon")):
-            status_evidence = evidence if evidence and str(evidence.get("url") or "") not in used_news_urls else None
-            if status_evidence and status_evidence.get("url"):
-                used_news_urls.add(str(status_evidence.get("url")))
-            alerts.append(
-                {
-                    "id": _alert_id(league.get("id"), player_id, "status", lowered_status),
-                    "severity": "high",
-                    "title": f"Aggiornamento disponibilita: {name}",
-                    "message": f"Motivo registrato nel listone: {status}.",
-                    "evidence_title": str((status_evidence or {}).get("title") or ""),
-                    "has_news": bool(status_evidence),
-                    "player_id": player_id,
-                    "source": str((status_evidence or {}).get("source") or "Listone"),
-                    "url": (status_evidence or {}).get("url"),
-                }
-            )
-    for player in relevant:
-        for item in _related_news(player, available_news)[:2]:
-            url = str(item.get("url") or "")
-            if url in used_news_urls:
-                continue
-            used_news_urls.add(url)
-            title = str(item.get("title") or "")
-            summary = str(item.get("summary") or "").strip()
-            alerts.append(
-                {
-                    "id": _alert_id(league.get("id"), url, title),
-                    "severity": "news",
-                    "title": f"Notizia su {player.get('name')}",
-                    "message": summary or "Aggiornamento recente collegato alla tua rosa o watchlist.",
-                    "evidence_title": title,
-                    "has_news": True,
-                    "player_id": str(player.get("player_id") or player.get("id") or ""),
-                    "source": str(item.get("source") or "Fantacalcio.it"),
-                    "url": item.get("url"),
-                }
-            )
+        matched_players = [
+            player for player in relevant if _related_news(player, [item])
+        ]
+        if not matched_players:
+            continue
+        used_news_urls.add(url)
+        names = list(
+            dict.fromkeys(str(player.get("name") or "Giocatore") for player in matched_players)
+        )
+        kind, severity = _news_alert_kind(item)
+        title = str(item.get("title") or "")
+        summary = str(item.get("summary") or "").strip()
+        alerts.append(
+            {
+                "id": _alert_id(league.get("id"), url, title),
+                "severity": severity,
+                "title": f"{kind}: {', '.join(names)}",
+                "message": summary or (
+                    f"La notizia pubblicata cita {', '.join(names)} della tua rosa o watchlist."
+                ),
+                "evidence_title": title,
+                "has_news": True,
+                "player_id": str(
+                    matched_players[0].get("player_id")
+                    or matched_players[0].get("id")
+                    or ""
+                ),
+                "source": str(item.get("source")),
+                "url": item.get("url"),
+            }
+        )
     severity_order = {"high": 0, "medium": 1, "news": 2, "low": 3}
     return sorted(alerts, key=lambda alert: severity_order.get(str(alert.get("severity")), 9))
