@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Any
 
 from config.settings import Settings
@@ -67,6 +68,52 @@ class SupabaseStorage:
             "model": model,
             "generated_at": prediction.generated_at.isoformat(),
             "payload_json": llm_payload(prediction, model),
+        }
+        try:
+            self.client.table("llm_prediction_cache").upsert(row, on_conflict="cache_key").execute()
+        except Exception:
+            return False
+        return True
+
+    def load_json_state(self, state_key: str) -> dict[str, Any] | None:
+        if not self.client:
+            return None
+        try:
+            response = (
+                self.client.table("llm_prediction_cache")
+                .select("payload_json")
+                .eq("cache_key", state_key)
+                .limit(1)
+                .execute()
+            )
+        except Exception:
+            return None
+        rows = getattr(response, "data", None) or []
+        if not rows:
+            return None
+        payload = rows[0].get("payload_json")
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(payload, str):
+            try:
+                decoded = json.loads(payload)
+            except json.JSONDecodeError:
+                return None
+            return decoded if isinstance(decoded, dict) else None
+        return None
+
+    def upsert_json_state(self, state_key: str, label: str, payload: dict[str, Any]) -> bool:
+        if not self.client:
+            return False
+        now = datetime.now(timezone.utc).isoformat()
+        row = {
+            "cache_key": state_key,
+            "match_id": "app-state",
+            "match_label": label,
+            "match_date": now[:10],
+            "model": "app-state-v1",
+            "generated_at": now,
+            "payload_json": payload,
         }
         try:
             self.client.table("llm_prediction_cache").upsert(row, on_conflict="cache_key").execute()
