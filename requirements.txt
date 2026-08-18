@@ -1,10 +1,10 @@
 requests>=2.32.0
 python-dotenv>=1.0.1
 streamlit>=1.35.0
+streamlit-aggrid>=1.2.0,<2.0.0
 pandas>=2.2.0
 openpyxl>=3.1.5
 beautifulsoup4>=4.12.3
 feedparser>=6.0.11
 supabase>=2.5.0
 pytest>=8.2.0
-# Streamlit rebuild: Player Board v2
