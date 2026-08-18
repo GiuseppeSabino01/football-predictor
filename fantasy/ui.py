@@ -16,6 +16,7 @@ from fantasy.official_catalog import (
 )
 from fantasy.service import (
     DEFAULT_ROSTER_SLOTS,
+    FORMATIONS,
     GAME_MODE_AUCTION,
     GAME_MODE_LIST,
     ROLE_LABELS,
@@ -31,6 +32,8 @@ from fantasy.service import (
     set_captain,
     set_preferred_xi,
     toggle_watchlist,
+    top_xi_for_formation,
+    top_xi_formation,
     top_xi_summary,
     touch_workspace,
     utc_now,
@@ -41,11 +44,12 @@ from nlp.gemini_client import GeminiClient
 
 
 WORKSPACE_SESSION_KEY = "fantasy_workspace"
+SASA_ANALYSIS_VERSION = 2
 
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Player Board v4 · rosa integrata")
+    st.caption("Fantacalcio · Player Board v5 · campo Top 11 + SaSa rosa completa")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -153,6 +157,7 @@ def _refresh_purchased_player_data(
         if league_changed:
             league["analysis"] = ""
             league["sasa_analysis"] = ""
+            league["sasa_analysis_version"] = 0
             league["updated_at"] = utc_now()
     return changed
 
@@ -1134,18 +1139,17 @@ def _render_my_squad(
     xi_summary = top_xi_summary(league)
     goals, assists, fantasy_average = st.columns(3)
     goals.metric(
-        "Media gol Top 11",
-        _format_stat(xi_summary["expected_goals_average"], 2),
+        "Gol totali attesi · Top 11",
+        _format_stat(xi_summary["expected_goals_total"], 1),
     )
     assists.metric(
-        "Media assist Top 11",
-        _format_stat(xi_summary["expected_assists_average"], 2),
+        "Assist totali attesi · Top 11",
+        _format_stat(xi_summary["expected_assists_total"], 1),
     )
     fantasy_average.metric(
-        "Fantamedia Top 11",
-        _format_stat(xi_summary["expected_fantasy_average"], 2),
+        "Somma FM attese · Top 11",
+        _format_stat(xi_summary["expected_fantasy_average_sum"], 2),
     )
-    _render_top_xi_table(xi_summary)
     if league.get("captain_enabled"):
         _render_captain_control(workspace, league, storage)
     with st.expander(f"Rosa completa · {len(league.get('purchases', []))} giocatori"):
@@ -1161,33 +1165,95 @@ def _render_top_xi_editor(
     purchases = league.get("purchases", [])
     by_id = {str(row.get("player_id")): row for row in purchases}
     current = top_xi_summary(league)
-    expected_size = min(11, len(purchases))
     mode = "personalizzata" if league.get("preferred_xi_customized") else "automatica"
     st.markdown(
         f'<section class="fantasy-xi-hero"><div><span>TOP 11 · {mode.upper()}</span>'
-        f'<strong>Scegli i titolari della tua squadra</strong>'
-        f'<small>Di default uso i {expected_size} giocatori pagati di piu. Puoi sostituirli e salvare la tua scelta.</small>'
+        f'<strong>Disegna la tua formazione sul campo</strong>'
+        f'<small>Scegli il modulo e ogni posizione. Di default inserisco i giocatori piu costosi compatibili.</small>'
         f'</div><b>{current["count"]}/11</b></section>',
         unsafe_allow_html=True,
     )
-    selector_key = (
-        f"preferred_xi_{league['id']}_{len(purchases)}_"
-        f"{int(bool(league.get('preferred_xi_customized')))}"
+    formation_options = list(FORMATIONS)
+    default_formation = top_xi_formation(league)
+    formation = st.selectbox(
+        "Modulo",
+        formation_options,
+        index=formation_options.index(default_formation),
+        key=f"preferred_formation_{league['id']}",
     )
-    selected_ids = st.multiselect(
-        "La mia Top 11",
-        list(by_id),
-        default=current["player_ids"],
-        max_selections=11,
-        format_func=lambda player_id: (
-            f"{by_id[player_id].get('role')} · {by_id[player_id].get('name')} · "
-            f"{by_id[player_id].get('team')} · {float(by_id[player_id].get('price') or 0):.0f} cr"
-        ),
-        key=selector_key,
-        help="Seleziona esattamente 11 giocatori, oppure tutti quelli disponibili finche la rosa ne contiene meno di 11.",
+    saved_formation = str(league.get("preferred_formation") or default_formation)
+    if league.get("preferred_xi_customized") and formation == saved_formation:
+        default_players = current["players"]
+    else:
+        default_players = top_xi_for_formation(league, formation)
+    defaults_by_role = {
+        role: [str(row.get("player_id")) for row in default_players if row.get("role") == role]
+        for role in ROLE_LABELS
+    }
+    available_by_role = {
+        role: sorted(
+            (str(row.get("player_id")) for row in purchases if row.get("role") == role),
+            key=lambda player_id: (
+                float(by_id[player_id].get("price") or 0),
+                float(by_id[player_id].get("fantasy_score") or 0),
+            ),
+            reverse=True,
+        )
+        for role in ROLE_LABELS
+    }
+    selected_ids: list[str] = []
+    pitch_version = (
+        f"{len(purchases)}_{int(bool(league.get('preferred_xi_customized')))}_{formation}"
     )
+    role_titles = {"A": "ATTACCO", "C": "CENTROCAMPO", "D": "DIFESA", "P": "PORTA"}
+    with st.container(key="top_xi_pitch"):
+        st.markdown(
+            f'<div class="fantasy-pitch-title"><span>FORMAZIONE TITOLARE</span>'
+            f'<strong>{escape(formation)}</strong></div>',
+            unsafe_allow_html=True,
+        )
+        for role in ("A", "C", "D", "P"):
+            required = int(FORMATIONS[formation].get(role, 0))
+            st.markdown(
+                f'<div class="fantasy-pitch-role role-{role.lower()}">{role_titles[role]}</div>',
+                unsafe_allow_html=True,
+            )
+            slot_columns = _pitch_slot_columns(required)
+            for slot_index, column in enumerate(slot_columns):
+                with column:
+                    st.caption(f"{role}{slot_index + 1}")
+                    default_id = (
+                        defaults_by_role[role][slot_index]
+                        if slot_index < len(defaults_by_role[role]) else None
+                    )
+                    options = [
+                        None,
+                        *[
+                            player_id
+                            for player_id in available_by_role[role]
+                            if player_id not in selected_ids
+                        ],
+                    ]
+                    if default_id not in options:
+                        default_id = None
+                    selected_id = st.selectbox(
+                        f"{role}{slot_index + 1}",
+                        options,
+                        index=options.index(default_id),
+                        format_func=lambda player_id, slot=f"{role}{slot_index + 1}": (
+                            f"Scegli {slot}" if player_id is None else
+                            f"{by_id[player_id].get('name')} · {by_id[player_id].get('team')}"
+                        ),
+                        label_visibility="collapsed",
+                        key=(
+                            f"pitch_player_{league['id']}_{pitch_version}_"
+                            f"{role}_{slot_index}"
+                        ),
+                    )
+                    if selected_id is not None:
+                        selected_ids.append(selected_id)
     save_column, reset_column = st.columns([1.35, 0.85])
-    selection_complete = len(selected_ids) == expected_size
+    selection_complete = len(selected_ids) == 11 and len(set(selected_ids)) == 11
     if save_column.button(
         "Salva la mia Top 11",
         type="primary",
@@ -1196,7 +1262,7 @@ def _render_top_xi_editor(
         key=f"save_preferred_xi_{league['id']}",
     ):
         try:
-            set_preferred_xi(league, selected_ids)
+            set_preferred_xi(league, selected_ids, formation=formation)
         except ValueError as error:
             st.error(str(error))
         else:
@@ -1209,14 +1275,19 @@ def _render_top_xi_editor(
         disabled=not league.get("preferred_xi_customized"),
         key=f"reset_preferred_xi_{league['id']}",
     ):
-        reset_preferred_xi(league)
+        reset_preferred_xi(league, formation=formation)
         touch_workspace(workspace)
         _save_workspace(workspace, storage)
         st.rerun()
     if not selection_complete:
-        st.warning(f"Seleziona {expected_size} giocatori: ne hai scelti {len(selected_ids)}.")
-    elif expected_size < 11:
-        st.caption(f"La Top 11 si completera automaticamente: mancano ancora {11 - expected_size} giocatori in rosa.")
+        missing = 11 - len(set(selected_ids))
+        st.warning(f"Completa il campo: mancano {missing} giocatori alla Top 11.")
+
+
+def _pitch_slot_columns(count: int) -> list[Any]:
+    side_space = {1: 2.2, 2: 1.15, 3: 0.58, 4: 0.24, 5: 0.08}.get(count, 0.08)
+    columns = st.columns([side_space, *([1.0] * count), side_space], gap="small")
+    return list(columns[1:-1])
 
 
 def _render_top_xi_table(summary: dict[str, Any]) -> None:
@@ -1334,7 +1405,7 @@ def _render_sasa_analysis(
 ) -> None:
     st.markdown("#### SaSa · Il tuo analista di fantacalcio")
     st.caption(
-        "SaSa e separato da GiGi: studia Top 11, rosa, costi, bonus attesi e regole del tuo fanta."
+        "SaSa analizza ogni giocatore della rosa e usa la Top 11 come riferimento tattico."
     )
     if st.button(
         "Chiedi l'analisi a SaSa",
@@ -1344,20 +1415,27 @@ def _render_sasa_analysis(
     ):
         prompt = _sasa_analysis_prompt(league, summary, xi_summary)
         try:
-            with st.spinner("SaSa sta studiando la tua Top 11..."):
+            with st.spinner("SaSa sta studiando tutti i giocatori della rosa..."):
                 analysis = GeminiClient(settings).generate_text(prompt).strip()
         except Exception as error:
             st.error(f"Analisi non disponibile: {error}")
         else:
             if analysis:
                 league["sasa_analysis"] = analysis
+                league["sasa_analysis_version"] = SASA_ANALYSIS_VERSION
                 league["updated_at"] = utc_now()
                 touch_workspace(workspace)
                 _save_workspace(workspace, storage)
                 st.rerun()
     if not settings.has_gemini:
         st.info("Configura GEMINI_API_KEY per attivare SaSa.")
-    if league.get("sasa_analysis"):
+    analysis_is_current = (
+        league.get("sasa_analysis")
+        and int(league.get("sasa_analysis_version") or 0) == SASA_ANALYSIS_VERSION
+    )
+    if league.get("sasa_analysis") and not analysis_is_current:
+        st.info("SaSa e stato aggiornato: avvia una nuova analisi per includere tutta la rosa.")
+    if analysis_is_current:
         with st.container(border=True):
             st.markdown(league["sasa_analysis"])
 
@@ -1367,11 +1445,14 @@ def _sasa_analysis_prompt(
     summary: dict[str, Any],
     xi_summary: dict[str, Any],
 ) -> str:
+    top_xi_ids = set(xi_summary.get("player_ids", []))
     roster_lines = []
     for row in league.get("purchases", []):
+        status = "TOP 11" if str(row.get("player_id")) in top_xi_ids else "PANCHINA"
         roster_lines.append(
             " | ".join(
                 [
+                    status,
                     str(row.get("role", "")),
                     str(row.get("name", "")),
                     str(row.get("team", "")),
@@ -1415,12 +1496,20 @@ Composizione rosa prevista: {league.get('roster_slots')}.
 Slot mancanti: {summary['missing']}.
 Top 11 selezionata ({xi_summary.get('count', 0)}/11):
 {chr(10).join(top_xi_lines) or 'non ancora disponibile'}
-Medie Top 11: gol {xi_summary.get('expected_goals_average')}; assist {xi_summary.get('expected_assists_average')}; fantamedia {xi_summary.get('expected_fantasy_average')}.
+Totali Top 11: gol attesi {xi_summary.get('expected_goals_total')}; assist attesi {xi_summary.get('expected_assists_total')}; somma fantamedie attese {xi_summary.get('expected_fantasy_average_sum')}.
 
-Rosa completa:
+Rosa completa ({len(league.get('purchases', []))} giocatori; TOP 11 o PANCHINA indicato per ogni riga):
 {chr(10).join(roster_lines)}
 
-Rispondi con queste sezioni brevi: Voto Top 11 su 10, Potenziale bonus, Punti deboli, Cambi consigliati nella Top 11, Priorita per i prossimi acquisti. Sii concreto, conciso e cita i giocatori per nome.
+ISTRUZIONE OBBLIGATORIA: l'oggetto principale e l'intera rosa, non soltanto la Top 11. Considera e cita tutti i {len(league.get('purchases', []))} giocatori senza ometterne nessuno. Usa la Top 11 come riferimento per gerarchie, equilibrio e possibili sostituzioni.
+
+Rispondi con queste sezioni:
+1. Voto della rosa completa su 10.
+2. Analisi giocatore per giocatore: una tabella con una riga per ogni calciatore, stato TOP 11/PANCHINA, giudizio sintetico e utilita prevista.
+3. Analisi della Top 11: bonus attesi, equilibrio e punti deboli.
+4. Panchina e profondita: coperture, rischi di titolarita e alternative alla Top 11.
+5. Cambi consigliati nella Top 11 e priorita per i prossimi acquisti.
+Sii concreto, non inventare dati e verifica prima di concludere che ogni nome della rosa sia stato citato almeno una volta.
 """.strip()
 
 
@@ -1487,6 +1576,21 @@ def render_fantasy_styles() -> None:
         .fantasy-xi-hero strong { color:#f4fbf7; font-size:1.12rem; }
         .fantasy-xi-hero small { color:#95a39e; }
         .fantasy-xi-hero b { min-width:66px; height:66px; display:grid; place-items:center; border:1px solid rgba(98,216,255,.55); border-radius:50%; color:#07100d; background:#62d8ff; font-size:1.08rem; box-shadow:0 0 30px rgba(98,216,255,.18); }
+        .st-key-top_xi_pitch { position:relative; isolation:isolate; overflow:hidden; margin:.75rem 0 1rem; padding:1rem 1.1rem 1.35rem; border:1px solid rgba(94,255,178,.45); border-radius:18px; background:radial-gradient(circle at 50% 50%,transparent 0 66px,rgba(225,255,240,.2) 67px 69px,transparent 70px),linear-gradient(to bottom,transparent 49.7%,rgba(225,255,240,.22) 49.8% 50.2%,transparent 50.3%),repeating-linear-gradient(90deg,rgba(10,74,53,.94) 0 12.5%,rgba(12,88,62,.94) 12.5% 25%),linear-gradient(145deg,#07533a,#092f26); box-shadow:inset 0 0 70px rgba(0,0,0,.34),0 18px 45px rgba(0,0,0,.22); }
+        .st-key-top_xi_pitch:before { content:""; position:absolute; z-index:-1; inset:1.2rem; border:2px solid rgba(225,255,240,.2); border-radius:4px; pointer-events:none; }
+        .st-key-top_xi_pitch:after { content:""; position:absolute; z-index:-1; left:36%; right:36%; bottom:1.2rem; height:13%; border:2px solid rgba(225,255,240,.18); border-bottom:0; pointer-events:none; }
+        .fantasy-pitch-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:.35rem; padding:.35rem .5rem; border-radius:8px; background:rgba(3,25,18,.48); }
+        .fantasy-pitch-title span { color:#a8c6ba; font-size:.62rem; font-weight:950; letter-spacing:.12em; }
+        .fantasy-pitch-title strong { color:#f4fbf7; font-size:1rem; }
+        .fantasy-pitch-role { width:fit-content; margin:.55rem auto .12rem; padding:.15rem .48rem; border-radius:999px; color:#07100d; background:#19e6b0; font-size:.58rem; font-weight:950; letter-spacing:.08em; box-shadow:0 4px 16px rgba(0,0,0,.18); }
+        .fantasy-pitch-role.role-a { background:#f4538a; }
+        .fantasy-pitch-role.role-c { background:#62d8ff; }
+        .fantasy-pitch-role.role-d { background:#19e6b0; }
+        .fantasy-pitch-role.role-p { background:#ffb020; }
+        .st-key-top_xi_pitch div[data-testid="stCaptionContainer"] { text-align:center; }
+        .st-key-top_xi_pitch div[data-testid="stCaptionContainer"] p { color:#d9eee5; font-size:.62rem; font-weight:900; }
+        .st-key-top_xi_pitch [data-baseweb="select"]>div { min-height:42px; border-color:rgba(224,255,241,.28); background:rgba(3,22,16,.84); box-shadow:0 8px 18px rgba(0,0,0,.2); }
+        .st-key-top_xi_pitch [data-baseweb="select"] span { color:#f4fbf7; font-size:.72rem; font-weight:750; }
         div[data-testid="stDataFrame"] { overflow:hidden; border:1px solid rgba(25,230,176,.2); border-radius:4px 4px 12px 12px; box-shadow:0 14px 36px rgba(0,0,0,.18); }
         .fantasy-player-hero { --role:#19e6b0; display:grid; grid-template-columns:auto 1fr auto; gap:.9rem; align-items:center; margin:1.15rem 0 .75rem; padding:1rem; border:1px solid color-mix(in srgb,var(--role) 42%,transparent); border-radius:13px; background:radial-gradient(circle at 88% 12%,color-mix(in srgb,var(--role) 18%,transparent),transparent 32%),linear-gradient(125deg,rgba(244,251,247,.055),rgba(8,10,11,.92)); }
         .fantasy-player-hero.role-p { --role:#ffb020; }
@@ -1536,6 +1640,10 @@ def render_fantasy_styles() -> None:
             .fantasy-xi-hero { align-items:flex-start; padding:.85rem; }
             .fantasy-xi-hero small { font-size:.72rem; }
             .fantasy-xi-hero b { min-width:54px; height:54px; }
+            .st-key-top_xi_pitch { padding:.7rem .35rem 1rem; border-radius:12px; }
+            .st-key-top_xi_pitch:before { inset:.75rem .45rem; }
+            .st-key-top_xi_pitch [data-baseweb="select"] span { font-size:.58rem; }
+            .st-key-top_xi_pitch [data-baseweb="select"]>div { min-height:38px; padding-left:.25rem; padding-right:.15rem; }
             .fantasy-role-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-insights { grid-template-columns:1fr; }
             .fantasy-empty { padding:1.25rem .8rem; }
