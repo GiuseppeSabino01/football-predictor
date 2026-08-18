@@ -77,8 +77,30 @@ def test_alerts_are_personalized_to_roster_and_watchlist():
     alerts = build_roster_alerts(
         league,
         catalog,
-        [{"title": "Player 3 cambia gerarchia", "url": "https://example.com/3"}],
+        [
+            {
+                "title": "Player 1 si ferma: problema muscolare",
+                "summary": "Il calciatore sara valutato nei prossimi giorni.",
+                "url": "https://example.com/1",
+                "source": "Test News",
+            },
+            {"title": "Player 3 cambia gerarchia", "url": "https://example.com/3"},
+        ],
     )
     titles = " ".join(str(alert["title"]) for alert in alerts)
     assert "Rischio fisico" in titles
     assert "Titolarita da monitorare" in titles
+    risk_alert = next(alert for alert in alerts if alert["title"].startswith("Rischio fisico"))
+    assert risk_alert["has_news"] is True
+    assert risk_alert["evidence_title"] == "Player 1 si ferma: problema muscolare"
+    assert risk_alert["source"] == "Test News"
+    assert "problema muscolare" in risk_alert["evidence_title"]
+
+
+def test_physical_risk_without_news_explains_that_it_is_statistical():
+    league, catalog = complete_league()
+    league["purchases"][0]["risk"] = 65
+    alerts = build_roster_alerts(league, catalog, [])
+    risk_alert = next(alert for alert in alerts if alert["title"].startswith("Rischio fisico"))
+    assert risk_alert["has_news"] is False
+    assert "Non risulta una notizia recente verificata" in risk_alert["message"]
