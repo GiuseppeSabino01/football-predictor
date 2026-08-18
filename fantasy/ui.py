@@ -24,6 +24,7 @@ from fantasy.service import (
     add_purchases_batch,
     auction_manager_summary,
     auction_managers,
+    auction_player_assignment,
     auction_price_board,
     auction_taken_player_ids,
     create_league,
@@ -44,6 +45,7 @@ from fantasy.service import (
     top_xi_formation,
     top_xi_summary,
     touch_workspace,
+    update_auction_assignments,
     utc_now,
     update_league_settings,
 )
@@ -57,7 +59,7 @@ SASA_ANALYSIS_VERSION = 2
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v6 · Top 11 WOW + Swap Lab + Asta Live")
+    st.caption("Fantacalcio · Build 2026.08.18 v7 · Auction Grid editabile")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -510,29 +512,46 @@ def _render_preparation(
 
     st.markdown(
         '<div class="fantasy-table-heading"><div><strong>Player board</strong>'
-        '<span>Spunta piu righe per aggiungerle insieme alla rosa; la prima apre la scheda completa</span></div>'
-        f'<b>{len(frame)}</b></div>',
+        + (
+            '<span>Assegna ogni giocatore, correggi il prezzo o scegli Non assegnato per rimuoverlo</span></div>'
+            if not list_mode else
+            '<span>Spunta piu righe per aggiungerle insieme alla rosa; la prima apre la scheda completa</span></div>'
+        )
+        + f'<b>{len(frame)}</b></div>',
         unsafe_allow_html=True,
     )
     version_key = f"catalog_board_version_{league['id']}"
     board_version = int(st.session_state.get(version_key, 0))
-    selected_ids = _render_catalog_table(
-        frame,
-        key=f"catalog_board_{league['id']}_{board_version}",
-        selection_mode="multi-row" if list_mode else "single-row",
-        purchased_ids=purchased_ids,
-        watchlist=watchlist,
-    )
+    if list_mode:
+        selected_ids = _render_catalog_table(
+            frame,
+            key=f"catalog_board_{league['id']}_{board_version}",
+            selection_mode="multi-row",
+            purchased_ids=purchased_ids,
+            watchlist=watchlist,
+        )
+    else:
+        selected_ids = _render_auction_catalog_editor(
+            frame,
+            catalog,
+            league,
+            workspace,
+            storage,
+            key=f"catalog_board_{league['id']}_{board_version}",
+            version_key=version_key,
+            watchlist=watchlist,
+        )
     if selected_ids:
         st.session_state[f"fantasy_selected_player_{league['id']}"] = selected_ids[0]
-    _render_board_actions(
-        selected_ids,
-        catalog,
-        league,
-        workspace,
-        storage,
-        version_key=version_key,
-    )
+    if list_mode:
+        _render_board_actions(
+            selected_ids,
+            catalog,
+            league,
+            workspace,
+            storage,
+            version_key=version_key,
+        )
 
     selected_id = st.session_state.get(f"fantasy_selected_player_{league['id']}")
     selected_player = next((player for player in catalog if player.get("id") == selected_id), None)
@@ -682,6 +701,175 @@ def _render_auction_room(
                 st.rerun()
         else:
             st.info("Nessuna aggiudicazione registrata per questa squadra.")
+
+
+def _render_auction_catalog_editor(
+    frame: pd.DataFrame,
+    catalog: list[dict[str, Any]],
+    league: dict[str, Any],
+    workspace: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    *,
+    key: str,
+    version_key: str,
+    watchlist: set[str],
+) -> list[str]:
+    if frame.empty:
+        st.warning("Nessun giocatore corrisponde ai filtri selezionati.")
+        return []
+    indexed = frame.reset_index(drop=True)
+    managers = auction_managers(league)
+    manager_names = [str(manager.get("name") or "") for manager in managers]
+    manager_id_by_name = {
+        str(manager.get("name") or ""): str(manager.get("id")) for manager in managers
+    }
+    unassigned = "— Non assegnato —"
+    assignments = {
+        str(player_id): auction_player_assignment(league, str(player_id))
+        for player_id in indexed["_id"]
+    }
+    display = pd.DataFrame(
+        {
+            "Scheda": False,
+            "In rosa": ["✓" if assignments[str(player_id)] else "" for player_id in indexed["_id"]],
+            "★": ["★" if str(player_id) in watchlist else "" for player_id in indexed["_id"]],
+            "Partecipante": [
+                assignments[str(player_id)]["manager_name"]
+                if assignments[str(player_id)] else unassigned
+                for player_id in indexed["_id"]
+            ],
+            "Prezzo asta": [
+                float(assignments[str(player_id)]["purchase"].get("price") or 0)
+                if assignments[str(player_id)] else
+                float(indexed.iloc[position].get("Spesa strategica"))
+                if pd.notna(indexed.iloc[position].get("Spesa strategica")) else 1.0
+                for position, player_id in enumerate(indexed["_id"])
+            ],
+            "Ruolo": indexed["Ruolo"].map(
+                {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
+            ).fillna(indexed["Ruolo"]),
+            "Giocatore": indexed["Giocatore"],
+            "Squadra": indexed["Squadra"],
+            "Q": indexed["Quotazione"],
+            "Spesa iniziale": indexed["Spesa iniziale"],
+            "Spesa aggiornata": indexed["Spesa aggiornata"],
+            "Max strategico": indexed["Spesa strategica"],
+            "Confronti": indexed["Comparabili"],
+            "FM attesa": indexed["FM attesa"],
+            "Gol attesi": indexed["Gol attesi"],
+            "Assist attesi": indexed["Assist attesi"],
+            "Titolarita": indexed["Titolarita %"],
+            "Score": indexed["Indice"],
+            "Fascia": indexed["Fascia"],
+        }
+    )
+    first_id = str(indexed.iloc[0]["_id"])
+    last_id = str(indexed.iloc[-1]["_id"])
+    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}"
+    edited = st.data_editor(
+        display,
+        hide_index=True,
+        use_container_width=True,
+        height=min(620, 88 + max(len(display), 1) * 38),
+        num_rows="fixed",
+        key=editor_key,
+        disabled=[
+            column
+            for column in display.columns
+            if column not in {"Scheda", "Partecipante", "Prezzo asta"}
+        ],
+        column_config={
+            "Scheda": st.column_config.CheckboxColumn("Apri", width="small"),
+            "In rosa": st.column_config.TextColumn(width="small"),
+            "★": st.column_config.TextColumn(width="small"),
+            "Partecipante": st.column_config.SelectboxColumn(
+                "Partecipante",
+                options=[unassigned, *manager_names],
+                required=True,
+                width="medium",
+                help="Seleziona Non assegnato per rimuovere il giocatore da tutte le rose.",
+            ),
+            "Prezzo asta": st.column_config.NumberColumn(
+                "Prezzo",
+                min_value=0,
+                step=1,
+                format="%.0f",
+                width="small",
+                help="Prezzo reale dell'aggiudicazione, modificabile direttamente.",
+            ),
+            "Ruolo": st.column_config.TextColumn(width="small"),
+            "Giocatore": st.column_config.TextColumn(width="large"),
+            "Squadra": st.column_config.TextColumn(width="small"),
+            "Q": st.column_config.NumberColumn(format="%.0f", width="small"),
+            "Spesa iniziale": st.column_config.NumberColumn(format="%.0f", width="small"),
+            "Spesa aggiornata": st.column_config.NumberColumn(format="%.0f", width="small"),
+            "Max strategico": st.column_config.NumberColumn(format="%.0f", width="small"),
+            "Confronti": st.column_config.NumberColumn(format="%d", width="small"),
+            "FM attesa": st.column_config.NumberColumn(format="%.2f", width="small"),
+            "Gol attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
+            "Assist attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
+            "Titolarita": st.column_config.ProgressColumn(
+                min_value=0, max_value=100, format="%.0f%%", width="medium"
+            ),
+            "Score": st.column_config.ProgressColumn(
+                min_value=0, max_value=100, format="%.0f", width="medium"
+            ),
+            "Fascia": st.column_config.TextColumn(width="small"),
+        },
+    )
+    changes: list[dict[str, Any]] = []
+    by_id = {str(player.get("id")): player for player in catalog}
+    for position, player_id in enumerate(indexed["_id"]):
+        clean_id = str(player_id)
+        current = assignments[clean_id]
+        current_name = current["manager_name"] if current else unassigned
+        edited_name = str(edited.iloc[position]["Partecipante"] or unassigned)
+        raw_price = edited.iloc[position]["Prezzo asta"]
+        edited_price = float(raw_price) if pd.notna(raw_price) else 0.0
+        current_price = (
+            float(current["purchase"].get("price") or 0) if current else edited_price
+        )
+        owner_changed = edited_name != current_name
+        price_changed = current is not None and abs(edited_price - current_price) > 0.001
+        if not owner_changed and not price_changed:
+            continue
+        player = by_id.get(clean_id)
+        if not player:
+            continue
+        changes.append(
+            {
+                "player": player,
+                "manager_id": None if edited_name == unassigned else manager_id_by_name[edited_name],
+                "price": edited_price,
+            }
+        )
+
+    selected_ids = [
+        str(indexed.iloc[position]["_id"])
+        for position, selected in enumerate(edited["Scheda"])
+        if bool(selected)
+    ]
+    action_column, hint_column = st.columns([1.1, 2.2])
+    if action_column.button(
+        f"Salva modifiche ({len(changes)})",
+        type="primary",
+        use_container_width=True,
+        disabled=not changes,
+        key=f"save_auction_grid_{editor_key}",
+    ):
+        try:
+            update_auction_assignments(league, changes)
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            touch_workspace(workspace)
+            _save_workspace(workspace, storage)
+            st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
+            st.rerun()
+    hint_column.caption(
+        "Puoi modificare più righe e salvarle insieme. Spunta Apri per mostrare la scheda completa."
+    )
+    return selected_ids
 
 
 def _render_catalog_table(
