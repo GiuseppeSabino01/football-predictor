@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from itertools import combinations
 from typing import Any
 from uuid import uuid4
 
@@ -98,6 +99,8 @@ def create_league(
         "captain_enabled": bool(captain_enabled),
         "captain_player_id": None,
         "purchases": [],
+        "auction_managers": _new_auction_managers(int(participants or 0))
+        if game_mode == GAME_MODE_AUCTION else [],
         "watchlist": [],
         "analysis": "",
         "preferred_xi": [],
@@ -135,6 +138,14 @@ def update_league_settings(
         raise ValueError("Modalita di gioco non riconosciuta.")
     if game_mode == GAME_MODE_AUCTION and (participants is None or participants < 2):
         raise ValueError("Servono almeno due partecipanti.")
+    if game_mode == GAME_MODE_AUCTION:
+        current_managers = league.get("auction_managers", [])
+        if int(participants or 0) < len(current_managers):
+            removed = current_managers[int(participants or 0):]
+            if any(manager.get("purchases") for manager in removed):
+                raise ValueError(
+                    "Non puoi ridurre i partecipanti: una delle squadre da rimuovere ha gia acquisti."
+                )
     if game_mode == GAME_MODE_LIST:
         list_spent = sum(
             _number(row.get("quote")) if row.get("quote") is not None else _number(row.get("price"))
@@ -172,6 +183,9 @@ def update_league_settings(
         for purchase in league.get("purchases", []):
             if purchase.get("quote") is not None:
                 purchase["price"] = _number(purchase.get("quote"))
+        league["auction_managers"] = []
+    else:
+        _resize_auction_managers(league, int(participants or 0))
     _invalidate_sasa(league)
 
 
@@ -184,6 +198,243 @@ def delete_league(workspace: dict[str, Any], league_id: str) -> None:
 
 def find_league(workspace: dict[str, Any], league_id: str | None) -> dict[str, Any] | None:
     return next((league for league in workspace.get("leagues", []) if league.get("id") == league_id), None)
+
+
+def auction_managers(league: dict[str, Any]) -> list[dict[str, Any]]:
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        return []
+    _resize_auction_managers(league, int(league.get("participants") or 0))
+    return league["auction_managers"]
+
+
+def rename_auction_manager(league: dict[str, Any], manager_id: str, name: str) -> None:
+    clean_name = name.strip()
+    if not clean_name:
+        raise ValueError("Il nome del partecipante non puo essere vuoto.")
+    managers = auction_managers(league)
+    manager = next((row for row in managers if row.get("id") == manager_id), None)
+    if not manager:
+        raise ValueError("Partecipante non trovato.")
+    if any(
+        row.get("id") != manager_id
+        and str(row.get("name", "")).strip().casefold() == clean_name.casefold()
+        for row in managers
+    ):
+        raise ValueError("Esiste gia un partecipante con questo nome.")
+    manager["name"] = clean_name
+    league["updated_at"] = utc_now()
+
+
+def auction_manager_summary(league: dict[str, Any], manager_id: str) -> dict[str, Any]:
+    manager = next((row for row in auction_managers(league) if row.get("id") == manager_id), None)
+    if not manager:
+        raise ValueError("Partecipante non trovato.")
+    purchases = league.get("purchases", []) if manager.get("is_user") else manager.get("purchases", [])
+    draft = {
+        "initial_budget": league.get("initial_budget", 0),
+        "roster_slots": league.get("roster_slots", DEFAULT_ROSTER_SLOTS),
+        "purchases": purchases,
+    }
+    summary = roster_summary(draft)
+    return {**summary, "manager": manager, "purchases": purchases}
+
+
+def auction_taken_player_ids(league: dict[str, Any]) -> set[str]:
+    taken = {str(row.get("player_id")) for row in league.get("purchases", [])}
+    for manager in auction_managers(league):
+        if manager.get("is_user"):
+            continue
+        taken.update(str(row.get("player_id")) for row in manager.get("purchases", []))
+    return taken
+
+
+def record_auction_purchase(
+    league: dict[str, Any], manager_id: str, player: dict[str, Any], price: float
+) -> dict[str, Any]:
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        raise ValueError("Questa funzione e disponibile solo per l'asta.")
+    manager = next((row for row in auction_managers(league) if row.get("id") == manager_id), None)
+    if not manager:
+        raise ValueError("Partecipante non trovato.")
+    player_id = str(player.get("id") or "")
+    if player_id in auction_taken_player_ids(league):
+        raise ValueError("Questo giocatore e gia stato acquistato.")
+    if manager.get("is_user"):
+        purchase = add_purchase(league, player, price)
+    else:
+        draft = {
+            "game_mode": GAME_MODE_AUCTION,
+            "initial_budget": league.get("initial_budget", 0),
+            "roster_slots": deepcopy(league.get("roster_slots", DEFAULT_ROSTER_SLOTS)),
+            "purchases": deepcopy(manager.get("purchases", [])),
+            "watchlist": [],
+            "preferred_xi": [],
+        }
+        purchase = add_purchase(draft, player, price)
+        manager["purchases"] = draft["purchases"]
+        league["updated_at"] = utc_now()
+        _invalidate_sasa(league)
+    return purchase
+
+
+def remove_auction_purchase(league: dict[str, Any], manager_id: str, player_id: str) -> None:
+    manager = next((row for row in auction_managers(league) if row.get("id") == manager_id), None)
+    if not manager:
+        raise ValueError("Partecipante non trovato.")
+    if manager.get("is_user"):
+        remove_purchase(league, player_id)
+    else:
+        manager["purchases"] = [
+            row for row in manager.get("purchases", []) if str(row.get("player_id")) != player_id
+        ]
+        league["updated_at"] = utc_now()
+        _invalidate_sasa(league)
+
+
+def auction_price_board(
+    league: dict[str, Any], catalog: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Return initial, market-adjusted and opponent-credit-aware auction prices."""
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        return {}
+    managers = auction_managers(league)
+    budget = float(league.get("initial_budget", 0) or 0)
+    baseline_by_id = {
+        str(player.get("id")): _initial_auction_price(player, budget) for player in catalog
+    }
+    groups: dict[tuple[str, str], list[float]] = {}
+    catalog_by_id = {str(player.get("id")): player for player in catalog}
+    for manager in managers:
+        purchases = league.get("purchases", []) if manager.get("is_user") else manager.get("purchases", [])
+        for purchase in purchases:
+            player_id = str(purchase.get("player_id"))
+            comparable = catalog_by_id.get(player_id, purchase)
+            baseline = baseline_by_id.get(player_id) or _initial_auction_price(comparable, budget)
+            if baseline <= 0:
+                continue
+            group = _auction_comparable_group(comparable)
+            ratio = max(0.35, min(_number(purchase.get("price")) / baseline, 2.25))
+            groups.setdefault(group, []).append(ratio)
+
+    user_manager = next((row for row in managers if row.get("is_user")), None)
+    user_summary = (
+        auction_manager_summary(league, str(user_manager.get("id"))) if user_manager else None
+    )
+    opponent_credits = [
+        auction_manager_summary(league, str(manager.get("id")))["remaining_budget"]
+        for manager in managers
+        if not manager.get("is_user")
+    ]
+    highest_opponent_credit = max(opponent_credits, default=budget)
+    remaining_slots = int(user_summary["remaining_slots"] if user_summary else 0)
+    own_credit = float(user_summary["remaining_budget"] if user_summary else budget)
+    affordable = max(own_credit - max(remaining_slots - 1, 0), 0)
+
+    board: dict[str, dict[str, Any]] = {}
+    for player in catalog:
+        player_id = str(player.get("id"))
+        initial = baseline_by_id[player_id]
+        comparable_ratios = groups.get(_auction_comparable_group(player), [])
+        market_factor = _robust_average(comparable_ratios) if comparable_ratios else 1.0
+        updated = max(1.0, round(initial * market_factor)) if initial > 0 else 0.0
+        strategic = min(updated, highest_opponent_credit + 1, affordable)
+        board[player_id] = {
+            "initial": initial,
+            "updated": updated,
+            "strategic": max(strategic, 0.0),
+            "comparables": len(comparable_ratios),
+            "group": _auction_comparable_group(player)[1],
+            "highest_opponent_credit": highest_opponent_credit,
+        }
+    return board
+
+
+def _new_auction_managers(count: int) -> list[dict[str, Any]]:
+    if count <= 0:
+        return []
+    managers = [
+        {"id": uuid4().hex, "name": "La mia squadra", "is_user": True, "purchases": []}
+    ]
+    managers.extend(
+        {
+            "id": uuid4().hex,
+            "name": f"Avversario {index}",
+            "is_user": False,
+            "purchases": [],
+        }
+        for index in range(1, count)
+    )
+    return managers
+
+
+def _resize_auction_managers(league: dict[str, Any], count: int) -> None:
+    managers = league.setdefault("auction_managers", [])
+    if count <= 0:
+        league["auction_managers"] = []
+        return
+    if not managers:
+        league["auction_managers"] = _new_auction_managers(count)
+        return
+    if not any(manager.get("is_user") for manager in managers):
+        managers[0]["is_user"] = True
+    if len(managers) > count:
+        removable = [manager for manager in reversed(managers) if not manager.get("is_user")]
+        while len(managers) > count and removable:
+            manager = removable.pop(0)
+            if manager.get("purchases"):
+                raise ValueError(
+                    "Non puoi ridurre i partecipanti: una delle squadre da rimuovere ha gia acquisti."
+                )
+            managers.remove(manager)
+    while len(managers) < count:
+        managers.append(
+            {
+                "id": uuid4().hex,
+                "name": f"Avversario {len(managers)}",
+                "is_user": False,
+                "purchases": [],
+            }
+        )
+
+
+def _initial_auction_price(player: dict[str, Any], budget: float) -> float:
+    fvm = _optional_number(player.get("fvm"))
+    if fvm is not None and fvm > 0:
+        return max(1.0, round(fvm * budget / 1000))
+    quote = _number(player.get("quote"))
+    predicted = _number(player.get("predicted_quote"))
+    score = max(player_score(player), 0)
+    proxy = max(quote * 2.1, predicted * 1.8, score * 0.7)
+    return max(1.0, round(proxy * budget / 500)) if proxy > 0 else 1.0
+
+
+def _auction_comparable_group(player: dict[str, Any]) -> tuple[str, str]:
+    role = str(player.get("role", "")).upper()
+    tier = str(player.get("tier") or "").strip().casefold()
+    if tier:
+        return role, tier
+    score = player_score(player)
+    if score >= 75:
+        band = "elite"
+    elif score >= 62:
+        band = "top"
+    elif score >= 48:
+        band = "buono"
+    elif score >= 32:
+        band = "rotazione"
+    else:
+        band = "scommessa"
+    return role, band
+
+
+def _robust_average(values: list[float]) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        return 1.0
+    if len(ordered) >= 5:
+        trim = max(1, len(ordered) // 10)
+        ordered = ordered[trim:-trim]
+    return sum(ordered) / len(ordered)
 
 
 def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -> dict[str, Any]:
@@ -199,6 +450,13 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
         raise ValueError("Giocatore non valido.")
     if any(row.get("player_id") == player_id for row in league.get("purchases", [])):
         raise ValueError("Questo giocatore e gia nella rosa.")
+    if league.get("game_mode") == GAME_MODE_AUCTION and any(
+        row.get("player_id") == player_id
+        for manager in league.get("auction_managers", [])
+        if not manager.get("is_user")
+        for row in manager.get("purchases", [])
+    ):
+        raise ValueError("Questo giocatore e gia stato acquistato da un altro partecipante.")
 
     summary = roster_summary(league)
     if clean_price > summary["remaining_budget"]:
@@ -357,6 +615,178 @@ def role_balance_recommendation(
         "reason": reason,
         "candidates": ranked,
     }
+
+
+def list_trade_analysis(
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    *,
+    limit: int = 5,
+) -> dict[str, Any]:
+    """Find exact-cost 1x1 and 2x2 upgrades for a complete list-mode roster."""
+    summary = roster_summary(league)
+    result = {
+        "ready": False,
+        "reason": "",
+        "evaluated_players": len(league.get("purchases", [])),
+        "spent": summary["spent"],
+        "budget": float(league.get("initial_budget", 0) or 0),
+        "weakest": [],
+        "trades": [],
+    }
+    if league.get("game_mode") != GAME_MODE_LIST:
+        result["reason"] = "Lo Swap Lab e disponibile per i fantacalci a listone."
+        return result
+    if not summary["complete"]:
+        result["reason"] = "Completa la rosa per attivare lo Swap Lab."
+        return result
+    if summary["spent"] > result["budget"] + 0.001:
+        result["reason"] = "La rosa supera il budget configurato."
+        return result
+
+    owned = list(league.get("purchases", []))
+    owned_ids = {str(row.get("player_id")) for row in owned}
+    available = [
+        player
+        for player in catalog
+        if str(player.get("id")) not in owned_ids
+        and str(player.get("role", "")).upper() in ROLE_LABELS
+        and _number(player.get("quote")) >= 0
+    ]
+    result["weakest"] = sorted(owned, key=_roster_upgrade_score)[:3]
+
+    outgoing_packages = [*(tuple([row]) for row in owned), *combinations(owned, 2)]
+    outgoing_keys = {_trade_signature(package, outgoing=True) for package in outgoing_packages}
+    incoming_by_key: dict[tuple[tuple[str, ...], int], list[tuple[float, tuple[dict[str, Any], ...]]]] = {}
+
+    def remember(package: tuple[dict[str, Any], ...]) -> None:
+        key = _trade_signature(package, outgoing=False)
+        if key not in outgoing_keys:
+            return
+        bucket = incoming_by_key.setdefault(key, [])
+        bucket.append((sum(_roster_upgrade_score(row) for row in package), package))
+        bucket.sort(key=lambda item: item[0], reverse=True)
+        del bucket[12:]
+
+    for player in available:
+        remember((player,))
+    for package in combinations(available, 2):
+        remember(package)
+
+    proposals: list[dict[str, Any]] = []
+    for outgoing in outgoing_packages:
+        key = _trade_signature(outgoing, outgoing=True)
+        candidates = incoming_by_key.get(key, [])
+        if not candidates:
+            continue
+        outgoing_score = sum(_roster_upgrade_score(row) for row in outgoing)
+        incoming_score, incoming = candidates[0]
+        improvement = incoming_score - outgoing_score
+        if improvement <= 0.05:
+            continue
+        outgoing_total = sum(_number(row.get("price")) for row in outgoing)
+        incoming_total = sum(_number(row.get("quote")) for row in incoming)
+        projected_spent = summary["spent"] - outgoing_total + incoming_total
+        if abs(outgoing_total - incoming_total) > 0.001 or projected_spent > result["budget"] + 0.001:
+            continue
+        deltas = {
+            "goals": _package_delta(outgoing, incoming, "expected_goals"),
+            "assists": _package_delta(outgoing, incoming, "expected_assists"),
+            "fantasy_average": _package_delta(
+                outgoing, incoming, "expected_fantasy_average"
+            ),
+            "starter": _package_delta(outgoing, incoming, "starter_probability"),
+        }
+        proposals.append(
+            {
+                "outgoing": list(outgoing),
+                "incoming": list(incoming),
+                "outgoing_total": outgoing_total,
+                "incoming_total": incoming_total,
+                "projected_spent": projected_spent,
+                "improvement": improvement,
+                "deltas": deltas,
+                "motivation": _trade_motivation(outgoing_total, deltas),
+            }
+        )
+
+    proposals.sort(
+        key=lambda item: (
+            item["improvement"],
+            item["deltas"]["fantasy_average"],
+            item["deltas"]["goals"],
+        ),
+        reverse=True,
+    )
+    selected: list[dict[str, Any]] = []
+    seen_incoming: set[tuple[str, ...]] = set()
+    for proposal in proposals:
+        incoming_ids = tuple(sorted(str(row.get("id")) for row in proposal["incoming"]))
+        if incoming_ids in seen_incoming:
+            continue
+        seen_incoming.add(incoming_ids)
+        selected.append(proposal)
+        if len(selected) >= max(int(limit), 1):
+            break
+    result["ready"] = True
+    result["trades"] = selected
+    if not selected:
+        result["reason"] = "Non ho trovato cambi a costo identico che migliorino la rosa."
+    return result
+
+
+def _trade_signature(
+    package: tuple[dict[str, Any], ...], *, outgoing: bool
+) -> tuple[tuple[str, ...], int]:
+    roles = tuple(sorted(str(row.get("role", "")).upper() for row in package))
+    cost_field = "price" if outgoing else "quote"
+    total_cents = int(round(sum(_number(row.get(cost_field)) for row in package) * 100))
+    return roles, total_cents
+
+
+def _roster_upgrade_score(player: dict[str, Any]) -> float:
+    starter = _number(player.get("starter_probability"))
+    if starter <= 1:
+        starter *= 100
+    return (
+        _number(player.get("expected_fantasy_average")) * 13
+        + _number(player.get("expected_goals")) * 2.8
+        + _number(player.get("expected_assists")) * 2.1
+        + starter * 0.09
+        + _number(player.get("reliability")) * 0.05
+        - _number(player.get("risk")) * 0.05
+        + player_score(player) * 0.12
+    )
+
+
+def _package_delta(
+    outgoing: tuple[dict[str, Any], ...],
+    incoming: tuple[dict[str, Any], ...],
+    field: str,
+) -> float:
+    return sum(_number(row.get(field)) for row in incoming) - sum(
+        _number(row.get(field)) for row in outgoing
+    )
+
+
+def _trade_motivation(cost: float, deltas: dict[str, float]) -> str:
+    gains = []
+    labels = (
+        ("fantasy_average", "somma FM attesa"),
+        ("goals", "gol attesi"),
+        ("assists", "assist attesi"),
+        ("starter", "titolarita complessiva"),
+    )
+    for field, label in labels:
+        value = deltas[field]
+        if value > 0.05:
+            suffix = " punti" if field == "starter" else ""
+            gains.append(f"+{value:.1f} {label}{suffix}")
+    improvement = ", ".join(gains[:3]) or "un profilo complessivamente piu forte"
+    return (
+        f"A parita di {cost:.0f} crediti ottieni {improvement}, "
+        "senza cambiare gli slot di ruolo ne superare il budget."
+    )
 
 
 def _recommendation_score(player: dict[str, Any], focus: str) -> float:
@@ -639,6 +1069,16 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("captain_enabled", False)
     league.setdefault("captain_player_id", None)
     league.setdefault("purchases", [])
+    league.setdefault("auction_managers", [])
+    if league["game_mode"] == GAME_MODE_AUCTION:
+        _resize_auction_managers(league, int(league.get("participants") or 0))
+        for manager in league["auction_managers"]:
+            manager.setdefault("id", uuid4().hex)
+            manager.setdefault("name", "Partecipante")
+            manager.setdefault("is_user", False)
+            manager.setdefault("purchases", [])
+    else:
+        league["auction_managers"] = []
     league.setdefault("watchlist", [])
     league.setdefault("analysis", "")
     league.setdefault("preferred_xi", [])
