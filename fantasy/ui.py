@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from html import escape
 from typing import Any
 
@@ -72,7 +73,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v11 · Righe assegnate evidenziate")
+    st.caption("Fantacalcio · Build 2026.08.18 v12 · Fasce a riga colorata")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -885,6 +886,37 @@ def _render_auction_catalog_editor(
     last_id = str(indexed.iloc[-1]["_id"])
     editor_version = int(st.session_state.get(version_key, 0))
     editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}_{editor_version}"
+    tier_labels_by_color: dict[str, list[str]] = {}
+    for tier in custom_tiers:
+        color = str(tier.get("color") or "gray")
+        tier_labels_by_color.setdefault(color, []).append(_tier_option_label(tier))
+    row_class_rules: dict[str, Any] = {
+        "fantasy-player-assigned": "data._assigned === true",
+    }
+    tier_row_css: dict[str, dict[str, str]] = {}
+    for color, labels in tier_labels_by_color.items():
+        safe_color = color if color in AUCTION_TIER_PALETTE else "gray"
+        hex_color = AUCTION_TIER_PALETTE[safe_color][2]
+        class_name = f"fantasy-tier-{safe_color}"
+        encoded_labels = json.dumps(labels, ensure_ascii=False)
+        row_class_rules[class_name] = JsCode(
+            f"""function(params) {{
+                return params.data && params.data._assigned !== true
+                    && {encoded_labels}.includes(params.data['Fascia personale']);
+            }}"""
+        )
+        tier_row_css[f".{class_name}"] = {
+            "background": (
+                "linear-gradient(90deg, "
+                f"color-mix(in srgb, {hex_color} 28%, #080b0a), "
+                "#080b0a 82%) !important"
+            ),
+            "border-left": f"5px solid {hex_color} !important",
+            "box-shadow": f"inset 0 0 18px color-mix(in srgb, {hex_color} 10%, transparent)",
+        }
+        tier_row_css[f".{class_name} .ag-cell"] = {
+            "background": "transparent !important",
+        }
     grid_options = {
         "defaultColDef": {
             "sortable": True,
@@ -950,9 +982,7 @@ def _render_auction_catalog_editor(
             {"field": "Fascia", "width": 90},
         ],
         "getRowId": JsCode("function(params) { return params.data._player_id; }"),
-        "rowClassRules": {
-            "fantasy-player-assigned": "data._assigned === true",
-        },
+        "rowClassRules": row_class_rules,
         "singleClickEdit": True,
         "stopEditingWhenCellsLoseFocus": True,
         "suppressRowClickSelection": True,
@@ -992,6 +1022,7 @@ def _render_auction_catalog_editor(
             ".ag-row-hover": {
                 "background": "#10201b !important",
             },
+            **tier_row_css,
             ".fantasy-player-assigned": {
                 "background": "#111514 !important",
                 "color": "#5b6661 !important",
