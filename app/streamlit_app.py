@@ -53,7 +53,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.18 · Fantasy v17 · Player Intelligence Lab")
+    st.caption("Build 2026.08.18 · Fantasy v18 · Decision Center")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
