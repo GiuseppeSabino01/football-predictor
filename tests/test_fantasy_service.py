@@ -9,8 +9,11 @@ from fantasy.service import (
     auction_manager_summary,
     auction_managers,
     auction_player_assignment,
+    auction_player_tier,
     auction_price_board,
+    create_auction_tier,
     create_league,
+    delete_auction_tier,
     delete_league,
     list_trade_analysis,
     new_workspace,
@@ -318,7 +321,7 @@ def test_auction_tracks_every_manager_and_updates_comparable_prices() -> None:
     douvikas = make_player(name="Douvikas", team="Como", role="A", quote=25)
     perrone = make_player(name="Perrone", team="Como", role="C", quote=15)
     lautaro.update({"fvm": 200, "tier": "Top", "expected_fantasy_average": 7.5})
-    douvikas.update({"fvm": 160, "tier": "Top", "expected_fantasy_average": 7.0})
+    douvikas.update({"fvm": 160, "tier": "Buono", "expected_fantasy_average": 7.0})
     perrone.update({"fvm": 100, "tier": "Buono", "expected_fantasy_average": 6.5})
     managers = auction_managers(league)
 
@@ -329,6 +332,46 @@ def test_auction_tracks_every_manager_and_updates_comparable_prices() -> None:
     assert prices[douvikas["id"]]["comparables"] == 1
     assert prices[douvikas["id"]]["updated"] != prices[douvikas["id"]]["initial"]
     assert prices[perrone["id"]]["comparables"] == 0
+
+
+def test_custom_auction_tiers_are_isolated_and_do_not_drive_market_prices() -> None:
+    workspace = new_workspace()
+    first = create_league(
+        workspace,
+        "Asta uno",
+        initial_budget=500,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+    )
+    second = create_league(
+        workspace,
+        "Asta due",
+        initial_budget=500,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+    )
+    player = make_player(name="Dimarco", team="Inter", role="D", quote=32)
+    tier = create_auction_tier(first, "Top difensori", "red")
+
+    update_auction_assignments(
+        first,
+        [
+            {
+                "player": player,
+                "manager_id": None,
+                "price": 0,
+                "update_assignment": False,
+                "tier_id": tier["id"],
+            }
+        ],
+    )
+
+    assert auction_player_tier(first, player["id"])["name"] == "Top difensori"
+    assert second["auction_tiers"] == []
+    assert second["auction_player_tiers"] == {}
+
+    delete_auction_tier(first, tier["id"])
+    assert auction_player_tier(first, player["id"]) is None
 
 
 def test_strategic_auction_price_stops_one_above_richest_opponent() -> None:
