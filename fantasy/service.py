@@ -18,6 +18,15 @@ ROLE_LABELS = {
     "A": "Attaccanti",
 }
 AUCTION_TIER_COLORS = {"red", "orange", "yellow", "green", "blue", "purple", "gray"}
+DEFAULT_AUCTION_TIER_SPECS = (
+    ("Top", "red"),
+    ("Semi-top", "orange"),
+    ("Terza fascia", "yellow"),
+    ("Quarta fascia", "green"),
+    ("Quinta fascia", "blue"),
+    ("Scommesse", "purple"),
+    ("Titolari", "gray"),
+)
 FORMATIONS = {
     "4-3-3": {"P": 1, "D": 4, "C": 3, "A": 3},
     "4-4-2": {"P": 1, "D": 4, "C": 4, "A": 2},
@@ -29,6 +38,13 @@ FORMATIONS = {
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _new_auction_tiers() -> list[dict[str, str]]:
+    return [
+        {"id": uuid4().hex, "name": name, "color": color}
+        for name, color in DEFAULT_AUCTION_TIER_SPECS
+    ]
 
 
 def new_workspace() -> dict[str, Any]:
@@ -102,7 +118,9 @@ def create_league(
         "purchases": [],
         "auction_managers": _new_auction_managers(int(participants or 0))
         if game_mode == GAME_MODE_AUCTION else [],
-        "auction_tiers": [],
+        "auction_tiers": _new_auction_tiers()
+        if game_mode == GAME_MODE_AUCTION else [],
+        "auction_tiers_initialized": game_mode == GAME_MODE_AUCTION,
         "auction_player_tiers": {},
         "watchlist": [],
         "analysis": "",
@@ -202,6 +220,10 @@ def update_league_settings(
         league["auction_managers"] = []
     else:
         _resize_auction_managers(league, int(participants or 0))
+        if not league.get("auction_tiers_initialized"):
+            if not league.get("auction_tiers"):
+                league["auction_tiers"] = _new_auction_tiers()
+            league["auction_tiers_initialized"] = True
     _invalidate_sasa(league)
 
 
@@ -1233,6 +1255,14 @@ def _normalize_league(league: dict[str, Any]) -> None:
         league["auction_tiers"] = []
     if not isinstance(league["auction_player_tiers"], dict):
         league["auction_player_tiers"] = {}
+    if league["game_mode"] == GAME_MODE_AUCTION and not league.get(
+        "auction_tiers_initialized"
+    ):
+        if not league["auction_tiers"]:
+            league["auction_tiers"] = _new_auction_tiers()
+        league["auction_tiers_initialized"] = True
+    else:
+        league.setdefault("auction_tiers_initialized", False)
     valid_tier_ids = set()
     for tier in league["auction_tiers"]:
         tier.setdefault("id", uuid4().hex)
