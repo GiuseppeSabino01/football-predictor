@@ -134,6 +134,19 @@ def update_league_settings(
         raise ValueError("Inserisci un nome per il fanta.")
     if initial_budget < spent:
         raise ValueError(f"Il budget non puo essere inferiore ai {spent:.0f} crediti gia spesi.")
+    opponent_spent = max(
+        (
+            sum(_number(row.get("price")) for row in manager.get("purchases", []))
+            for manager in league.get("auction_managers", [])
+            if not manager.get("is_user")
+        ),
+        default=0.0,
+    )
+    if game_mode == GAME_MODE_AUCTION and initial_budget < opponent_spent:
+        raise ValueError(
+            f"Il budget non puo essere inferiore ai {opponent_spent:.0f} crediti "
+            "gia spesi da un avversario."
+        )
     if game_mode not in GAME_MODES:
         raise ValueError("Modalita di gioco non riconosciuta.")
     if game_mode == GAME_MODE_AUCTION and (participants is None or participants < 2):
