@@ -93,7 +93,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v19 · Explainable Alerts")
+    st.caption("Fantacalcio · Build 2026.08.18 v20 · Official News Alerts")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -124,7 +124,7 @@ def render_fantasy_page(settings: Settings) -> None:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def _cached_fantasy_news() -> list[dict[str, str]]:
+def _cached_fantasy_news() -> list[dict[str, Any]]:
     try:
         response = requests.get(
             "https://www.fantacalcio.it/news",
@@ -161,6 +161,7 @@ def _cached_fantasy_news() -> list[dict[str, str]]:
                 "summary": summary,
                 "url": href,
                 "source": "Fantacalcio.it",
+                "verified": True,
             }
         )
         if len(news) >= 40:
@@ -2834,7 +2835,7 @@ def _render_alert_center(
         st.rerun()
     visible = unread if only_unread else alerts
     if not visible:
-        st.success("Nessun nuovo segnale critico per la tua rosa o watchlist.")
+        st.success("Nessuna nuova notizia pubblicata sulla tua rosa o watchlist.")
         return
     for alert in visible:
         alert_id = str(alert.get("id"))
@@ -2863,8 +2864,9 @@ def _render_alert_center(
             unsafe_allow_html=True,
         )
     st.caption(
-        "Gli avvisi incrociano rosa e watchlist con titolarita, rischio fisico, stato del "
-        "listone e notizie pubbliche pertinenti. Aggiornamento notizie ogni 15 minuti."
+        "Il Centro notifiche non genera avvisi da indici statistici: mostra esclusivamente "
+        "notizie realmente pubblicate e collegate alla rosa o alla watchlist. "
+        "Aggiornamento ogni 15 minuti."
     )
 
 
