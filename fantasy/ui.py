@@ -71,7 +71,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v8 · Reparti + fasce personali")
+    st.caption("Fantacalcio · Build 2026.08.18 v9 · Player Board dimmed")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -795,13 +795,6 @@ def _tier_option_label(tier: dict[str, Any]) -> str:
     return f"{marker} {str(tier.get('name') or 'Fascia')}"
 
 
-def _struck_text(value: Any) -> str:
-    return "".join(
-        f"{character}\u0336" if not character.isspace() else character
-        for character in str(value or "")
-    )
-
-
 def _render_auction_catalog_editor(
     frame: pd.DataFrame,
     catalog: list[dict[str, Any]],
@@ -855,7 +848,7 @@ def _render_auction_catalog_editor(
                 for player_id in indexed["_id"]
             ],
             "Stato": [
-                "🔒 ASSEGNATO" if assignments[str(player_id)] else "🟢 LIBERO"
+                "● OCCUPATO" if assignments[str(player_id)] else "🟢 LIBERO"
                 for player_id in indexed["_id"]
             ],
             "★": ["★" if str(player_id) in watchlist else "" for player_id in indexed["_id"]],
@@ -879,14 +872,10 @@ def _render_auction_catalog_editor(
             ).fillna(indexed["Ruolo"]),
             "Giocatore": [
                 f"{player_tier_marker(str(player_id))} "
-                f"{_struck_text(indexed.iloc[position]['Giocatore']) if assignments[str(player_id)] else indexed.iloc[position]['Giocatore']}"
+                f"{indexed.iloc[position]['Giocatore']}"
                 for position, player_id in enumerate(indexed["_id"])
             ],
-            "Squadra": [
-                _struck_text(indexed.iloc[position]["Squadra"])
-                if assignments[str(player_id)] else indexed.iloc[position]["Squadra"]
-                for position, player_id in enumerate(indexed["_id"])
-            ],
+            "Squadra": indexed["Squadra"],
             "Q": indexed["Quotazione"],
             "Spesa iniziale": indexed["Spesa iniziale"],
             "Spesa aggiornata": indexed["Spesa aggiornata"],
@@ -903,8 +892,22 @@ def _render_auction_catalog_editor(
     first_id = str(indexed.iloc[0]["_id"])
     last_id = str(indexed.iloc[-1]["_id"])
     editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}"
+    assigned_positions = {
+        position
+        for position, player_id in enumerate(indexed["_id"])
+        if assignments[str(player_id)]
+    }
+
+    def dim_assigned_row(row: pd.Series) -> list[str]:
+        if int(row.name) not in assigned_positions:
+            return [""] * len(row)
+        return [
+            "color:#59635f;background-color:#090d0c;opacity:0.42;"
+        ] * len(row)
+
+    editor_source = display.style.apply(dim_assigned_row, axis=1)
     edited = st.data_editor(
-        display,
+        editor_source,
         hide_index=True,
         use_container_width=True,
         height=min(620, 88 + max(len(display), 1) * 38),
@@ -923,7 +926,7 @@ def _render_auction_catalog_editor(
             ),
             "Stato": st.column_config.TextColumn(
                 width="medium",
-                help="I giocatori assegnati restano visibili, ma non sono più disponibili.",
+                help="I giocatori occupati restano visibili, ma la riga viene spenta.",
             ),
             "★": st.column_config.TextColumn(width="small"),
             "Partecipante": st.column_config.SelectboxColumn(
