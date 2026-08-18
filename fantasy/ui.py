@@ -73,7 +73,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v13 · Indicatori scouting")
+    st.caption("Fantacalcio · Build 2026.08.18 v14 · Renderer scouting stabile")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -804,19 +804,12 @@ def _auction_metric_renderer(color: str, suffix: str = "") -> JsCode:
             const raw = Number(params.value);
             if (!Number.isFinite(raw)) return '—';
             const value = Math.max(0, Math.min(100, raw));
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:flex-end;padding:0 2px;';
-            const track = document.createElement('span');
-            track.style.cssText = 'position:absolute;left:2px;right:2px;bottom:4px;height:4px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;';
-            const bar = document.createElement('i');
-            bar.style.cssText = 'display:block;height:100%;width:' + value + '%;border-radius:999px;background:{color};box-shadow:0 0 8px {color};';
-            const label = document.createElement('b');
-            label.style.cssText = 'position:relative;color:inherit;font-size:11px;font-weight:800;';
-            label.textContent = Math.round(value) + {safe_suffix};
-            track.appendChild(bar);
-            wrapper.appendChild(track);
-            wrapper.appendChild(label);
-            return wrapper;
+            const label = Math.round(value) + {safe_suffix};
+            return '<div style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:flex-end;padding:0 2px;box-sizing:border-box;">'
+                + '<span style="position:absolute;left:2px;right:2px;bottom:4px;height:4px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;">'
+                + '<i style="display:block;height:100%;width:' + value + '%;border-radius:999px;background:{color};box-shadow:0 0 8px {color};"></i>'
+                + '</span><b style="position:relative;color:inherit;font-size:11px;font-weight:800;">'
+                + label + '</b></div>';
         }}"""
     )
 
