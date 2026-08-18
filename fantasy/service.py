@@ -304,6 +304,93 @@ def remove_auction_purchase(league: dict[str, Any], manager_id: str, player_id: 
         _invalidate_sasa(league)
 
 
+def auction_player_assignment(
+    league: dict[str, Any], player_id: str
+) -> dict[str, Any] | None:
+    clean_id = str(player_id)
+    for manager in auction_managers(league):
+        purchases = (
+            league.get("purchases", [])
+            if manager.get("is_user") else manager.get("purchases", [])
+        )
+        purchase = next(
+            (row for row in purchases if str(row.get("player_id")) == clean_id),
+            None,
+        )
+        if purchase:
+            return {
+                "manager_id": str(manager.get("id")),
+                "manager_name": str(manager.get("name") or ""),
+                "is_user": bool(manager.get("is_user")),
+                "purchase": purchase,
+            }
+    return None
+
+
+def update_auction_assignments(
+    league: dict[str, Any], changes: list[dict[str, Any]]
+) -> None:
+    """Apply auction owner/price edits atomically across one or more players."""
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        raise ValueError("Questa funzione e disponibile solo per l'asta.")
+    if not changes:
+        return
+    draft = deepcopy(league)
+    seen: set[str] = set()
+    for change in changes:
+        player = change.get("player")
+        if not isinstance(player, dict):
+            raise ValueError("Giocatore non valido.")
+        player_id = str(player.get("id") or "")
+        if not player_id or player_id in seen:
+            raise ValueError("Ogni giocatore puo essere modificato una sola volta.")
+        seen.add(player_id)
+        manager_id = change.get("manager_id")
+        clean_manager_id = str(manager_id) if manager_id else None
+        price = _number(change.get("price"))
+        if price < 0:
+            raise ValueError("Il prezzo non puo essere negativo.")
+        _apply_auction_assignment(draft, player, clean_manager_id, price)
+    league.clear()
+    league.update(draft)
+
+
+def _apply_auction_assignment(
+    league: dict[str, Any],
+    player: dict[str, Any],
+    manager_id: str | None,
+    price: float,
+) -> None:
+    player_id = str(player.get("id") or "")
+    current = auction_player_assignment(league, player_id)
+    current_manager_id = str(current.get("manager_id")) if current else None
+    if manager_id is None:
+        if current_manager_id:
+            remove_auction_purchase(league, current_manager_id, player_id)
+        return
+
+    managers = auction_managers(league)
+    if not any(str(manager.get("id")) == manager_id for manager in managers):
+        raise ValueError("Partecipante non trovato.")
+    if current_manager_id == manager_id and current:
+        purchase = current["purchase"]
+        manager_summary = auction_manager_summary(league, manager_id)
+        available = manager_summary["remaining_budget"] + _number(purchase.get("price"))
+        if price > available + 0.001:
+            raise ValueError(
+                f"Crediti insufficienti per {current.get('manager_name')}: "
+                f"massimo {available:.0f}."
+            )
+        purchase["price"] = price
+        league["updated_at"] = utc_now()
+        _invalidate_sasa(league)
+        return
+
+    if current_manager_id:
+        remove_auction_purchase(league, current_manager_id, player_id)
+    record_auction_purchase(league, manager_id, player, price)
+
+
 def auction_price_board(
     league: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> dict[str, dict[str, Any]]:
