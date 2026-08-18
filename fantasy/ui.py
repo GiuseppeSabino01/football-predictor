@@ -25,9 +25,12 @@ from fantasy.service import (
     auction_manager_summary,
     auction_managers,
     auction_player_assignment,
+    auction_player_tier,
     auction_price_board,
     auction_taken_player_ids,
     create_league,
+    create_auction_tier,
+    delete_auction_tier,
     delete_league,
     find_league,
     list_trade_analysis,
@@ -55,11 +58,20 @@ from nlp.gemini_client import GeminiClient
 
 WORKSPACE_SESSION_KEY = "fantasy_workspace"
 SASA_ANALYSIS_VERSION = 2
+AUCTION_TIER_PALETTE = {
+    "red": ("Rosso", "🔴", "#ff5d73"),
+    "orange": ("Arancione", "🟠", "#ff9f43"),
+    "yellow": ("Giallo", "🟡", "#ffd166"),
+    "green": ("Verde", "🟢", "#19e6b0"),
+    "blue": ("Blu", "🔵", "#62d8ff"),
+    "purple": ("Viola", "🟣", "#b895ff"),
+    "gray": ("Grigio", "⚪", "#a7b0ad"),
+}
 
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v7 · Auction Grid editabile")
+    st.caption("Fantacalcio · Build 2026.08.18 v8 · Reparti + fasce personali")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -616,10 +628,11 @@ def _render_auction_room(
         unsafe_allow_html=True,
     )
     st.caption(
-        "La spesa aggiornata usa tutte le aggiudicazioni di giocatori dello stesso ruolo e fascia. "
+        "La spesa aggiornata usa tutte le aggiudicazioni dello stesso reparto, senza distinguere le fasce. "
         "Il massimo strategico considera anche i crediti residui degli avversari e il budget da "
         "conservare per completare la tua rosa."
     )
+    _render_auction_tier_manager(workspace, league, storage)
     with st.expander("Gestisci partecipanti e rose dell'asta"):
         st.markdown("##### Nomi delle squadre")
         with st.form(f"auction_manager_names_{league['id']}"):
@@ -703,6 +716,92 @@ def _render_auction_room(
             st.info("Nessuna aggiudicazione registrata per questa squadra.")
 
 
+def _render_auction_tier_manager(
+    workspace: dict[str, Any], league: dict[str, Any], storage: FantasyWorkspaceStorage
+) -> None:
+    tiers = league.get("auction_tiers", [])
+    with st.expander(f"Fasce personalizzate · {len(tiers)}"):
+        st.caption(
+            "Queste fasce e i relativi colori appartengono solo a questo fantacalcio. "
+            "Dopo averle create potrai assegnarle direttamente dal Player Board."
+        )
+        if tiers:
+            cards = []
+            assignments = league.get("auction_player_tiers", {})
+            for tier in tiers:
+                color = str(tier.get("color") or "gray")
+                marker = AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[1]
+                hex_color = AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[2]
+                count = sum(
+                    1 for tier_id in assignments.values()
+                    if str(tier_id) == str(tier.get("id"))
+                )
+                cards.append(
+                    f'<div class="fantasy-custom-tier" style="--tier-color:{hex_color}">'
+                    f'<span>{marker}</span><strong>{escape(str(tier.get("name") or ""))}</strong>'
+                    f'<small>{count} giocatori</small></div>'
+                )
+            st.markdown(
+                f'<div class="fantasy-custom-tier-grid">{"".join(cards)}</div>',
+                unsafe_allow_html=True,
+            )
+        with st.form(f"create_auction_tier_{league['id']}"):
+            name_column, color_column = st.columns([1.4, 0.8])
+            tier_name = name_column.text_input("Nome fascia", placeholder="Es. Top assoluti")
+            tier_color = color_column.selectbox(
+                "Colore",
+                list(AUCTION_TIER_PALETTE),
+                format_func=lambda value: (
+                    f"{AUCTION_TIER_PALETTE[value][1]} {AUCTION_TIER_PALETTE[value][0]}"
+                ),
+            )
+            create_tier = st.form_submit_button(
+                "Crea fascia", type="primary", use_container_width=True
+            )
+        if create_tier:
+            try:
+                create_auction_tier(league, tier_name, tier_color)
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.rerun()
+        if tiers:
+            tier_column, delete_column = st.columns([2.2, 0.8])
+            delete_tier_id = tier_column.selectbox(
+                "Elimina una fascia",
+                [str(tier.get("id")) for tier in tiers],
+                format_func=lambda value: next(
+                    _tier_option_label(tier) for tier in tiers
+                    if str(tier.get("id")) == value
+                ),
+                key=f"delete_auction_tier_select_{league['id']}",
+            )
+            if delete_column.button(
+                "Elimina",
+                use_container_width=True,
+                key=f"delete_auction_tier_{league['id']}",
+            ):
+                delete_auction_tier(league, delete_tier_id)
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.rerun()
+
+
+def _tier_option_label(tier: dict[str, Any]) -> str:
+    color = str(tier.get("color") or "gray")
+    marker = AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[1]
+    return f"{marker} {str(tier.get('name') or 'Fascia')}"
+
+
+def _struck_text(value: Any) -> str:
+    return "".join(
+        f"{character}\u0336" if not character.isspace() else character
+        for character in str(value or "")
+    )
+
+
 def _render_auction_catalog_editor(
     frame: pd.DataFrame,
     catalog: list[dict[str, Any]],
@@ -724,14 +823,41 @@ def _render_auction_catalog_editor(
         str(manager.get("name") or ""): str(manager.get("id")) for manager in managers
     }
     unassigned = "— Non assegnato —"
+    no_tier = "— Nessuna fascia —"
+    custom_tiers = league.get("auction_tiers", [])
+    tier_label_by_id = {
+        str(tier.get("id")): _tier_option_label(tier) for tier in custom_tiers
+    }
+    tier_id_by_label = {
+        label: tier_id for tier_id, label in tier_label_by_id.items()
+    }
     assignments = {
         str(player_id): auction_player_assignment(league, str(player_id))
         for player_id in indexed["_id"]
     }
+    player_tiers = {
+        str(player_id): auction_player_tier(league, str(player_id))
+        for player_id in indexed["_id"]
+    }
+
+    def player_tier_marker(player_id: str) -> str:
+        tier = player_tiers.get(str(player_id))
+        color = str(tier.get("color") or "gray") if tier else "gray"
+        return AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[1] if tier else "▫️"
+
     display = pd.DataFrame(
         {
             "Scheda": False,
-            "In rosa": ["✓" if assignments[str(player_id)] else "" for player_id in indexed["_id"]],
+            "In rosa": [
+                "✓"
+                if assignments[str(player_id)] and assignments[str(player_id)].get("is_user")
+                else ""
+                for player_id in indexed["_id"]
+            ],
+            "Stato": [
+                "🔒 ASSEGNATO" if assignments[str(player_id)] else "🟢 LIBERO"
+                for player_id in indexed["_id"]
+            ],
             "★": ["★" if str(player_id) in watchlist else "" for player_id in indexed["_id"]],
             "Partecipante": [
                 assignments[str(player_id)]["manager_name"]
@@ -740,16 +866,27 @@ def _render_auction_catalog_editor(
             ],
             "Prezzo asta": [
                 float(assignments[str(player_id)]["purchase"].get("price") or 0)
-                if assignments[str(player_id)] else
-                float(indexed.iloc[position].get("Spesa strategica"))
-                if pd.notna(indexed.iloc[position].get("Spesa strategica")) else 1.0
-                for position, player_id in enumerate(indexed["_id"])
+                if assignments[str(player_id)] else 0.0
+                for player_id in indexed["_id"]
+            ],
+            "Fascia personale": [
+                tier_label_by_id.get(str(player_tiers[str(player_id)].get("id")), no_tier)
+                if player_tiers[str(player_id)] else no_tier
+                for player_id in indexed["_id"]
             ],
             "Ruolo": indexed["Ruolo"].map(
                 {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
             ).fillna(indexed["Ruolo"]),
-            "Giocatore": indexed["Giocatore"],
-            "Squadra": indexed["Squadra"],
+            "Giocatore": [
+                f"{player_tier_marker(str(player_id))} "
+                f"{_struck_text(indexed.iloc[position]['Giocatore']) if assignments[str(player_id)] else indexed.iloc[position]['Giocatore']}"
+                for position, player_id in enumerate(indexed["_id"])
+            ],
+            "Squadra": [
+                _struck_text(indexed.iloc[position]["Squadra"])
+                if assignments[str(player_id)] else indexed.iloc[position]["Squadra"]
+                for position, player_id in enumerate(indexed["_id"])
+            ],
             "Q": indexed["Quotazione"],
             "Spesa iniziale": indexed["Spesa iniziale"],
             "Spesa aggiornata": indexed["Spesa aggiornata"],
@@ -776,11 +913,18 @@ def _render_auction_catalog_editor(
         disabled=[
             column
             for column in display.columns
-            if column not in {"Scheda", "Partecipante", "Prezzo asta"}
+            if column not in {"Scheda", "Partecipante", "Prezzo asta", "Fascia personale"}
         ],
         column_config={
             "Scheda": st.column_config.CheckboxColumn("Apri", width="small"),
-            "In rosa": st.column_config.TextColumn(width="small"),
+            "In rosa": st.column_config.TextColumn(
+                width="small",
+                help="La spunta compare solo per i giocatori della tua squadra.",
+            ),
+            "Stato": st.column_config.TextColumn(
+                width="medium",
+                help="I giocatori assegnati restano visibili, ma non sono più disponibili.",
+            ),
             "★": st.column_config.TextColumn(width="small"),
             "Partecipante": st.column_config.SelectboxColumn(
                 "Partecipante",
@@ -796,6 +940,13 @@ def _render_auction_catalog_editor(
                 format="%.0f",
                 width="small",
                 help="Prezzo reale dell'aggiudicazione, modificabile direttamente.",
+            ),
+            "Fascia personale": st.column_config.SelectboxColumn(
+                "Fascia personale",
+                options=[no_tier, *tier_id_by_label],
+                required=True,
+                width="medium",
+                help="Classificazione e colore validi solo in questo fantacalcio.",
             ),
             "Ruolo": st.column_config.TextColumn(width="small"),
             "Giocatore": st.column_config.TextColumn(width="large"),
@@ -827,22 +978,36 @@ def _render_auction_catalog_editor(
         raw_price = edited.iloc[position]["Prezzo asta"]
         edited_price = float(raw_price) if pd.notna(raw_price) else 0.0
         current_price = (
-            float(current["purchase"].get("price") or 0) if current else edited_price
+            float(current["purchase"].get("price") or 0) if current else 0.0
+        )
+        current_tier = player_tiers[clean_id]
+        current_tier_label = (
+            tier_label_by_id.get(str(current_tier.get("id")), no_tier)
+            if current_tier else no_tier
+        )
+        edited_tier_label = str(
+            edited.iloc[position]["Fascia personale"] or no_tier
         )
         owner_changed = edited_name != current_name
         price_changed = current is not None and abs(edited_price - current_price) > 0.001
-        if not owner_changed and not price_changed:
+        tier_changed = edited_tier_label != current_tier_label
+        if not owner_changed and not price_changed and not tier_changed:
             continue
         player = by_id.get(clean_id)
         if not player:
             continue
-        changes.append(
-            {
-                "player": player,
-                "manager_id": None if edited_name == unassigned else manager_id_by_name[edited_name],
-                "price": edited_price,
-            }
-        )
+        change = {
+            "player": player,
+            "manager_id": None if edited_name == unassigned else manager_id_by_name[edited_name],
+            "price": edited_price,
+            "update_assignment": owner_changed or price_changed,
+        }
+        if tier_changed:
+            change["tier_id"] = (
+                None if edited_tier_label == no_tier
+                else tier_id_by_label[edited_tier_label]
+            )
+        changes.append(change)
 
     selected_ids = [
         str(indexed.iloc[position]["_id"])
@@ -867,7 +1032,7 @@ def _render_auction_catalog_editor(
             st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
             st.rerun()
     hint_column.caption(
-        "Puoi modificare più righe e salvarle insieme. Spunta Apri per mostrare la scheda completa."
+        "Prezzo resta 0 finché il giocatore è libero. Puoi aggiornare proprietario, prezzo e fascia su più righe insieme."
     )
     return selected_ids
 
@@ -2206,6 +2371,11 @@ def render_fantasy_styles() -> None:
         .fantasy-manager-card>strong { overflow:hidden; color:#f4fbf7; font-size:.76rem; text-overflow:ellipsis; white-space:nowrap; }
         .fantasy-manager-card>small { grid-column:1; color:#899791; font-size:.58rem; }
         .fantasy-manager-card>b { grid-column:2; grid-row:2/4; color:#ffbe45; font-size:1.05rem; }
+        .fantasy-custom-tier-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:.48rem; margin:.35rem 0 .75rem; }
+        .fantasy-custom-tier { display:grid; grid-template-columns:auto 1fr; gap:.05rem .45rem; align-items:center; padding:.58rem .65rem; border:1px solid color-mix(in srgb,var(--tier-color) 38%,transparent); border-left:4px solid var(--tier-color); border-radius:10px; background:linear-gradient(135deg,color-mix(in srgb,var(--tier-color) 10%,transparent),rgba(8,10,11,.62)); }
+        .fantasy-custom-tier>span { grid-row:1/3; font-size:1.05rem; filter:drop-shadow(0 0 8px var(--tier-color)); }
+        .fantasy-custom-tier>strong { color:#f4fbf7; font-size:.76rem; }
+        .fantasy-custom-tier>small { color:#899791; font-size:.58rem; }
         @media (max-width:720px) {
             .fantasy-league-hero { grid-template-columns:1fr auto; }
             .fantasy-mode-stack { grid-column:1/3; justify-content:flex-start; }
@@ -2237,6 +2407,7 @@ def render_fantasy_styles() -> None:
             .fantasy-auction-hero { align-items:flex-start; }
             .fantasy-auction-hero aside { min-width:75px; }
             .fantasy-manager-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .fantasy-custom-tier-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-role-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-insights { grid-template-columns:1fr; }
             .fantasy-empty { padding:1.25rem .8rem; }
