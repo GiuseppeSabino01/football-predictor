@@ -7,3 +7,4 @@ beautifulsoup4>=4.12.3
 feedparser>=6.0.11
 supabase>=2.5.0
 pytest>=8.2.0
+# Streamlit rebuild: Player Board v2
