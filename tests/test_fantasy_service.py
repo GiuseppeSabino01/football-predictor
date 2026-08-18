@@ -8,6 +8,7 @@ from fantasy.service import (
     add_purchases_batch,
     auction_manager_summary,
     auction_managers,
+    auction_player_assignment,
     auction_price_board,
     create_league,
     delete_league,
@@ -23,6 +24,7 @@ from fantasy.service import (
     suggest_lineup,
     top_xi_formation,
     top_xi_summary,
+    update_auction_assignments,
     update_league_settings,
 )
 
@@ -364,3 +366,72 @@ def test_delete_league_keeps_other_fantacalci() -> None:
 
     assert [league["name"] for league in workspace["leagues"]] == ["Da conservare"]
     assert workspace["active_league_id"] == second["id"]
+
+
+def test_auction_grid_can_reprice_transfer_and_unassign_player() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Editor asta",
+        initial_budget=100,
+        participants=3,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 1, "D": 1, "C": 1, "A": 1},
+    )
+    player = make_player(name="Provedel", team="Lazio", role="P", quote=2)
+    managers = auction_managers(league)
+    first_rival = str(managers[1]["id"])
+    second_rival = str(managers[2]["id"])
+    record_auction_purchase(league, first_rival, player, 5)
+
+    update_auction_assignments(
+        league,
+        [{"player": player, "manager_id": first_rival, "price": 8}],
+    )
+    assignment = auction_player_assignment(league, player["id"])
+    assert assignment is not None
+    assert assignment["manager_id"] == first_rival
+    assert assignment["purchase"]["price"] == 8
+
+    update_auction_assignments(
+        league,
+        [{"player": player, "manager_id": second_rival, "price": 11}],
+    )
+    assignment = auction_player_assignment(league, player["id"])
+    assert assignment is not None
+    assert assignment["manager_id"] == second_rival
+    assert assignment["purchase"]["price"] == 11
+    assert auction_manager_summary(league, first_rival)["roster_size"] == 0
+
+    update_auction_assignments(
+        league,
+        [{"player": player, "manager_id": None, "price": 0}],
+    )
+    assert auction_player_assignment(league, player["id"]) is None
+
+
+def test_auction_grid_changes_are_atomic_when_one_price_is_invalid() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Editor atomico",
+        initial_budget=20,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 2, "D": 0, "C": 0, "A": 0},
+    )
+    first = make_player(name="Portiere 1", team="Roma", role="P", quote=1)
+    second = make_player(name="Portiere 2", team="Milan", role="P", quote=1)
+    rival_id = str(auction_managers(league)[1]["id"])
+
+    with pytest.raises(ValueError, match="Crediti insufficienti"):
+        update_auction_assignments(
+            league,
+            [
+                {"player": first, "manager_id": rival_id, "price": 5},
+                {"player": second, "manager_id": rival_id, "price": 30},
+            ],
+        )
+
+    assert auction_player_assignment(league, first["id"]) is None
+    assert auction_player_assignment(league, second["id"]) is None
