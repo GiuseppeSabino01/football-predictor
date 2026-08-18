@@ -7,6 +7,9 @@ from uuid import uuid4
 
 
 DEFAULT_ROSTER_SLOTS = {"P": 3, "D": 7, "C": 7, "A": 5}
+GAME_MODE_AUCTION = "auction"
+GAME_MODE_LIST = "list"
+GAME_MODES = {GAME_MODE_AUCTION, GAME_MODE_LIST}
 ROLE_LABELS = {
     "P": "Portieri",
     "D": "Difensori",
@@ -32,6 +35,7 @@ def new_workspace() -> dict[str, Any]:
         "updated_at": utc_now(),
         "active_league_id": None,
         "catalog": [],
+        "catalog_meta": {},
         "leagues": [],
     }
 
@@ -42,9 +46,12 @@ def normalize_workspace(payload: dict[str, Any] | None) -> dict[str, Any]:
     workspace.setdefault("updated_at", utc_now())
     workspace.setdefault("active_league_id", None)
     workspace.setdefault("catalog", [])
+    workspace.setdefault("catalog_meta", {})
     workspace.setdefault("leagues", [])
     if not isinstance(workspace["catalog"], list):
         workspace["catalog"] = []
+    if not isinstance(workspace["catalog_meta"], dict):
+        workspace["catalog_meta"] = {}
     if not isinstance(workspace["leagues"], list):
         workspace["leagues"] = []
     for league in workspace["leagues"]:
@@ -59,19 +66,22 @@ def create_league(
     workspace: dict[str, Any],
     name: str,
     initial_budget: int = 250,
-    participants: int = 10,
+    participants: int | None = 10,
     season: str = "2026/27",
     roster_slots: dict[str, int] | None = None,
     modifier_enabled: bool = True,
+    captain_enabled: bool = False,
+    game_mode: str = GAME_MODE_AUCTION,
 ) -> dict[str, Any]:
     clean_name = name.strip()
     if not clean_name:
         raise ValueError("Inserisci un nome per il fanta.")
     if initial_budget <= 0:
         raise ValueError("Il budget deve essere maggiore di zero.")
-    if participants < 2:
+    if game_mode not in GAME_MODES:
+        raise ValueError("Modalita di gioco non riconosciuta.")
+    if game_mode == GAME_MODE_AUCTION and (participants is None or participants < 2):
         raise ValueError("Servono almeno due partecipanti.")
-
     now = utc_now()
     slots = {role: int((roster_slots or DEFAULT_ROSTER_SLOTS).get(role, 0)) for role in ROLE_LABELS}
     if any(value < 0 for value in slots.values()) or sum(slots.values()) == 0:
@@ -80,10 +90,13 @@ def create_league(
         "id": uuid4().hex,
         "name": clean_name,
         "season": season.strip() or "2026/27",
+        "game_mode": game_mode,
         "initial_budget": int(initial_budget),
-        "participants": int(participants),
+        "participants": int(participants) if game_mode == GAME_MODE_AUCTION else None,
         "roster_slots": slots,
         "modifier_enabled": bool(modifier_enabled),
+        "captain_enabled": bool(captain_enabled),
+        "captain_player_id": None,
         "purchases": [],
         "watchlist": [],
         "analysis": "",
@@ -101,8 +114,11 @@ def update_league_settings(
     *,
     name: str,
     initial_budget: int,
-    participants: int,
+    participants: int | None,
+    game_mode: str,
     modifier_enabled: bool,
+    captain_enabled: bool,
+    roster_slots: dict[str, int],
 ) -> None:
     clean_name = name.strip()
     spent = sum(_number(row.get("price")) for row in league.get("purchases", []))
@@ -110,17 +126,47 @@ def update_league_settings(
         raise ValueError("Inserisci un nome per il fanta.")
     if initial_budget < spent:
         raise ValueError(f"Il budget non puo essere inferiore ai {spent:.0f} crediti gia spesi.")
-    if participants < 2:
+    if game_mode not in GAME_MODES:
+        raise ValueError("Modalita di gioco non riconosciuta.")
+    if game_mode == GAME_MODE_AUCTION and (participants is None or participants < 2):
         raise ValueError("Servono almeno due partecipanti.")
+    if game_mode == GAME_MODE_LIST:
+        list_spent = sum(
+            _number(row.get("quote")) if row.get("quote") is not None else _number(row.get("price"))
+            for row in league.get("purchases", [])
+        )
+        if initial_budget < list_spent:
+            raise ValueError(
+                f"Con i costi del listone servono almeno {list_spent:.0f} crediti di budget."
+            )
+    slots = {role: int(roster_slots.get(role, 0)) for role in ROLE_LABELS}
+    if any(value < 0 for value in slots.values()) or sum(slots.values()) == 0:
+        raise ValueError("La composizione della rosa non e valida.")
+    current_counts = roster_summary(league)["role_counts"]
+    for role, count in current_counts.items():
+        if slots[role] < count:
+            raise ValueError(
+                f"Non puoi impostare meno di {count} slot per {ROLE_LABELS[role].lower()}: "
+                "hai gia quei giocatori in rosa."
+            )
     league.update(
         {
             "name": clean_name,
+            "game_mode": game_mode,
             "initial_budget": int(initial_budget),
-            "participants": int(participants),
+            "participants": int(participants) if game_mode == GAME_MODE_AUCTION else None,
+            "roster_slots": slots,
             "modifier_enabled": bool(modifier_enabled),
+            "captain_enabled": bool(captain_enabled),
             "updated_at": utc_now(),
         }
     )
+    if not captain_enabled:
+        league["captain_player_id"] = None
+    if game_mode == GAME_MODE_LIST:
+        for purchase in league.get("purchases", []):
+            if purchase.get("quote") is not None:
+                purchase["price"] = _number(purchase.get("quote"))
 
 
 def delete_league(workspace: dict[str, Any], league_id: str) -> None:
@@ -135,7 +181,11 @@ def find_league(workspace: dict[str, Any], league_id: str | None) -> dict[str, A
 
 
 def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -> dict[str, Any]:
-    clean_price = float(price)
+    clean_price = (
+        _number(player.get("quote"))
+        if league.get("game_mode") == GAME_MODE_LIST
+        else float(price)
+    )
     if clean_price < 0:
         raise ValueError("Il prezzo non puo essere negativo.")
     player_id = str(player.get("id", "")).strip()
@@ -161,11 +211,16 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
         "role": role,
         "price": clean_price,
         "quote": _optional_number(player.get("quote")),
+        "fvm": _optional_number(player.get("fvm")),
         "predicted_quote": _optional_number(player.get("predicted_quote")),
         "expected_goals": _optional_number(player.get("expected_goals")),
         "expected_assists": _optional_number(player.get("expected_assists")),
         "starter_probability": _optional_number(player.get("starter_probability")),
         "fantasy_score": player_score(player),
+        "reliability": _optional_number(player.get("reliability")),
+        "risk": _optional_number(player.get("risk")),
+        "tier": player.get("tier"),
+        "profile": player.get("profile"),
         "acquired_at": utc_now(),
     }
     league.setdefault("purchases", []).append(purchase)
@@ -177,6 +232,21 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
 
 def remove_purchase(league: dict[str, Any], player_id: str) -> None:
     league["purchases"] = [row for row in league.get("purchases", []) if row.get("player_id") != player_id]
+    league["analysis"] = ""
+    if league.get("captain_player_id") == player_id:
+        league["captain_player_id"] = None
+    league["updated_at"] = utc_now()
+
+
+def set_captain(league: dict[str, Any], player_id: str | None) -> None:
+    if not league.get("captain_enabled"):
+        raise ValueError("La regola del capitano non e attiva.")
+    if player_id is None:
+        league["captain_player_id"] = None
+    elif not any(row.get("player_id") == player_id for row in league.get("purchases", [])):
+        raise ValueError("Il capitano deve essere un giocatore della tua rosa.")
+    else:
+        league["captain_player_id"] = player_id
     league["analysis"] = ""
     league["updated_at"] = utc_now()
 
@@ -264,9 +334,16 @@ def touch_workspace(workspace: dict[str, Any]) -> None:
 def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("season", "2026/27")
     league.setdefault("initial_budget", 250)
-    league.setdefault("participants", 10)
+    league.setdefault("game_mode", GAME_MODE_AUCTION)
+    if league.get("game_mode") not in GAME_MODES:
+        league["game_mode"] = GAME_MODE_AUCTION
+    league.setdefault("participants", 10 if league["game_mode"] == GAME_MODE_AUCTION else None)
+    if league["game_mode"] == GAME_MODE_LIST:
+        league["participants"] = None
     league.setdefault("roster_slots", deepcopy(DEFAULT_ROSTER_SLOTS))
     league.setdefault("modifier_enabled", True)
+    league.setdefault("captain_enabled", False)
+    league.setdefault("captain_player_id", None)
     league.setdefault("purchases", [])
     league.setdefault("watchlist", [])
     league.setdefault("analysis", "")

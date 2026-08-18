@@ -13,14 +13,16 @@ App personale per pronostici calcistici in stile betting. Combina API gratuite, 
 - Forma recente e head-to-head per nazionali tramite storico gratuito martj42/international_results.
 - News italiane gratuite via RSS con analisi Gemini.
 - Dashboard Streamlit protetta da password.
-- Area Fantacalcio multi-squadra con listone, asta, rosa, modificatore e analisi Gemini.
+- Area Fantacalcio multi-squadra con listone automatico, asta/listone, regole personalizzate e analisi Gemini.
 - CLI locale.
 
 ## Fantacalcio
 
-La voce `Fantacalcio` nel menu laterale permette di creare piu fanta indipendenti. Ogni fanta mantiene il proprio budget, gli acquisti, la watchlist e le impostazioni del modificatore.
+La voce `Fantacalcio` nel menu laterale permette di creare piu fanta indipendenti. Ogni fanta mantiene budget, rosa, watchlist e regolamento: modalita Asta o Listone, modificatore difesa, capitano e numero di portieri, difensori, centrocampisti e attaccanti.
 
-Il listone puo essere importato in formato CSV o Excel; le principali intestazioni del listone Classic vengono riconosciute automaticamente. Una volta configurato Supabase, workspace, listone e squadre vengono sincronizzati usando la tabella `llm_prediction_cache` gia prevista dallo schema, quindi non serve una nuova migrazione SQL.
+Il listone non richiede caricamenti manuali: a ogni apertura l'app controlla le [quotazioni ufficiali Fantacalcio.it](https://www.fantacalcio.it/quotazioni-fantacalcio), salva l'ultima versione disponibile e mantiene come fallback la base analizzata 2026/27. In modalita Listone non vengono richiesti i partecipanti e ogni calciatore costa automaticamente la quotazione ufficiale; in modalita Asta si registrano partecipanti e prezzo battuto.
+
+Una volta configurato Supabase, workspace, listone e squadre vengono sincronizzati usando la tabella `llm_prediction_cache` gia prevista dallo schema, quindi non serve una nuova migrazione SQL.
 
 ## Setup locale
 
