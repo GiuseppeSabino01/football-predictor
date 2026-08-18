@@ -53,7 +53,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.18 · Fantasy v15 · Barre scouting native")
+    st.caption("Build 2026.08.18 · Fantasy v16 · Contrasto fasce e valori")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
