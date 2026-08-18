@@ -8,7 +8,8 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
-data/
+data/*
+!data/fantacalcio_seed_2026_27.csv
 logs/
 pytest-cache-files-*/
 *.db
