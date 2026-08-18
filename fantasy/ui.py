@@ -1669,7 +1669,7 @@ def _render_lineup(lineup: dict[str, Any], captain_player_id: str | None = None)
 def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
     analysis = list_trade_analysis(league, catalog, limit=5)
     weak_names = " · ".join(
-        escape(str(row.get("name") or "")) for row in analysis.get("weakest", [])
+        str(row.get("name") or "") for row in analysis.get("weakest", [])
     )
     st.markdown(
         f'<section class="fantasy-swap-hero"><div><span>SASA · SWAP LAB</span>'
