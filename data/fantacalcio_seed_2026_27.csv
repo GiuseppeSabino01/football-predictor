@@ -1,495 +1,495 @@
-role,name,team,mantra_role,quote,fvm,status,starter_probability,data_quality,appearances_previous,average_rating_previous,fantasy_average_previous,goals_previous,assists_previous,xg_previous,xa_previous,penalties_scored,penalties_taken,yellow_cards,red_cards,goals_conceded,penalties_saved,goals_prevented,expected_appearances,expected_goals,expected_assists,expected_fantasy_average,reliability,bonus,potential,risk,value,fantasy_score,tier,profile
-P,Svilar,ROM,Por,18,65,Titolare,0.9,Storico Serie A,38,6.32,5.5,0,0,,,0,0,0,0,31,0,4.7,34,0,0,5.5,93,76,68,7,24,68,Top,Priorità d'asta
-P,Martinez Jo.,INT,Por,17,63,Titolare,0.9,Campione ridotto,5,6,5.2,0,0,,,0,0,0,0,4,0,,30,0,0,5.2,71,57,46,36,19,47,Buono,Rotazione/copertura
-P,Butez,COM,Por,16,56,Titolare,0.9,Storico Serie A,38,6.11,5.41,0,1,,,0,0,3,0,29,1,2.1,34,0,0,5.41,93,69,54,8,25,62,Ottimo,Titolare affidabile
-P,Carnesecchi,ATA,Por,16,52,Titolare,0.9,Storico Serie A,37,6.43,5.65,0,0,,,0,0,0,0,35,2,7.1,34,0,0,5.65,92,77,70,8,28,69,Top,Priorità d'asta
-P,Maignan,MIL,Por,15,50,Titolare,0.9,Storico Serie A,37,6.3,5.46,0,0,,,0,0,4,0,35,2,10.5,34,0,0,5.46,92,78,69,9,29,69,Top,Priorità d'asta
-P,De Gea,FIO,Por,13,45,Titolare,0.9,Storico Serie A,37,6.22,4.97,0,0,,,0,0,0,0,49,1,,34,0,0,4.97,92,62,41,8,28,58,Ottimo,Titolare affidabile
-P,Meret,NAP,Por,11,45,Titolare,0.9,Storico Serie A,11,6.18,5.14,0,1,,,0,0,1,0,12,0,,31,0,0,5.14,75,54,41,26,29,49,Buono,Rotazione/copertura
-P,Skorupski,BOL,Por,10,37,Titolare,0.9,Storico Serie A,18,6.14,5.22,0,0,,,0,0,1,1,15,0,-1,32,0,0,5.22,79,52,28,23,30,47,Buono,Rotazione/copertura
-P,Caprile,CAG,Por,9,27,Titolare,0.9,Storico Serie A,38,6.29,4.87,0,0,,,0,0,2,0,53,0,3.5,34,0,0,4.87,93,65,52,8,43,64,Ottimo,Titolare affidabile
-P,Di Gregorio,JUV,Por,9,40,Titolare,0.9,Storico Serie A,30,6.07,5.32,0,0,,,0,0,1,0,25,1,,33,0,0,5.32,87,58,39,13,38,56,Ottimo,Titolare affidabile
-P,Mandas,LAZ,Por,9,30,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0,0,5.86,86,56,36,29,38,53,Buono,Titolare affidabile
-P,Okoye,UDI,Por,9,29,Titolare,0.9,Storico Serie A,30,6.08,5.1,0,1,,,0,0,1,1,32,1,4.4,33,0,0,5.1,87,64,63,14,43,64,Ottimo,Titolare affidabile
-P,Bijlow,GEN,Por,8,18,Titolare,0.9,Storico Serie A,16,6.09,4.81,0,0,,,0,0,1,0,20,0,,31,0,0,4.81,78,49,33,23,37,48,Buono,Rotazione/copertura
-P,Falcone,LEC,Por,8,25,Titolare,0.9,Storico Serie A,38,6.45,5.26,0,0,,,0,0,2,0,50,2,6.4,34,0,0,5.26,93,70,62,8,51,70,Top,Priorità d'asta
-P,Daffara,PAR,Por,7,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.77,34,26,29,81,24,20,Cautela,Profilo rischioso
-P,Muric,SAS,Por,7,15,Titolare,0.9,Storico Serie A,32,6.06,4.75,0,0,,,0,0,4,0,43,1,5.7,33,0,0,4.75,89,64,59,13,55,66,Top,Priorità d'asta
-P,Suzuki,PAR,Por,7,20,Riserva/rotazione,0.2,Storico Serie A,20,6.05,4.78,0,0,,,0,0,1,0,28,1,-1.4,7,0,0,4.78,28,24,21,73,19,16,Cautela,Profilo rischioso
-P,Perin,JUV,Por,6,10,Riserva/rotazione,0.2,Storico Serie A,9,6.06,5.06,0,0,,,0,0,0,0,9,0,,7,0,0,5.06,21,21,31,79,21,15,Cautela,Profilo rischioso
-P,Stankovic F.,VEN,Por,6,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0,0,5.8,86,52,32,29,55,54,Buono,Titolare affidabile
-P,Milinkovic-Savic V.,NAP,Por,5,10,Riserva/rotazione,0.2,Storico Serie A,27,6.17,5.61,0,0,,,0,0,0,0,24,3,0.6,7,0,0,5.61,33,28,35,67,35,25,Cautela,Profilo rischioso
-P,Thiam,MON,Por,5,12,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0,0,5.79,86,51,31,29,65,56,Ottimo,Titolare affidabile
-P,Palmisani,FRO,Por,4,8,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0,0,5.78,86,50,30,29,80,58,Ottimo,Occasione di valore
-P,Desplanches,FRO,Por,2,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.78,34,27,30,81,86,33,Cautela,Profilo rischioso
-P,Provedel,INT,Por,2,5,Riserva/rotazione,0.2,Storico Serie A,27,6.28,5.37,0,0,,,0,0,1,0,27,1,5.9,7,0,0,5.37,33,37,56,67,100,46,Buono,Profilo rischioso
-P,Christensen O.,FIO,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,1,7.5,6.5,0,0,,,0,0,0,0,1,0,,8,0,0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso
-P,Ciocci,CAG,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Contini,NAP,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Corvi,PAR,Por,1,1,Titolare,0.9,Storico Serie A,17,6.24,5.15,0,0,,,0,0,1,0,18,0,,31,0,0,5.15,79,45,28,22,100,59,Ottimo,Occasione di valore
-P,De Marzi,ROM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Di Gennaro,INT,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,1,6,5,0,0,,,0,0,0,0,1,0,,8,0,0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso
-P,Fruchtl,LEC,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Gollini,ROM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Grandi,VEN,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Happonen,BOL,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Lezzerini,FIO,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Lolic,FRO,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Mascardi,TOR,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Motta,LAZ,Por,1,1,Riserva/rotazione,0.2,Storico Serie A,9,6,5.17,0,0,,,0,0,1,0,10,1,,7,0,0,5.17,21,19,28,80,100,30,Cautela,Profilo rischioso
-P,Padelli,UDI,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,2,6.25,5.25,0,0,,,0,0,0,0,2,0,,8,0,0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso
-P,Paleari,TOR,Por,1,1,Titolare,0.9,Storico Serie A,29,6.12,4.55,0,0,,,0,0,1,0,45,0,-0.5,33,0,0,4.55,87,48,25,13,100,62,Ottimo,Occasione di valore
-P,Pessina Mas.,BOL,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,4,6.12,5.62,0,0,,,0,0,0,0,2,0,,8,0,0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso
-P,Piana,UDI,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Pinsoglio,JUV,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Pizzignacco,MON,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Pozzi,VEN,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Renzetti,LAZ,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Rossi F.,ATA,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Russo A.,SAS,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Samooja,LEC,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Sherri,CAG,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Siviero,TOR,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Sommariva,GEN,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,2,5.75,3.75,0,0,,,0,0,0,0,4,0,,8,0,0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso
-P,Sportiello,ATA,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,1,5.5,4.5,0,0,,,0,0,0,0,1,0,,8,0,0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso
-P,Stolz,GEN,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Strajnar,MON,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Terracciano,MIL,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Tornqvist,COM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Torriani,MIL,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-P,Turati,SAS,Por,1,3,Riserva/rotazione,0.2,Campione ridotto,6,6.25,5.08,0,0,,,0,0,0,0,7,0,,7,0,0,5.08,19,19,29,88,100,28,Cautela,Profilo rischioso
-P,Vigorito,COM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso
-D,Dimarco,INT,E;W,32,265,Titolare,0.9,Storico Serie A,35,6.64,7.69,7,17,5.2,11.3,0,0,3,0,0,0,,34,5.8,12,7.46,91,100,91,10,23,80,Elite,Priorità d'asta
-D,Wesley,ROM,E,17,90,Titolare,0.9,Storico Serie A,30,6.17,6.52,5,0,1.6,3.7,0,0,5,2,0,0,,33,3.3,2.4,6.39,87,44,46,17,27,50,Buono,Titolare affidabile
-D,Akanji,INT,Dc,16,55,Titolare,0.9,Storico Serie A,32,6.27,6.39,2,0,2,1.4,0,0,4,0,0,0,,33,2.1,0.9,6.43,89,26,30,13,24,41,Scommessa,Titolare affidabile
-D,Bremer,JUV,Dc,15,50,Titolare,0.9,Storico Serie A,26,6.29,6.77,4,3,2.8,1.2,0,0,5,0,0,0,,33,4.2,2.4,6.65,85,54,45,17,33,54,Buono,Titolare affidabile
-D,Mancini,ROM,Dc,15,49,Titolare,0.9,Storico Serie A,36,6.31,6.57,4,2,2.5,1.5,0,0,9,0,0,0,,34,2.9,1.6,6.49,91,37,35,12,29,47,Buono,Titolare affidabile
-D,Bastoni,INT,Dc,14,44,Titolare,0.9,Storico Serie A,28,6.16,6.3,1,4,1.4,3,0,0,6,0,0,0,,33,1.5,4,6.31,86,30,39,17,28,44,Scommessa,Titolare affidabile
-D,Pavlovic,MIL,Dc,14,48,Titolare,0.9,Storico Serie A,34,6.28,6.66,5,0,3.5,1.2,0,0,4,0,0,0,,34,4.1,0.7,6.6,90,46,36,11,33,51,Buono,Titolare affidabile
-D,Rrahmani,NAP,Dc,14,47,Titolare,0.9,Storico Serie A,21,6.26,6.48,2,0,1.4,0.4,0,0,3,0,0,0,,32,2.3,0.5,6.42,81,26,29,21,26,38,Scommessa,Titolare affidabile
-D,Kalulu,JUV,Dd;Dc,13,46,Titolare in ballottaggio,0.72,Storico Serie A,37,6.2,6.42,2,4,1.7,,0,0,2,1,0,0,,27,1.3,2.9,6.4,78,24,38,23,27,39,Scommessa,Rotazione/copertura
-D,N'Dicka,ROM,Dc,13,44,Titolare,0.9,Storico Serie A,31,6.15,6.39,3,1,2,,0,0,5,0,0,0,,33,2.6,1.1,6.34,88,32,32,14,30,44,Scommessa,Titolare affidabile
-D,Solet,UDI,Dc,13,46,Titolare,0.9,Storico Serie A,35,6.26,6.47,3,1,2.8,2.4,1,1,1,0,0,0,,34,2.9,1.8,6.55,91,38,37,9,34,49,Buono,Titolare affidabile
-D,Di Lorenzo,NAP,Dd;E,12,40,Titolare,0.9,Storico Serie A,26,6.02,6.27,2,1,2,2.8,0,0,1,0,0,0,,33,2.5,2.6,6.31,85,36,37,15,34,47,Buono,Titolare affidabile
-D,Gila,MIL,Dc,12,31,Titolare,0.9,Storico Serie A,31,5.95,5.87,0,0,1.4,0.6,0,0,3,1,0,0,,33,0.9,0.4,5.96,88,11,20,14,25,33,Cautela,Titolare affidabile
-D,Stones,INT,Dc,12,38,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.7,1,6.02,73,11,24,42,23,27,Cautela,Scommessa nuova
-D,Bisseck,INT,Dc,11,33,Alternativa in ballottaggio,0.48,Storico Serie A,23,6.2,6.63,3,2,,1.1,0,0,2,0,0,0,,17,2.1,1.1,6.59,51,26,41,50,28,31,Cautela,Profilo rischioso
-D,Ostigard,GEN,Dc,11,40,Titolare,0.9,Storico Serie A,30,6.13,6.52,5,0,3.4,0.8,0,0,7,0,0,0,,33,4.6,0.5,6.45,87,51,39,16,43,54,Buono,Titolare affidabile
-D,Dodò,FIO,Dd;E,10,30,Alternativa in ballottaggio,0.48,Storico Serie A,36,6.07,6.11,1,2,2.2,5,0,0,7,0,0,0,,18,0.9,1.9,6.23,60,16,36,42,28,29,Cautela,Rotazione/copertura
-D,Hermoso,ROM,Dc,10,26,Titolare in ballottaggio,0.72,Storico Serie A,27,6.17,6.41,3,2,1.8,0.8,0,0,9,0,0,0,,26,2.2,1.2,6.3,72,28,32,32,34,38,Scommessa,Rotazione/copertura
-D,Ramon,COM,Dc,10,32,Titolare,0.9,Storico Serie A,32,6.16,6.14,2,0,4.6,1.5,0,0,11,1,0,0,,33,3.7,0.9,6.32,89,43,34,16,44,51,Buono,Titolare affidabile
-D,Scalvini,ATA,Dc,10,28,Titolare,0.9,Storico Serie A,24,6.04,6.42,3,1,2.6,1.6,0,0,2,0,0,0,,32,3.6,1.8,6.39,83,45,37,18,43,51,Buono,Titolare affidabile
-D,Cambiaso,JUV,Dd;Ds;E,9,27,Titolare,0.9,Storico Serie A,36,5.79,5.97,3,4,2.9,5.5,0,0,3,1,0,0,,34,2.8,4.6,6.1,91,46,44,11,51,57,Ottimo,Titolare affidabile
-D,Vasquez,GEN,Ds;Dc,9,33,Titolare,0.9,Storico Serie A,36,6.11,6.17,1,0,,0.7,0,0,2,0,0,0,,34,0.9,0.4,6.17,91,11,20,10,35,37,Scommessa,Titolare affidabile
-D,Bartesaghi,MIL,Ds;E,8,25,Titolare,0.9,Storico Serie A,31,6,6.08,2,0,1.1,4.1,0,0,3,0,0,0,,33,1.6,2.6,6.18,88,26,31,13,46,45,Buono,Titolare affidabile
-D,Celik,JUV,B;Dd;E,8,21,Alternativa in ballottaggio,0.48,Storico Serie A,32,6.08,6.17,1,2,1.5,2,0,0,2,1,0,0,,18,0.7,1.1,6.2,57,11,27,45,30,25,Cautela,Profilo rischioso
-D,Delprato,PAR,B;Dd;E,8,21,Titolare,0.9,Storico Serie A,35,6.01,6.11,2,0,2.1,0.9,0,0,5,0,0,0,,34,2,0.5,6.13,91,23,23,11,44,43,Scommessa,Titolare affidabile
-D,Dragusin,FIO,Dc,8,27,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.6,0.7,5.96,86,9,19,29,36,33,Cautela,Titolare affidabile
-D,Gutierrez,NAP,Ds;E,8,26,Riserva/rotazione,0.2,Storico Serie A,22,5.89,6.07,1,1,0.8,1.3,0,0,0,0,0,0,,7,0.3,0.4,6.08,29,5,27,71,19,11,Cautela,Profilo rischioso
-D,Hien,ATA,Dc,8,16,Alternativa in ballottaggio,0.48,Storico Serie A,28,6.02,5.96,1,0,0.8,0.3,0,0,5,0,0,0,,18,0.6,0.1,6.04,54,7,18,48,25,20,Cautela,Profilo rischioso
-D,Jimenez A.,FIO,Dd;Ds;E,8,23,Titolare in ballottaggio,0.72,Campione ridotto,1,5.5,5,0,0,,0.1,0,0,1,0,0,0,,27,0.5,0.6,5.96,73,8,19,34,31,28,Cautela,Rotazione/copertura
-D,Koulierakis,ROM,Dc,8,20,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.4,0.5,5.97,55,6,20,60,25,19,Cautela,Profilo rischioso
-D,Lucumì,BOL,Dc,8,18,Riserva/rotazione,0.2,Storico Serie A,28,5.91,5.93,1,0,1,0.4,0,0,5,0,0,0,,7,0.3,0.1,5.96,33,4,20,69,18,10,Cautela,Profilo rischioso
-D,Mina,CAG,Dc,8,20,Titolare,0.9,Storico Serie A,26,6.02,6.19,2,1,1.6,0.6,0,0,3,1,0,0,,33,2.2,1,6.15,85,27,26,17,45,43,Scommessa,Titolare affidabile
-D,Miranda J.,BOL,Ds;E,8,24,Titolare,0.9,Storico Serie A,31,5.94,6.03,1,3,0.6,4.1,0,0,6,0,0,0,,33,0.8,3.9,6.03,88,23,33,14,45,44,Scommessa,Titolare affidabile
-D,Norton-Cuffy,GEN,Dd;E,8,22,Titolare,0.9,Storico Serie A,27,5.94,6.11,2,1,,,0,0,3,1,0,0,,33,2.4,1.2,6.1,85,30,28,17,46,45,Buono,Titolare affidabile
-D,Spinazzola,NAP,Ds;E,8,24,Titolare in ballottaggio,0.72,Storico Serie A,30,6.1,6.48,3,3,1.2,3.4,0,0,1,0,0,0,,26,1.7,2.8,6.39,74,28,38,26,45,42,Scommessa,Rotazione/copertura
-D,Valeri,PAR,Ds;E,8,24,Titolare in ballottaggio,0.72,Storico Serie A,34,6.1,6.13,0,2,0.7,4.2,0,0,2,0,0,0,,27,0.3,2.6,6.2,76,13,28,25,37,34,Cautela,Rotazione/copertura
-D,Vojvoda,UDI,Dd;E,8,19,Titolare,0.9,Storico Serie A,27,5.94,6.17,2,1,1.4,2.7,0,0,2,0,0,0,,33,2,2.5,6.16,85,30,32,16,47,46,Buono,Titolare affidabile
-D,Zappacosta,ATA,Dd;E,8,24,Titolare in ballottaggio,0.72,Storico Serie A,35,6.03,6.27,3,1,2.3,5,0,0,3,0,0,0,,27,2,2.6,6.31,77,31,37,24,47,45,Buono,Rotazione/copertura
-D,Buongiorno,NAP,Dc,7,18,Alternativa in ballottaggio,0.48,Storico Serie A,32,5.84,5.83,0,1,1.4,0.8,0,0,3,0,0,0,,18,0.5,0.5,5.9,57,7,20,44,30,22,Cautela,Rotazione/copertura
-D,Carlos Augusto,INT,B;Ds;E,7,27,Riserva/rotazione,0.2,Storico Serie A,28,6.05,6.09,1,1,1.5,1.5,0,0,6,0,0,0,,7,0.3,0.3,6.11,33,4,26,70,23,12,Cautela,Profilo rischioso
-D,Coco,TOR,Dc,7,18,Alternativa in ballottaggio,0.48,Storico Serie A,35,5.89,5.96,1,1,0.9,0.9,0,0,3,0,0,0,,18,0.5,0.5,5.96,59,7,20,42,31,23,Cautela,Rotazione/copertura
-D,Djimsiti,ATA,Dc,7,16,Riserva/rotazione,0.2,Storico Serie A,33,5.89,5.83,0,0,1.6,0.7,0,0,4,0,0,0,,7,0.2,0.1,5.93,37,3,18,64,21,12,Cautela,Profilo rischioso
-D,Doekhi,LAZ,Dc,7,22,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.5,0.6,5.94,86,8,17,29,40,33,Cautela,Titolare affidabile
-D,Gabbia,MIL,Dc,7,23,Titolare,0.9,Storico Serie A,29,5.91,5.84,0,0,1.4,0.2,0,0,4,0,0,0,,33,1,0.1,5.93,87,11,18,15,42,36,Scommessa,Titolare affidabile
-D,Idzes,SAS,Dc,7,1,Titolare,0.9,Storico Serie A,35,6.01,5.97,0,0,0.2,0.6,0,0,3,0,0,0,,34,0.1,0.3,5.98,91,2,12,10,38,32,Cautela,Titolare affidabile
-D,Ismajli,TOR,Dc,7,18,Titolare in ballottaggio,0.72,Storico Serie A,24,5.96,5.94,0,2,0.3,0.3,0,0,5,0,0,0,,26,0.2,1,5.92,70,6,19,33,34,27,Cautela,Rotazione/copertura
-D,Kaiki,COM,Ds;E,7,23,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.5,0.6,5.96,73,8,19,42,36,28,Cautela,Scommessa nuova
-D,Kristensen T.,UDI,Dd;Dc,7,15,Riserva/rotazione,0.2,Storico Serie A,28,6.04,6.29,3,0,1,0.2,0,0,4,0,0,0,,7,0.5,0,6.18,33,5,22,69,22,12,Cautela,Profilo rischioso
-D,Obert,CAG,B;Ds;E,7,14,Titolare,0.9,Storico Serie A,34,5.97,5.91,0,3,1.4,2.3,0,0,8,1,0,0,,34,0.8,2.6,5.97,90,18,26,14,48,42,Scommessa,Titolare affidabile
-D,Romagnoli,LAZ,Dc,7,24,Titolare,0.9,Storico Serie A,32,6,5.89,0,0,1.5,,0,0,5,1,0,0,,33,0.9,0,5.97,89,10,17,14,42,36,Scommessa,Titolare affidabile
-D,Tiago Gabriel,LEC,Dc,7,17,Titolare,0.9,Storico Serie A,36,6.03,6.04,2,0,3.6,0.1,0,0,7,0,0,0,,34,2.8,0.1,6.18,91,30,24,11,54,48,Buono,Titolare affidabile
-D,Tomori,MIL,Dc,7,20,Riserva/rotazione,0.2,Storico Serie A,32,5.92,5.83,0,1,0.6,1,0,0,6,1,0,0,,7,0.1,0.2,5.87,36,2,19,67,20,11,Cautela,Profilo rischioso
-D,Ahanor,ATA,B;Ds;E,6,16,Alternativa in ballottaggio,0.48,Storico Serie A,21,5.79,5.69,0,0,1.9,0.7,0,0,2,1,0,0,,17,0.8,0.4,5.86,50,10,22,52,34,22,Cautela,Profilo rischioso
-D,Bella-Kotchap,VEN,Dc,6,13,Titolare,0.9,Storico Serie A,18,5.94,5.86,0,0,0.1,0.4,0,0,3,0,0,0,,32,0.2,0.4,5.89,79,4,14,23,40,30,Cautela,Rotazione/copertura
-D,Bellanova,ATA,Dd;E,6,15,Alternativa in ballottaggio,0.48,Storico Serie A,22,5.75,5.75,0,1,0.5,2.3,0,0,2,0,0,0,,17,0.2,1.3,5.82,50,7,24,51,33,21,Cautela,Profilo rischioso
-D,Bernasconi,ATA,Ds;E,6,17,Titolare in ballottaggio,0.72,Storico Serie A,22,6.11,6.18,0,3,0.4,3.5,0,0,3,0,0,0,,26,0.3,3.5,6.21,68,16,33,34,49,36,Scommessa,Rotazione/copertura
-D,Beukema,NAP,Dc,6,16,Titolare in ballottaggio,0.72,Storico Serie A,22,5.89,6.11,2,0,1.7,0.5,0,0,2,0,0,0,,26,1.9,0.4,6.08,68,22,25,33,49,36,Scommessa,Rotazione/copertura
-D,Circati,PAR,Dc,6,18,Titolare,0.9,Storico Serie A,31,5.98,5.98,1,0,1,0.5,0,0,6,0,0,0,,33,1.1,0.3,5.99,88,13,18,14,50,39,Scommessa,Titolare affidabile
-D,Comuzzo,TOR,Dc,6,11,Titolare in ballottaggio,0.72,Storico Serie A,24,5.73,5.73,1,0,1,0.2,0,0,2,0,0,0,,26,1,0.1,5.81,70,11,17,31,41,30,Cautela,Rotazione/copertura
-D,Gallo,LEC,Ds;E,6,13,Titolare,0.9,Storico Serie A,37,5.93,5.97,0,3,0.5,2.9,0,0,3,0,0,0,,34,0.3,2.7,6,92,13,24,9,54,42,Scommessa,Titolare affidabile
-D,Heggem,BOL,Ds;Dc,6,15,Titolare,0.9,Storico Serie A,25,5.86,5.82,0,0,1.1,0.1,0,0,0,1,0,0,,32,0.8,0.1,5.9,84,9,16,17,46,35,Scommessa,Titolare affidabile
-D,Kamara H.,UDI,Ds;E,6,12,Titolare,0.9,Storico Serie A,26,5.9,5.88,0,2,,,0,0,5,0,0,0,,33,0,2.5,5.88,85,9,22,17,48,37,Scommessa,Titolare affidabile
-D,Mangas,MON,Ds;E,6,15,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.3,0.4,5.91,86,5,15,29,44,32,Cautela,Titolare affidabile
-D,Marcandalli,GEN,Dc,6,13,Titolare,0.9,Storico Serie A,31,5.89,5.85,0,1,0.3,0.8,0,0,4,0,0,0,,33,0.2,0.9,5.87,88,5,16,14,45,35,Scommessa,Titolare affidabile
-D,Marusic,LAZ,Dd;Ds;E,6,20,Titolare in ballottaggio,0.72,Storico Serie A,33,5.8,5.91,1,2,1.3,1.4,0,0,1,1,0,0,,27,1,1.3,5.91,76,15,25,25,48,36,Scommessa,Rotazione/copertura
-D,Monterisi,FRO,Dc,6,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.3,0.4,5.91,86,5,15,29,44,32,Cautela,Titolare affidabile
-D,Pavard,INT,Dd;Dc,6,18,Riserva/rotazione,0.2,Campione ridotto,1,6.5,6.5,0,0,0,0,0,0,0,0,0,0,,8,0.3,0.3,6.02,34,4,23,73,25,12,Cautela,Profilo rischioso
-D,Tavares N.,LAZ,Ds;E,6,17,Riserva/rotazione,0.2,Storico Serie A,21,5.83,5.71,0,0,0.6,2,0,0,5,0,0,0,,7,0.2,0.4,5.85,29,4,24,74,23,11,Cautela,Profilo rischioso
-D,Valdepenas,FIO,Ds;Dc,6,18,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.4,0.5,5.94,73,6,17,42,40,28,Cautela,Scommessa nuova
-D,Valle,COM,Ds;E,6,18,Alternativa in ballottaggio,0.48,Storico Serie A,26,6.06,6.23,1,3,1,1.2,0,0,3,0,0,0,,17,0.7,1.3,6.2,53,12,29,48,40,26,Cautela,Profilo rischioso
-D,Viery,FIO,Ds;Dc,6,19,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.4,0.5,5.94,73,6,17,42,40,28,Cautela,Scommessa nuova
-D,Zortea,BOL,Dd;E,6,19,Titolare,0.9,Storico Serie A,28,5.79,5.82,0,2,0.4,2.5,0,0,2,0,0,0,,33,0.3,2.7,5.86,86,13,25,15,51,40,Scommessa,Titolare affidabile
-D,Bracaglia,FRO,Ds;Dc,5,11,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,45,27,Cautela,Scommessa nuova
-D,Gaspar K.,LEC,Dc,5,12,Titolare in ballottaggio,0.72,Storico Serie A,21,5.81,5.62,0,0,,,0,0,6,1,0,0,,26,0,0.1,5.62,68,0,12,37,38,23,Cautela,Rotazione/copertura
-D,Haps,VEN,Ds;E,5,11,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,3,18,81,28,11,Cautela,Profilo rischioso
-D,Holm,BOL,Dd;E,5,13,Riserva/rotazione,0.2,Storico Serie A,16,6.03,6.38,1,4,1.3,1.7,0,0,1,1,0,0,,7,0.4,0.9,6.24,26,8,38,76,35,16,Cautela,Profilo rischioso
-D,Kelly L.,JUV,Ds;Dc,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,35,6.04,6.1,1,1,,,0,0,4,0,0,0,,18,0.5,0.5,6.09,59,7,20,42,44,26,Cautela,Rotazione/copertura
-D,Kempf,COM,Dc,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,30,6.12,6.5,4,1,2.8,0.8,0,0,3,0,0,0,,18,2,0.5,6.43,56,23,31,45,58,35,Scommessa,Profilo rischioso
-D,Kofler,CAG,Dc,5,11,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.2,0.2,5.91,55,3,15,60,37,19,Cautela,Profilo rischioso
-D,Kolasinac,ATA,Ds;Dc,5,12,Riserva/rotazione,0.2,Storico Serie A,17,5.94,5.85,0,0,0.2,0.3,0,0,3,0,0,0,,7,0.1,0.2,5.92,26,2,18,76,23,8,Cautela,Profilo rischioso
-D,Martin,GEN,Ds;E,5,15,Alternativa in ballottaggio,0.48,Storico Serie A,29,5.91,6.05,1,5,1.8,5.6,0,1,2,0,0,0,,18,0.9,3.5,6.22,55,22,47,46,61,38,Scommessa,Profilo rischioso
-D,Moreno M.,VEN,Dc,5,11,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.2,0.2,5.91,55,3,15,60,37,19,Cautela,Profilo rischioso
-D,Olivera,NAP,B;Ds;E,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,24,5.79,5.73,0,0,1.4,0.7,0,0,3,0,0,0,,17,0.6,0.3,5.85,52,7,19,50,39,22,Cautela,Profilo rischioso
-D,Oyono A.,FRO,Dd;E,5,12,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.2,0.2,5.97,34,3,19,81,28,11,Cautela,Profilo rischioso
-D,Parisi,FIO,Ds;E,5,12,Riserva/rotazione,0.2,Storico Serie A,23,6.11,6.07,1,1,1.3,1.7,0,0,6,0,0,0,,7,0.4,0.4,6.21,30,6,28,73,33,15,Cautela,Profilo rischioso
-D,Pedersen,TOR,Dd;E,5,13,Titolare,0.9,Storico Serie A,28,5.84,5.96,1,2,1.7,2,0,0,3,0,0,0,,33,1.7,2.4,6.01,86,27,29,15,72,50,Buono,Occasione di valore
-D,Pedraza,LAZ,Ds;E,5,15,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.3,0.4,5.92,73,5,16,42,47,28,Cautela,Scommessa nuova
-D,Rensch,ROM,B;Dd;E,5,16,Riserva/rotazione,0.2,Storico Serie A,18,6.11,6.47,1,4,0.3,2.3,0,0,1,0,0,0,,7,0.3,1,6.35,27,7,38,74,36,17,Cautela,Profilo rischioso
-D,Veiga D.,LEC,Dd;E,5,11,Riserva/rotazione,0.2,Storico Serie A,36,5.86,5.74,0,0,,,0,0,9,0,0,0,,8,0,0,5.74,39,0,11,64,25,11,Cautela,Profilo rischioso
-D,Vitik,BOL,Dc,5,11,Titolare in ballottaggio,0.72,Storico Serie A,18,5.81,5.72,0,0,0.4,0.1,0,0,3,0,0,0,,25,0.3,0.1,5.77,66,4,14,36,42,26,Cautela,Rotazione/copertura
-D,Zè Pedro,CAG,Dd;Dc,5,11,Titolare in ballottaggio,0.72,Storico Serie A,22,5.8,5.7,0,1,0.8,0.4,0,0,6,0,0,0,,26,0.5,0.7,5.75,68,8,18,35,46,29,Cautela,Rotazione/copertura
-D,Arizala,UDI,Ds;E,4,8,Riserva/rotazione,0.2,Campione ridotto,5,5.8,5.8,0,0,0,0.2,0,0,0,0,0,0,,7,0.1,0.2,5.87,18,2,17,89,23,4,Cautela,Profilo rischioso
-D,Bertola,UDI,Dd;Ds;Dc,4,10,Titolare,0.9,Storico Serie A,25,5.92,5.9,0,1,0.6,0.7,0,0,3,0,0,0,,32,0.5,1,5.94,84,9,18,17,70,40,Scommessa,Occasione di valore
-D,Birindelli,MON,Dd;Ds;E,4,12,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.3,0.3,5.9,86,4,14,29,65,36,Scommessa,Titolare affidabile
-D,Calvani,FRO,Dc,4,10,Titolare in ballottaggio,0.72,Storico Serie A,24,6.04,6.42,3,1,,0.5,0,0,2,0,0,0,,26,3.1,0.7,6.38,70,36,32,31,92,52,Buono,Occasione di valore
-D,Comert,TOR,Dc,4,10,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.2,0.3,5.89,86,3,13,29,64,35,Scommessa,Titolare affidabile
-D,Correia T.,VEN,Dd;E,4,12,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,56,29,Cautela,Scommessa nuova
-D,Delli Carri,MON,Dc,4,11,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,56,29,Cautela,Scommessa nuova
-D,Doig,SAS,Ds;E,4,13,Alternativa in ballottaggio,0.48,Storico Serie A,27,5.81,5.72,0,0,0.7,1,0,0,5,0,0,0,,17,0.3,0.4,5.79,54,5,18,48,47,23,Cautela,Profilo rischioso
-D,Gatti,JUV,Dc,4,10,Riserva/rotazione,0.2,Storico Serie A,16,5.97,6.25,2,0,2.1,0.1,0,0,3,0,0,0,,7,0.7,0.1,6.19,26,8,27,76,39,15,Cautela,Profilo rischioso
-D,Ghilardi,ROM,Dc,4,10,Riserva/rotazione,0.2,Storico Serie A,21,5.88,5.86,0,0,0.3,0.3,0,0,1,0,0,0,,7,0.1,0.1,5.91,29,1,15,72,29,9,Cautela,Profilo rischioso
-D,Halhal,VEN,Dc,4,10,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,56,29,Cautela,Scommessa nuova
-D,Kabasele,UDI,Dc,4,9,Titolare,0.9,Storico Serie A,29,5.97,6.16,3,0,1.3,0.1,0,0,5,1,0,0,,33,2.3,0.1,6.06,87,25,21,16,86,50,Buono,Occasione di valore
-D,Lucchesi,MON,Dc,4,12,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.3,0.3,5.9,86,4,14,29,65,36,Scommessa,Titolare affidabile
-D,Mitaj,GEN,Ds;E,4,9,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.2,5.92,34,2,16,81,33,11,Cautela,Profilo rischioso
-D,Pongracic,FIO,Dc,4,8,Riserva/rotazione,0.2,Storico Serie A,35,5.89,5.71,0,0,0.7,0.5,0,0,12,0,0,0,,8,0.1,0.1,5.77,38,1,15,66,33,13,Cautela,Profilo rischioso
-D,Siebert,LEC,Dc,4,12,Alternativa in ballottaggio,0.48,Storico Serie A,19,5.79,5.87,1,0,0.4,0.2,0,0,3,0,0,0,,17,0.5,0.2,5.81,49,6,17,53,45,21,Cautela,Profilo rischioso
-D,Smolcic I.,COM,Dd;E,4,10,Alternativa in ballottaggio,0.48,Storico Serie A,25,6.08,5.96,0,1,0.9,0.7,0,0,8,0,0,0,,17,0.4,0.6,6.03,52,6,20,52,49,24,Cautela,Profilo rischioso
-D,Valenti,PAR,Dc,4,10,Titolare in ballottaggio,0.72,Storico Serie A,27,5.87,5.74,0,0,0.6,0.6,0,0,7,0,0,0,,26,0.3,0.3,5.79,72,4,15,31,56,31,Cautela,Rotazione/copertura
-D,Walukiewicz,SAS,Dd;Dc,4,10,Titolare in ballottaggio,0.72,Storico Serie A,34,5.79,5.72,0,1,0.2,2.1,0,0,7,0,0,0,,27,0.1,1.3,5.75,76,6,19,26,61,35,Scommessa,Rotazione/copertura
-D,Zanoli,UDI,Dd;E,4,10,Riserva/rotazione,0.2,Storico Serie A,19,5.95,6.18,1,2,0.1,1.1,0,0,1,0,0,0,,7,0.2,0.5,6.08,28,4,25,73,36,13,Cautela,Profilo rischioso
-D,Zappa,CAG,B;Dd;E,4,9,Alternativa in ballottaggio,0.48,Storico Serie A,25,5.94,6.02,0,3,0.9,1.5,0,0,2,0,0,0,,17,0.4,1.4,6.05,52,9,26,49,54,27,Cautela,Profilo rischioso
-D,Akpoguma,FRO,Dc,3,7,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.1,0.2,5.89,55,2,13,60,59,23,Cautela,Profilo rischioso
-D,Angelino,ROM,E,3,12,Riserva/rotazione,0.2,Campione ridotto,7,5.79,5.64,0,0,0.2,0.7,0,0,2,0,0,0,,7,0.2,0.3,5.78,20,3,22,90,36,9,Cautela,Profilo rischioso
-D,Athekame,MIL,Dd;E,3,8,Riserva/rotazione,0.2,Storico Serie A,19,5.89,6.24,2,2,0.4,1.1,0,0,3,0,0,0,,7,0.3,0.5,6.01,28,5,27,74,49,17,Cautela,Profilo rischioso
-D,Britschgi,PAR,Dd;Ds;E,3,10,Riserva/rotazione,0.2,Storico Serie A,28,5.66,5.61,0,2,0.4,1.3,0,0,5,1,0,0,,7,0.1,0.4,5.64,33,3,21,70,44,15,Cautela,Profilo rischioso
-D,Candè,SAS,Ds;Dc,3,12,Titolare,0.9,Storico Serie A,8,5.69,5.56,0,0,0.2,0,0,0,2,0,0,0,,30,0.3,0.2,5.6,73,4,14,30,73,34,Cautela,Occasione di valore
-D,Carboni A.,MON,Ds;Dc,3,9,Alternativa in ballottaggio,0.48,Campione ridotto,2,5.75,5.75,0,0,,,0,0,0,0,0,0,,18,0.2,0.2,5.91,55,3,14,52,61,25,Cautela,Profilo rischioso
-D,Casale,BOL,Dc,3,6,Alternativa in ballottaggio,0.48,Storico Serie A,10,5.55,5.55,0,0,0.7,0.2,0,0,0,0,0,0,,16,0.3,0.2,5.62,43,4,15,57,50,19,Cautela,Profilo rischioso
-D,Cittadini,FRO,Dc,3,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.2,5.92,34,2,16,81,44,13,Cautela,Profilo rischioso
-D,De Winter,MIL,Dd;Dc,3,12,Riserva/rotazione,0.2,Storico Serie A,24,5.71,5.85,1,1,0.7,0.4,0,0,1,0,0,0,,7,0.2,0.2,5.8,31,3,20,70,44,15,Cautela,Profilo rischioso
-D,Estupinan,MIL,Ds;E,3,9,Riserva/rotazione,0.2,Storico Serie A,14,5.61,5.68,1,1,0.4,1.5,0,0,5,1,0,0,,7,0.3,0.5,5.56,24,5,27,82,42,13,Cautela,Profilo rischioso
-D,Floriani Mussolini,LAZ,Dd;E,3,12,Alternativa in ballottaggio,0.48,Storico Serie A,23,5.72,5.72,0,1,0.4,0.7,0,0,2,0,0,0,,17,0.2,0.6,5.75,51,4,18,50,59,25,Cautela,Profilo rischioso
-D,Hainaut,VEN,Dd;E,3,7,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.1,0.2,5.87,86,2,12,29,83,38,Scommessa,Occasione di valore
-D,Idrissi R.,CAG,Ds;E,3,7,Riserva/rotazione,0.2,Storico Serie A,19,5.95,6.18,2,0,,3.5,0,0,3,0,0,0,,7,0.6,0.6,6.21,28,9,35,74,60,22,Cautela,Profilo rischioso
-D,Joao Mario,FIO,Dd;E,3,7,Alternativa in ballottaggio,0.48,Storico Serie A,15,5.87,6.07,1,1,0.3,0.9,0,0,2,0,0,0,,17,0.5,0.7,5.93,46,8,21,56,63,26,Cautela,Profilo rischioso
-D,Kossounou,ATA,Dd;Dc,3,7,Riserva/rotazione,0.2,Storico Serie A,17,5.79,5.94,1,0,0.4,0.2,0,0,1,0,0,0,,7,0.2,0.1,5.86,26,3,17,75,39,11,Cautela,Profilo rischioso
-D,Kouadio,MON,Dd;Dc,3,9,Titolare,0.9,Campione ridotto,1,6,6,0,0,2.1,0,0,0,0,0,0,0,,34,0.2,0.2,5.89,86,3,13,21,85,40,Scommessa,Occasione di valore
-D,Provstgaard,LAZ,Dc,3,10,Riserva/rotazione,0.2,Storico Serie A,23,5.91,5.85,0,0,0.3,0.3,0,0,3,0,0,0,,7,0.1,0.1,5.9,30,1,15,72,39,11,Cautela,Profilo rischioso
-D,Ranieri L.,FIO,Ds;Dc,3,7,Alternativa in ballottaggio,0.48,Storico Serie A,31,5.81,5.74,1,0,1.9,1.1,0,0,8,1,0,0,,18,0.9,0.4,5.82,56,11,21,48,73,32,Cautela,Profilo rischioso
-D,Rodriguez Ju.,CAG,Ds;Dc,3,10,Titolare in ballottaggio,0.72,Storico Serie A,16,5.78,5.88,1,0,0.8,0.6,0,0,3,0,0,0,,25,1,0.5,5.83,65,13,20,37,82,38,Scommessa,Rotazione/copertura
-D,Schingtienne,VEN,Dc,3,7,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.1,0.2,5.87,86,2,12,29,83,38,Scommessa,Occasione di valore
-D,Sverko,VEN,Ds;Dc,3,7,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,42,12,Cautela,Profilo rischioso
-D,Troilo,PAR,Dc,3,8,Alternativa in ballottaggio,0.48,Storico Serie A,21,5.88,5.81,1,0,,0.7,0,0,5,2,0,0,,17,0.7,0.3,5.81,50,9,19,55,65,27,Cautela,Profilo rischioso
-D,Alhassane,BOL,Ds;E,2,6,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso
-D,Biraghi,TOR,B;Ds;E,2,5,Riserva/rotazione,0.2,Storico Serie A,11,5.73,5.73,0,0,0.1,0.9,0,0,0,0,0,0,,7,0.1,0.2,5.8,22,2,17,78,51,12,Cautela,Profilo rischioso
-D,Diawara S.,MIL,Ds;Dc,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso
-D,Ebosse,UDI,Ds;Dc,2,4,Riserva/rotazione,0.2,Storico Serie A,16,5.75,5.72,0,1,0,0.4,0,0,4,0,0,0,,7,0,0.2,5.65,26,1,15,77,50,12,Cautela,Profilo rischioso
-D,Franjic,VEN,B;Ds;E,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso
-D,Helland,BOL,Dd;Dc,2,5,Riserva/rotazione,0.2,Campione ridotto,6,5.75,5.58,0,0,0.1,0,0,0,2,0,0,0,,7,0.1,0.1,5.64,19,1,15,92,41,7,Cautela,Profilo rischioso
-D,Jean,LEC,Dc,2,4,Riserva/rotazione,0.2,Campione ridotto,5,5.8,5.7,0,0,0,0.2,0,0,1,0,0,0,,7,0.1,0.1,5.76,18,1,15,91,42,7,Cautela,Profilo rischioso
-D,Lazzari,LAZ,Dd;E,2,8,Riserva/rotazione,0.2,Storico Serie A,17,5.74,5.68,0,0,0.2,0.3,0,0,2,0,0,0,,7,0.1,0.1,5.74,26,1,15,75,51,13,Cautela,Profilo rischioso
-D,Marin R.,NAP,Dc,2,6,Riserva/rotazione,0.2,Storico Serie A,21,5.74,5.57,0,0,,2.4,0,0,7,0,0,0,,7,0,0.4,5.63,29,1,19,75,56,15,Cautela,Profilo rischioso
-D,Otoa,GEN,Dc,2,5,Riserva/rotazione,0.2,Storico Serie A,10,5.65,5.4,0,0,0.1,0,0,0,1,0,0,0,,7,0.1,0.1,5.66,22,1,15,79,45,10,Cautela,Profilo rischioso
-D,Palma,UDI,Dc,2,5,Riserva/rotazione,0.2,Campione ridotto,4,5.5,5.5,0,0,0,0.1,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,73,63,17,Cautela,Profilo rischioso
-D,Pellegrini Lu.,LAZ,Ds;E,2,5,Riserva/rotazione,0.2,Storico Serie A,24,5.73,5.69,1,0,0.7,1.4,0,0,8,0,0,0,,7,0.2,0.2,5.68,31,3,19,73,63,18,Cautela,Profilo rischioso
-D,Puczka,GEN,Ds;E,2,7,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso
-D,Sabelli,GEN,Dd;Ds;E,2,5,Riserva/rotazione,0.2,Storico Serie A,13,5.85,5.69,0,0,0.5,0.6,0,0,0,0,0,0,,7,0.1,0.2,5.92,24,2,17,76,55,14,Cautela,Profilo rischioso
-D,Sagrado,VEN,Dd;E,2,4,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.1,0.1,5.88,55,1,12,60,86,28,Cautela,Profilo rischioso
-D,Van der Brempt,COM,Dd;E,2,5,Riserva/rotazione,0.2,Storico Serie A,14,5.96,5.96,0,1,0.2,1.1,0,0,2,0,0,0,,7,0.1,0.4,5.99,24,3,21,78,61,16,Cautela,Profilo rischioso
-D,Abankwah,UDI,Dd;Dc,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0.1,5.87,34,0,12,81,100,23,Cautela,Profilo rischioso
-D,Amey,FRO,Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Antov,MON,Dc,1,2,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Bakoune,MON,Dd;E,1,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,100,24,Cautela,Profilo rischioso
-D,Cabal,JUV,B;Ds;E,1,4,Riserva/rotazione,0.2,Storico Serie A,10,5.95,6.5,2,0,0.8,0.2,0,0,1,0,0,0,,7,0.4,0.1,6.09,22,5,21,79,100,24,Cautela,Profilo rischioso
-D,Carboni F.,PAR,Ds;E,1,3,Riserva/rotazione,0.2,Campione ridotto,2,5.75,5.75,0,0,,,0,0,0,0,0,0,,8,0,0.1,5.87,34,0,12,73,100,24,Cautela,Profilo rischioso
-D,Corrado,FRO,Ds;E,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0.1,5.87,34,0,12,81,100,23,Cautela,Profilo rischioso
-D,Cuenca A.,COM,Ds;Dc,1,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.2,5.92,34,2,16,81,100,24,Cautela,Profilo rischioso
-D,De Silvestri,BOL,Dd;E,1,4,Riserva/rotazione,0.2,Storico Serie A,10,6,5.9,0,0,,0.1,0,0,2,0,0,0,,7,0,0.1,5.91,22,0,13,80,92,19,Cautela,Profilo rischioso
-D,Gelli J.,FRO,Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Goldaniga,COM,Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Gomes,VEN,Ds;Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Marianucci,NAP,Dc,1,5,Riserva/rotazione,0.2,Storico Serie A,11,5.73,5.73,0,1,0,0.2,0,0,2,0,0,0,,7,0.1,0.2,5.71,22,2,17,80,99,21,Cautela,Profilo rischioso
-D,Matturro,GEN,Ds;Dc,1,2,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Mazzocchi,NAP,Dd;Ds;E,1,3,Riserva/rotazione,0.2,Storico Serie A,9,5.83,5.83,0,1,0,0.8,0,0,0,1,0,0,,7,0,0.3,5.76,21,1,16,82,93,19,Cautela,Profilo rischioso
-D,Missori,SAS,Dd;E,1,2,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0,0,5.85,55,0,10,60,100,30,Cautela,Profilo rischioso
-D,Mlacic,UDI,Dc,1,3,Riserva/rotazione,0.2,Campione ridotto,4,5.88,5.62,0,0,0,0,0,0,2,0,0,0,,8,0,0.1,5.87,34,0,12,73,100,24,Cautela,Profilo rischioso
-D,Ndaba,LEC,Ds;E,1,4,Riserva/rotazione,0.2,Storico Serie A,10,5.55,5.55,0,0,0.1,0.1,0,0,0,0,0,0,,7,0.1,0.1,5.61,22,1,15,78,89,19,Cautela,Profilo rischioso
-D,Ndiaye,PAR,Dc,1,4,Riserva/rotazione,0.2,Storico Serie A,11,5.59,5.36,0,0,0.6,0.1,0,0,3,1,0,0,,7,0.1,0.1,5.42,22,1,15,83,84,17,Cautela,Profilo rischioso
-D,Oyono J.,FRO,Dd;E,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0.1,5.87,34,0,12,81,100,23,Cautela,Profilo rischioso
-D,Patric,LAZ,Dd;Dc,1,4,Riserva/rotazione,0.2,Storico Serie A,11,5.82,5.73,0,0,0.3,0.2,0,0,2,0,0,0,,7,0.1,0.1,5.79,22,1,15,80,95,20,Cautela,Profilo rischioso
-D,Perez M.,LEC,Dd;Dc,1,1,Riserva/rotazione,0.2,Campione ridotto,1,5.5,5.5,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso
-D,Pieragnolo,SAS,Ds;E,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Raterink,CAG,Dd;E,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Rugani,JUV,Dc,1,3,Riserva/rotazione,0.2,Storico Serie A,8,5.62,5.5,0,0,0.1,0,0,0,2,0,0,0,,7,0.1,0.1,5.55,20,1,14,83,81,16,Cautela,Profilo rischioso
-D,Vogliacco,GEN,Dd;Dc,1,2,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-D,Ziolkowski,ROM,Dc,1,2,Riserva/rotazione,0.2,Storico Serie A,9,5.83,5.67,0,0,0.1,0.1,0,0,3,0,0,0,,7,0,0.1,5.68,21,0,12,83,81,16,Cautela,Profilo rischioso
-C,Paz N.,COM,T;A,30,250,Titolare,0.9,Storico Serie A,35,6.41,7.34,12,5,8.5,4.5,0,2,5,0,0,0,,34,9.6,5,7.33,91,70,86,11,27,69,Top,Priorità d'asta · piazzati
-C,McTominay,NAP,C;T,28,240,Titolare,0.9,Storico Serie A,33,6.35,7.21,10,2,11,1.6,0,1,1,0,0,0,,34,10.9,1.8,7.35,89,72,77,11,28,67,Top,Priorità d'asta
-C,Calhanoglu,INT,M;C,27,230,Titolare,0.9,Storico Serie A,22,6.43,7.55,9,4,5.7,3.5,4,5,7,0,0,0,,32,11,6.2,7.5,82,82,92,22,31,72,Top,Priorità d'asta · rigorista · piazzati
-C,Orsolini,BOL,W;A,26,200,Titolare,0.9,Storico Serie A,34,6.1,6.81,10,1,9.7,1.1,4,6,2,0,0,0,,34,10.8,1.2,7.06,90,70,75,11,29,67,Top,Priorità d'asta · rigorista · piazzati
-C,Pulisic,MIL,T;A,25,180,Titolare,0.9,Storico Serie A,29,6.07,6.93,8,4,8.1,4.1,0,1,0,0,0,0,,33,9.5,4.9,7.08,87,70,77,13,30,66,Top,Priorità d'asta
-C,Rabiot,MIL,C;T,22,128,Titolare,0.9,Storico Serie A,29,6.33,6.98,6,4,4.3,3.4,0,0,4,1,0,0,,33,5.7,4.1,6.87,87,44,55,15,28,52,Buono,Titolare affidabile
-C,Baturina,COM,T,19,102,Titolare in ballottaggio,0.72,Storico Serie A,25,6.34,7.18,6,3,1.8,4.8,0,0,0,0,0,0,,26,3.6,4.5,6.93,70,32,53,30,27,42,Scommessa,Rotazione/copertura
-C,Da Cunha,COM,C;T,18,90,Titolare,0.9,Storico Serie A,35,6.39,6.96,6,4,6.6,5.1,4,4,4,0,0,0,,34,6.8,4.5,7.07,91,52,56,10,37,59,Ottimo,Titolare affidabile · rigorista
-C,Zaniolo,UDI,T;A,18,90,Titolare,0.9,Storico Serie A,31,6.24,6.76,5,5,5.5,3.7,0,0,8,0,0,0,,33,5.6,4.9,6.77,88,45,53,15,34,54,Buono,Titolare affidabile · piazzati
-C,Atta,FIO,C;T,17,87,Titolare,0.9,Storico Serie A,32,6.34,6.86,5,3,4,2.3,0,0,3,0,0,0,,33,4.5,2.7,6.78,89,34,42,12,32,48,Buono,Titolare affidabile
-C,Barella,INT,C,17,82,Titolare,0.9,Storico Serie A,34,6.29,6.72,3,9,3.2,6.6,0,0,7,0,0,0,,34,3.1,7.6,6.68,90,35,50,12,33,50,Buono,Titolare affidabile
-C,McKennie,JUV,C,17,68,Titolare in ballottaggio,0.72,Storico Serie A,34,6.18,6.72,5,6,7.5,6.1,0,0,5,0,0,0,,27,5.2,4.8,6.86,76,43,53,26,33,49,Buono,Rotazione/copertura
-C,Zaccagni,LAZ,W;A,16,91,Titolare,0.9,Storico Serie A,26,5.92,6,3,0,4.1,2.7,0,1,6,1,0,0,,33,5.1,2.2,6.3,85,36,47,19,33,48,Buono,Titolare affidabile · rigorista
-C,De Bruyne,NAP,T,15,100,Titolare in ballottaggio,0.72,Storico Serie A,18,6.33,7.25,5,2,4,3.5,3,3,1,0,0,0,,25,6,4.1,7.19,66,46,65,35,39,50,Buono,Rotazione/copertura · rigorista · piazzati
-C,Vlasic,TOR,T,14,80,Titolare,0.9,Storico Serie A,37,6.07,6.7,8,3,7,3.3,5,5,7,0,0,0,,34,7.5,3.2,6.73,92,54,55,10,47,61,Ottimo,Titolare affidabile · rigorista · piazzati
-C,Gudmundsson A.,FIO,T;A,13,61,Titolare,0.9,Storico Serie A,32,5.77,6.23,5,3,5.6,,3,3,4,1,0,0,,33,6.1,3.4,6.33,89,45,49,13,45,56,Ottimo,Titolare affidabile · rigorista · piazzati
-C,Taylor K.,LAZ,C;T,13,64,Titolare,0.9,Storico Serie A,17,6.03,6.53,3,2,,,0,0,5,0,0,0,,31,4.6,3.1,6.43,79,35,43,25,39,46,Buono,Rotazione/copertura
-C,Alajbegovic,JUV,W;T,12,57,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,2,1.7,6.21,73,16,30,42,31,32,Cautela,Scommessa nuova
-C,Conceicao,JUV,W;A,12,60,Titolare,0.9,Storico Serie A,31,6.24,6.65,3,5,7.8,5.2,0,0,3,0,0,0,,33,6.3,5.5,6.93,88,51,51,13,53,59,Ottimo,Titolare affidabile
-C,Ederson D.S.,ATA,M;C,12,45,Titolare,0.9,Storico Serie A,30,6.25,6.43,2,1,4.4,1.6,1,1,3,0,0,0,,33,3.8,1.5,6.59,87,27,31,14,40,44,Scommessa,Titolare affidabile
-C,Modric,MIL,M;C,12,50,Titolare,0.9,Storico Serie A,33,6.5,6.71,2,3,1.6,4.8,0,0,4,0,0,0,,34,1.8,4.6,6.73,89,21,36,12,40,44,Scommessa,Titolare affidabile · piazzati
-C,Rodriguez Je.,COM,W;A,12,32,Alternativa in ballottaggio,0.48,Storico Serie A,28,6.29,6.7,2,8,4,,0,0,3,1,0,0,,18,2.1,5.1,6.83,54,24,50,48,35,34,Cautela,Profilo rischioso
-C,Samardzic,ATA,C;T,12,42,Titolare in ballottaggio,0.72,Storico Serie A,22,5.86,6.2,2,2,3,2.6,0,0,1,0,0,0,,26,2.9,2.7,6.28,68,24,36,33,34,36,Scommessa,Rotazione/copertura
-C,Baldanzi,GEN,T,11,30,Titolare in ballottaggio,0.72,Storico Serie A,17,6,6.24,1,2,2,1.4,0,0,2,0,0,0,,25,2,2.1,6.27,65,17,31,36,33,31,Cautela,Rotazione/copertura · piazzati
-C,Rowe,BOL,W;T,11,37,Titolare in ballottaggio,0.72,Storico Serie A,28,6.09,6.48,3,3,4,2,0,0,2,0,0,0,,26,3.3,2.2,6.52,72,25,34,29,39,38,Scommessa,Rotazione/copertura
-C,Zambo Anguissa,NAP,C,11,55,Alternativa in ballottaggio,0.48,Storico Serie A,18,6.14,6.83,4,1,2.5,1.3,0,0,1,0,0,0,,17,2.7,1.3,6.67,48,20,39,53,32,28,Cautela,Profilo rischioso
-C,Casadei,TOR,C;T,10,37,Titolare in ballottaggio,0.72,Storico Serie A,32,6.03,6.52,6,0,4.2,1.6,0,0,5,0,0,0,,27,4.2,0.8,6.45,75,28,32,27,44,41,Scommessa,Rotazione/copertura
-C,Ekkelenkamp,UDI,C;T,10,41,Titolare in ballottaggio,0.72,Storico Serie A,31,6,6.56,5,3,4.9,1.8,0,0,1,0,0,0,,27,4.3,2.1,6.54,74,31,38,26,47,44,Scommessa,Rotazione/copertura
-C,Konè M.,ROM,M;C,10,42,Titolare,0.9,Storico Serie A,29,6.19,6.47,2,3,,,0,0,2,0,0,0,,33,2.3,3.4,6.47,87,21,31,14,45,43,Scommessa,Titolare affidabile
-C,Perrone,COM,M;C,10,38,Titolare,0.9,Storico Serie A,36,6.31,6.56,3,4,2.1,2.9,0,0,8,0,0,0,,34,2.3,3.2,6.5,91,21,30,12,46,44,Scommessa,Titolare affidabile
-C,Politano,NAP,W,10,47,Titolare in ballottaggio,0.72,Storico Serie A,33,6.06,6.33,2,5,2.4,4.9,0,0,4,0,0,0,,27,1.8,4.2,6.35,76,20,38,25,42,40,Scommessa,Rotazione/copertura
-C,Saelemaekers,MIL,E;W,10,43,Titolare in ballottaggio,0.72,Storico Serie A,35,6.23,6.5,3,3,3.3,4.8,0,0,5,0,0,0,,27,2.5,3.1,6.55,77,22,35,25,44,40,Scommessa,Rotazione/copertura
-C,Thorstvedt,SAS,C;T,10,41,Titolare,0.9,Storico Serie A,31,6.27,6.61,4,3,6.3,2,0,0,9,0,0,0,,33,5.7,2.6,6.72,88,41,38,15,56,54,Buono,Titolare affidabile
-C,Thuram K.,JUV,C,10,41,Riserva/rotazione,0.2,Storico Serie A,35,6.03,6.31,3,2,,,0,0,2,0,0,0,,8,0.7,0.5,6.33,38,5,29,63,23,15,Cautela,Profilo rischioso
-C,Zielinski,INT,C,10,41,Titolare in ballottaggio,0.72,Storico Serie A,31,6.35,6.89,6,2,2.5,3.1,1,1,3,0,0,0,,27,3.5,2.3,6.78,74,27,37,27,46,42,Scommessa,Rotazione/copertura
-C,Bernardeschi,BOL,W;T,9,21,Titolare in ballottaggio,0.72,Storico Serie A,25,6.08,6.58,4,2,3,2.3,1,1,3,0,0,0,,26,3.7,2.4,6.54,70,28,37,31,49,41,Scommessa,Rotazione/copertura
-C,Cancellieri,LAZ,W;A,9,28,Titolare in ballottaggio,0.72,Storico Serie A,28,5.82,6.18,4,1,4.3,1.6,0,0,6,0,0,0,,26,3.9,1.3,6.21,72,27,32,31,47,40,Scommessa,Rotazione/copertura
-C,Isaksen,LAZ,W;A,9,25,Alternativa in ballottaggio,0.48,Storico Serie A,27,5.96,6.56,5,1,5,1.2,0,0,0,0,0,0,,17,3.1,0.7,6.55,54,21,34,46,40,31,Cautela,Profilo rischioso
-C,Konè I.,SAS,C,9,20,Riserva/rotazione,0.2,Storico Serie A,35,6.19,6.63,6,0,,,0,0,3,1,0,0,,8,1.4,0,6.64,38,9,29,64,29,18,Cautela,Profilo rischioso
-C,Mandragora,FIO,C,9,28,Alternativa in ballottaggio,0.48,Storico Serie A,34,5.99,6.56,7,2,4.7,2.6,1,1,7,0,0,0,,18,3,1.2,6.45,58,21,35,44,41,33,Cautela,Rotazione/copertura
-C,Pasalic,ATA,C;T,9,32,Alternativa in ballottaggio,0.48,Storico Serie A,32,5.94,6.27,3,3,2.7,2.9,0,0,3,0,0,0,,18,1.6,1.7,6.25,57,14,31,44,36,28,Cautela,Rotazione/copertura
-C,Cambiaghi,BOL,W;A,8,25,Alternativa in ballottaggio,0.48,Storico Serie A,25,5.96,6.38,3,4,2.1,2.4,0,0,3,1,0,0,,17,1.7,2.1,6.28,52,15,34,50,40,28,Cautela,Profilo rischioso
-C,Colpani,MON,T,8,25,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,1,0.8,6,86,8,19,29,44,34,Cautela,Titolare affidabile
-C,Cristante,ROM,M;C,8,29,Titolare,0.9,Storico Serie A,37,6.09,6.2,2,1,2.1,2.8,0,0,6,0,0,0,,34,1.9,1.9,6.23,92,16,24,10,53,43,Scommessa,Titolare affidabile
-C,Diouf,INT,E;C,8,37,Alternativa in ballottaggio,0.48,Storico Serie A,11,6.14,6.41,1,0,0.6,1.5,0,0,1,0,0,0,,16,1.2,1.2,6.39,43,10,29,58,33,21,Cautela,Profilo rischioso
-C,Fagioli,FIO,M;C,8,23,Alternativa in ballottaggio,0.48,Storico Serie A,33,6.08,6.27,2,3,2.5,3.7,0,0,5,0,0,0,,18,1.3,1.9,6.33,58,12,29,44,40,28,Cautela,Rotazione/copertura
-C,Locatelli,JUV,M;C,8,32,Titolare,0.9,Storico Serie A,36,6.28,6.21,1,2,2.8,5,0,1,9,0,0,0,,34,2,3.8,6.44,91,20,31,12,57,46,Buono,Titolare affidabile
-C,Ndour,FIO,C,8,25,Titolare in ballottaggio,0.72,Storico Serie A,30,5.72,5.98,3,0,2.6,1.2,0,0,2,0,0,0,,26,2.4,0.6,5.99,74,16,24,27,45,35,Scommessa,Rotazione/copertura
-C,Odgaard,BOL,T,8,22,Alternativa in ballottaggio,0.48,Storico Serie A,22,5.91,6.61,5,1,2.5,,0,0,1,0,0,0,,17,2.5,0.8,6.38,50,17,31,51,40,28,Cautela,Profilo rischioso
-C,Sucic P.,INT,C,8,26,Riserva/rotazione,0.2,Storico Serie A,28,5.96,6.16,2,2,,,0,0,5,0,0,0,,7,0.5,0.5,6.16,33,4,26,69,25,13,Cautela,Profilo rischioso
-C,Vergara,NAP,W;T,8,34,Alternativa in ballottaggio,0.48,Storico Serie A,9,6.11,6.33,1,0,0.8,0.8,0,0,2,0,0,0,,16,1.3,0.9,6.3,42,10,27,61,32,20,Cautela,Profilo rischioso
-C,Bernabè,PAR,C,7,36,Titolare,0.9,Storico Serie A,32,6.08,6.39,3,1,2.2,3.1,0,0,0,0,0,0,,33,2.6,2.6,6.4,89,22,31,11,65,48,Buono,Titolare affidabile · piazzati
-C,Calò,FRO,M;C,7,25,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,1.1,0.9,6.01,86,9,24,29,53,37,Scommessa,Titolare affidabile · rigorista · piazzati
-C,Fazzini,CAG,C;T,7,19,Titolare,0.9,Storico Serie A,12,5.79,5.75,0,0,1.1,0.8,0,0,2,0,0,0,,31,1.2,1,5.86,75,10,21,27,47,33,Cautela,Rotazione/copertura · piazzati
-C,Ferguson,BOL,M;C,7,18,Titolare,0.9,Storico Serie A,23,5.87,5.85,1,0,0.7,1.2,0,0,5,1,0,0,,32,1.1,1,5.85,83,9,18,21,49,35,Scommessa,Titolare affidabile
-C,Frattesi,INT,C;T,7,13,Riserva/rotazione,0.2,Storico Serie A,15,5.9,5.9,0,0,2.2,0.2,0,0,0,0,0,0,,7,0.6,0.2,6.19,25,4,22,75,24,9,Cautela,Profilo rischioso
-C,Frendrup,GEN,M;C,7,19,Titolare,0.9,Storico Serie A,36,6,6.01,1,0,0.4,,0,0,5,0,0,0,,34,0.6,0,5.98,91,4,14,11,49,36,Scommessa,Titolare affidabile
-C,Gaetano,ATA,M;C,7,24,Titolare,0.9,Storico Serie A,32,6.08,6.33,2,4,1.9,1.8,0,0,4,0,0,0,,33,2,2.8,6.28,89,18,26,13,61,45,Buono,Titolare affidabile
-C,Lobotka,NAP,M;C,7,20,Titolare,0.9,Storico Serie A,31,6.08,6.13,1,0,0.5,1.8,0,0,3,0,0,0,,33,0.7,1.1,6.13,88,7,18,13,51,37,Scommessa,Titolare affidabile
-C,Oristanio,TOR,W;T,7,27,Alternativa in ballottaggio,0.48,Storico Serie A,18,5.72,5.83,1,0,2,0.9,0,0,1,0,0,0,,17,1.4,0.6,5.97,48,10,25,53,37,23,Cautela,Profilo rischioso
-C,Pessina,MON,M;C,7,20,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.8,0.7,5.99,73,6,23,42,45,30,Cautela,Scommessa nuova · rigorista · piazzati
-C,Unai Gomez,UDI,T,7,23,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.6,0.5,6.17,34,5,26,81,29,13,Cautela,Profilo rischioso
-C,Volpato,SAS,W;T,7,23,Riserva/rotazione,0.2,Storico Serie A,21,6.05,6.43,2,4,1.7,1.6,0,0,4,0,0,0,,7,0.6,0.8,6.33,29,5,31,73,30,14,Cautela,Profilo rischioso
-C,Adopo,CAG,M;C,6,13,Titolare,0.9,Storico Serie A,38,5.89,5.95,1,1,2.5,1.2,0,0,4,0,0,0,,34,1.7,1,6.02,93,13,19,8,66,44,Scommessa,Titolare affidabile
-C,Akinsanmiro,MON,C,6,16,Titolare,0.9,Storico Serie A,24,5.77,5.77,0,1,0.9,1.3,0,0,2,0,0,0,,32,0.7,1.5,5.84,83,7,18,18,56,36,Scommessa,Titolare affidabile
-C,Basic,VEN,M;C,6,19,Titolare,0.9,Storico Serie A,23,5.98,6.33,2,3,1.4,2,0,0,0,1,0,0,,32,2.2,3.1,6.24,83,20,28,18,70,46,Buono,Occasione di valore
-C,Caqueret,COM,C;T,6,20,Alternativa in ballottaggio,0.48,Storico Serie A,29,6.12,6.41,2,4,2.3,2.3,0,0,3,0,0,0,,18,1.4,1.8,6.4,55,12,29,46,52,30,Cautela,Profilo rischioso
-C,Chukwueze,MIL,W,6,11,Alternativa in ballottaggio,0.48,Campione ridotto,1,5.5,5.5,0,0,,0.1,0,0,0,0,0,0,,18,0.3,0.3,5.93,55,3,15,52,38,20,Cautela,Profilo rischioso
-C,Coulibaly L.,LEC,M;C,6,14,Titolare,0.9,Storico Serie A,33,6.03,6.27,3,1,,,0,0,4,0,0,0,,34,3.1,1,6.27,89,21,23,12,72,47,Buono,Occasione di valore
-C,Ellertsson,GEN,E;C,6,18,Titolare in ballottaggio,0.72,Storico Serie A,35,5.8,5.87,1,1,2.3,1.7,0,0,1,1,0,0,,27,1.4,1.1,5.95,77,11,21,24,57,36,Scommessa,Rotazione/copertura
-C,Karlstrom,UDI,M;C,6,20,Titolare,0.9,Storico Serie A,36,5.9,5.9,1,0,0.8,1.1,0,0,6,0,0,0,,34,0.8,0.6,5.9,91,6,17,11,59,39,Scommessa,Titolare affidabile
-C,Liberali,COM,T,6,22,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.6,0.5,6.17,34,5,25,81,34,14,Cautela,Profilo rischioso
-C,Nicolussi Caviglia,PAR,M;C,6,18,Titolare in ballottaggio,0.72,Storico Serie A,23,5.85,5.98,0,4,0.9,1.8,0,0,4,0,0,0,,26,0.6,3,5.95,69,10,26,33,54,33,Cautela,Rotazione/copertura
-C,Oulai,FIO,M;C,6,20,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.7,0.6,5.98,73,6,17,42,50,30,Cautela,Scommessa nuova
-C,Pierotti,LEC,W,6,19,Titolare,0.9,Storico Serie A,37,5.73,5.78,1,1,3.3,1.5,0,0,4,0,0,0,,34,2.2,1.3,5.91,92,16,24,9,68,46,Buono,Titolare affidabile · piazzati
-C,Pobega,BOL,M;C,6,14,Riserva/rotazione,0.2,Storico Serie A,23,5.87,6.22,3,1,,0.7,0,0,2,1,0,0,,7,0.9,0.3,6.21,30,6,27,72,34,15,Cautela,Profilo rischioso
-C,Rovella,LAZ,M;C,6,16,Titolare,0.9,Storico Serie A,11,5.82,5.73,0,1,0,1,0,0,2,1,0,0,,31,0.3,1.7,5.72,75,5,20,29,50,32,Cautela,Rotazione/copertura · piazzati
-C,Winks,CAG,M;C,6,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.5,0.4,5.93,86,4,14,29,54,34,Cautela,Titolare affidabile
-C,Zalewski,ATA,W,6,21,Riserva/rotazione,0.2,Storico Serie A,31,6.08,6.39,2,5,2.9,4.5,0,0,3,0,0,0,,7,0.6,1.1,6.45,35,6,35,66,40,19,Cautela,Profilo rischioso
-C,Zhegrova,JUV,W,6,18,Riserva/rotazione,0.2,Storico Serie A,12,6.04,6.04,0,0,0.8,1.4,0,0,1,0,0,0,,7,0.5,0.5,6.28,23,4,25,78,29,10,Cautela,Profilo rischioso
-C,Addai,COM,W;A,5,10,Riserva/rotazione,0.2,Storico Serie A,12,6,6.58,3,0,1.5,1.2,0,0,4,0,0,0,,7,0.8,0.4,6.23,23,6,27,81,36,12,Cautela,Profilo rischioso
-C,Adzic,SAS,C;T,5,14,Titolare in ballottaggio,0.72,Campione ridotto,4,6.12,6.88,1,0,0.2,0.2,0,0,0,0,0,0,,27,0.5,0.4,5.94,73,4,15,34,58,31,Cautela,Rotazione/copertura
-C,Amondarain,BOL,M;C,5,12,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.4,0.3,5.95,55,3,15,60,46,21,Cautela,Profilo rischioso
-C,Bakola,SAS,C;T,5,16,Alternativa in ballottaggio,0.48,Campione ridotto,3,6.17,6.17,0,0,0.1,0.1,0,0,0,0,0,0,,18,0.5,0.4,5.98,55,4,17,52,48,23,Cautela,Profilo rischioso
-C,Berisha M.,LEC,C;T,5,16,Titolare,0.9,Storico Serie A,12,6.25,7,2,3,,,0,0,0,0,0,0,,31,2.8,4.2,6.66,75,26,34,25,89,50,Buono,Occasione di valore
-C,Busio,VEN,M;C,5,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.5,0.5,5.93,86,4,17,29,66,37,Scommessa,Titolare affidabile · piazzati
-C,Cacciamani,TOR,E;W,5,18,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.7,0.6,5.95,86,6,16,29,68,38,Scommessa,Titolare affidabile
-C,Dele-Bashiru,LAZ,C;T,5,13,Riserva/rotazione,0.2,Storico Serie A,21,5.71,5.86,1,0,0.9,0.6,0,0,0,0,0,0,,7,0.3,0.2,5.87,29,2,18,71,30,10,Cautela,Profilo rischioso
-C,Felici,CAG,W,5,10,Alternativa in ballottaggio,0.48,Storico Serie A,11,6,6.5,2,1,0.6,0.3,0,0,3,0,0,0,,16,0.9,0.5,6.06,43,7,19,60,45,20,Cautela,Profilo rischioso
-C,Fofana Y.,MIL,M;C,5,23,Riserva/rotazione,0.2,Storico Serie A,33,5.83,6.05,2,3,,,0,0,4,0,0,0,,7,0.4,0.6,6.03,37,4,26,64,41,18,Cautela,Profilo rischioso
-C,Gandelman,LEC,C;T,5,14,Alternativa in ballottaggio,0.48,Storico Serie A,17,5.85,6.26,2,1,1.4,0.7,0,0,0,0,0,0,,17,1.3,0.7,6.12,47,10,23,53,51,25,Cautela,Profilo rischioso
-C,Gineitis,TOR,M;C,5,13,Titolare,0.9,Storico Serie A,28,5.82,5.77,0,1,1,2.4,0,0,5,0,0,0,,33,0.7,2.2,5.86,86,9,20,16,71,41,Scommessa,Occasione di valore
-C,Keita M.,PAR,M;C,5,15,Titolare,0.9,Storico Serie A,36,6,6.04,1,1,,,0,0,1,0,0,0,,34,0.9,0.9,6.09,91,8,17,9,74,43,Scommessa,Occasione di valore
-C,Koopmeiners,JUV,C;T,5,14,Riserva/rotazione,0.2,Storico Serie A,30,5.72,5.63,0,0,1.5,1.3,0,0,5,0,0,0,,7,0.2,0.2,5.75,35,2,17,67,33,13,Cautela,Profilo rischioso
-C,Matic,SAS,M;C,5,15,Titolare,0.9,Storico Serie A,34,6,6,1,1,0.4,1.5,0,0,6,1,0,0,,34,0.6,1.3,5.97,90,6,17,13,71,41,Scommessa,Occasione di valore
-C,Meichtry,GEN,W;T,5,14,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.4,0.4,5.96,55,3,16,60,47,21,Cautela,Profilo rischioso
-C,Milla,COM,M;C,5,14,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.4,0.3,6.06,34,3,20,81,36,13,Cautela,Profilo rischioso
-C,Mkhitaryan,INT,C,5,19,Riserva/rotazione,0.2,Storico Serie A,28,6.12,6.5,4,1,4.9,3.1,0,0,5,0,0,0,,7,1.1,0.6,6.59,33,8,35,69,50,21,Cautela,Profilo rischioso
-C,Ondrejka,PAR,W;A,5,18,Riserva/rotazione,0.2,Storico Serie A,15,5.67,5.6,0,0,1.2,0.5,0,0,2,0,0,0,,7,0.5,0.3,5.86,25,4,23,77,32,11,Cautela,Profilo rischioso
-C,Perez K.,VEN,C;T,5,14,Riserva/rotazione,0.2,Campione ridotto,1,5.5,5.5,0,0,,,0,0,0,0,0,0,,8,0.4,0.3,6.06,34,3,20,73,36,13,Cautela,Profilo rischioso
-C,Piotrowski,UDI,M;C,5,15,Titolare in ballottaggio,0.72,Storico Serie A,31,5.84,5.9,1,0,2.7,0.8,0,0,2,0,0,0,,27,1.8,0.4,6.02,74,12,19,27,67,37,Scommessa,Rotazione/copertura
-C,Pisilli,ROM,C,5,17,Riserva/rotazione,0.2,Storico Serie A,23,6.07,6.43,2,4,1.7,1.2,0,0,3,0,0,0,,7,0.6,0.7,6.36,30,5,29,72,41,16,Cautela,Profilo rischioso
-C,Romano,CAG,M;C,5,12,Titolare in ballottaggio,0.72,Storico Serie A,32,6,5.89,0,0,0.4,0,0,0,5,1,0,0,,27,0.2,0,5.91,75,1,12,28,55,30,Cautela,Rotazione/copertura
-C,Sohm,VEN,C,5,14,Alternativa in ballottaggio,0.48,Storico Serie A,24,5.6,5.58,0,1,0.8,1.5,0,0,3,0,0,0,,17,0.3,0.9,5.64,52,4,18,50,44,22,Cautela,Profilo rischioso
-C,Traorè Hj.,GEN,W;T,5,11,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.3,0.2,6,34,2,17,81,34,11,Cautela,Profilo rischioso
-C,Zerbin,FRO,W,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,30,5.77,5.8,0,2,1.6,2,0,0,2,0,0,0,,18,0.6,1.2,5.9,56,6,21,45,51,26,Cautela,Profilo rischioso
-C,Almqvist,PAR,W;A,4,14,Riserva/rotazione,0.2,Storico Serie A,10,5.9,6,0,1,0.4,0.9,0,0,0,0,0,0,,7,0.4,0.5,6.14,22,4,24,78,40,12,Cautela,Profilo rischioso
-C,Amorim,GEN,M;C,4,11,Alternativa in ballottaggio,0.48,Storico Serie A,9,5.72,5.67,0,0,0.2,,0,0,1,0,0,0,,16,0.3,0.2,5.73,42,2,14,59,44,17,Cautela,Profilo rischioso
-C,Cataldi,LAZ,M;C,4,12,Riserva/rotazione,0.2,Storico Serie A,27,6,6.33,3,3,3,1.4,2,2,6,0,0,0,,7,0.8,0.5,6.3,33,6,28,70,54,20,Cautela,Profilo rischioso
-C,Cichella,FRO,M;C,4,11,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.3,0.3,5.93,55,3,15,60,58,23,Cautela,Profilo rischioso
-C,De Roon,ATA,M;C,4,12,Riserva/rotazione,0.2,Storico Serie A,34,5.97,6,1,2,0.8,2,0,0,6,1,0,0,,7,0.2,0.4,6,37,2,19,66,46,16,Cautela,Profilo rischioso
-C,Douglas Luiz,JUV,C,4,12,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.3,0.3,6.02,34,3,18,81,44,14,Cautela,Profilo rischioso
-C,El Aynaoui,ROM,M;C,4,18,Riserva/rotazione,0.2,Storico Serie A,21,5.93,6.05,1,2,1.1,0.9,0,0,5,0,0,0,,7,0.4,0.5,6.05,29,4,24,74,45,15,Cautela,Profilo rischioso
-C,Fabbian,FIO,C;T,4,8,Riserva/rotazione,0.2,Storico Serie A,22,5.75,6,2,0,2.4,0.9,0,0,2,0,0,0,,7,0.7,0.2,6.03,29,5,23,72,45,15,Cautela,Profilo rischioso
-C,Fitz-Jim,TOR,M;C,4,13,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,0.5,0.4,5.92,86,4,14,29,81,39,Scommessa,Occasione di valore
-C,Folorunsho,NAP,C;T,4,10,Riserva/rotazione,0.2,Storico Serie A,26,5.92,6.1,2,0,3.4,1.1,0,0,3,0,0,0,,7,0.8,0.2,6.23,32,5,24,69,50,18,Cautela,Profilo rischioso
-C,Ilkhan,TOR,M;C,4,10,Riserva/rotazione,0.2,Storico Serie A,18,5.92,6.08,1,2,2.2,0.7,0,0,2,1,0,0,,7,0.6,0.4,6.12,27,5,24,76,45,15,Cautela,Profilo rischioso
-C,Jashari,MIL,C,4,11,Riserva/rotazione,0.2,Storico Serie A,12,5.67,5.75,0,1,0.2,0.6,0,0,0,0,0,0,,7,0.2,0.4,5.81,23,2,19,77,33,9,Cautela,Profilo rischioso
-C,Koutsoupias,FRO,C,4,12,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.3,0.3,6.02,34,3,18,81,44,14,Cautela,Profilo rischioso
-C,Loftus-Cheek,MIL,C;T,4,11,Riserva/rotazione,0.2,Storico Serie A,22,6.07,6.48,3,1,3.2,1.1,0,0,2,0,0,0,,7,0.9,0.3,6.45,29,6,27,72,52,18,Cautela,Profilo rischioso
-C,Luis Henrique,INT,E;W,4,13,Riserva/rotazione,0.2,Storico Serie A,27,5.87,6.04,1,2,0.9,1.8,0,0,1,0,0,0,,7,0.2,0.5,6.01,33,2,21,67,44,15,Cautela,Profilo rischioso
-C,Moro N.,BOL,M;C,4,10,Titolare,0.9,Storico Serie A,28,5.96,6.16,2,0,,,0,0,1,0,0,0,,33,2.4,0,6.16,86,15,18,14,96,48,Buono,Occasione di valore
-C,Ngom,LEC,M;C,4,11,Titolare in ballottaggio,0.72,Storico Serie A,13,5.62,5.58,0,0,0.2,,0,0,1,0,0,0,,25,0.3,0.2,5.63,63,2,13,38,59,27,Cautela,Rotazione/copertura
-C,Njie,TOR,W;A,4,12,Riserva/rotazione,0.2,Storico Serie A,11,5.86,6.18,1,1,1,,0,0,2,0,0,0,,7,0.5,0.5,6.05,22,4,25,80,40,12,Cautela,Profilo rischioso
-C,Prati,CAG,M;C,4,7,Alternativa in ballottaggio,0.48,Storico Serie A,32,5.83,5.83,1,0,1.6,0.2,0,0,6,0,0,0,,18,0.8,0.1,5.88,57,5,15,45,61,27,Cautela,Profilo rischioso
-C,Ricci S.,MIL,M;C,4,11,Riserva/rotazione,0.2,Storico Serie A,29,5.98,6.16,1,3,,,0,0,3,0,0,0,,7,0.2,0.7,6.11,34,3,23,67,48,17,Cautela,Profilo rischioso
-C,Aboukhlal,TOR,W;A,3,5,Riserva/rotazione,0.2,Storico Serie A,12,5.79,5.62,0,0,0.3,0.4,0,0,4,0,0,0,,7,0.1,0.1,5.68,23,1,13,81,38,8,Cautela,Profilo rischioso
-C,Brescianini,FIO,C;T,3,7,Riserva/rotazione,0.2,Storico Serie A,19,5.95,6.26,2,1,1.8,0.8,0,0,2,0,0,0,,7,0.6,0.3,6.2,28,4,23,73,60,18,Cautela,Profilo rischioso
-C,Colombo L.,MON,M;C,3,7,Alternativa in ballottaggio,0.48,Storico Serie A,37,5.91,6.39,7,1,,,1,2,2,0,0,0,,18,3.4,0.5,6.48,60,22,30,41,100,45,Buono,Rotazione/copertura
-C,Deiola,CAG,M;C,3,8,Riserva/rotazione,0.2,Storico Serie A,20,6.05,6.02,0,1,1.5,0.4,0,0,3,0,0,0,,7,0.3,0.2,6.13,28,2,18,74,53,15,Cautela,Profilo rischioso
-C,Diallo O.,PAR,W;A,3,12,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.4,0.3,5.95,55,3,15,60,77,27,Cautela,Profilo rischioso
-C,Dominguez B.,BOL,W;A,3,8,Riserva/rotazione,0.2,Storico Serie A,13,5.81,6,0,3,0.7,0.4,0,0,1,0,0,0,,7,0.3,0.5,5.97,24,3,21,77,50,14,Cautela,Profilo rischioso
-C,Fini,FRO,W,3,9,Riserva/rotazione,0.2,Campione ridotto,1,5.5,5.5,0,0,,0,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,2,16,73,55,16,Cautela,Profilo rischioso
-C,Gelli F.,FRO,C;T,3,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,2,16,81,55,15,Cautela,Profilo rischioso
-C,Gilmour,NAP,M;C,3,9,Riserva/rotazione,0.2,Storico Serie A,14,6.07,6.25,1,0,0.7,1,0,0,1,0,0,0,,7,0.4,0.3,6.25,24,3,20,77,53,14,Cautela,Profilo rischioso
-C,Helgason,VEN,C;T,3,7,Riserva/rotazione,0.2,Campione ridotto,4,5.62,5.62,0,0,0.2,0.1,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,2,15,73,55,16,Cautela,Profilo rischioso
-C,Messias,GEN,W;T,3,8,Riserva/rotazione,0.2,Storico Serie A,19,6.16,6.66,3,1,1.9,1.6,1,1,1,0,0,0,,7,0.7,0.4,6.49,28,5,25,73,66,20,Cautela,Profilo rischioso
-C,Miller L.,UDI,M;C,3,12,Alternativa in ballottaggio,0.48,Storico Serie A,19,5.87,5.89,0,2,,,0,0,4,0,0,0,,17,0.1,1.4,5.86,49,4,20,54,75,27,Cautela,Profilo rischioso
-C,Miretti,JUV,C;T,3,11,Riserva/rotazione,0.2,Storico Serie A,16,6,6.22,1,1,2.1,1.8,0,0,1,0,0,0,,7,0.6,0.5,6.3,26,5,26,75,62,18,Cautela,Profilo rischioso
-C,Sorensen O.,PAR,C,3,12,Alternativa in ballottaggio,0.48,Storico Serie A,31,5.76,5.85,1,1,,,0,0,2,0,0,0,,18,0.6,0.6,5.86,56,5,18,45,82,31,Cautela,Profilo rischioso
-C,Stankovic A.,INT,M;C,3,10,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.3,0.2,6,34,2,17,81,57,16,Cautela,Profilo rischioso
-C,Sulemana I.,ATA,M;C,3,7,Riserva/rotazione,0.2,Storico Serie A,18,5.69,5.78,1,0,,,0,0,3,0,0,0,,7,0.4,0.1,5.79,27,3,17,75,48,13,Cautela,Profilo rischioso
-C,Boloca,SAS,M;C,2,5,Riserva/rotazione,0.2,Campione ridotto,2,5.75,5.75,0,0,0.2,0,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,73,77,20,Cautela,Profilo rischioso
-C,Chakvetadze,UDI,W;T,2,6,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.2,0.1,5.95,34,1,14,81,79,19,Cautela,Profilo rischioso
-C,Ciurria,MON,E;W,2,6,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.2,0.1,5.95,34,1,14,81,79,19,Cautela,Profilo rischioso
-C,Duncan,VEN,C,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,77,19,Cautela,Profilo rischioso
-C,El Azzouzi O.,BOL,M;C,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,77,19,Cautela,Profilo rischioso
-C,Fadera,COM,W,2,3,Riserva/rotazione,0.2,Storico Serie A,24,5.92,6.15,2,1,2.1,1.2,0,0,5,0,0,0,,7,0.6,0.3,6.12,31,4,22,72,92,25,Cautela,Profilo rischioso
-C,Hasa,FRO,C;T,2,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,77,19,Cautela,Profilo rischioso
-C,Lipani,SAS,M;C,2,5,Riserva/rotazione,0.2,Storico Serie A,22,5.91,5.89,0,1,0.9,0.5,0,0,3,0,0,0,,7,0.2,0.2,5.96,29,2,16,73,76,19,Cautela,Profilo rischioso
-C,Maleh,LEC,M;C,2,5,Riserva/rotazione,0.2,Storico Serie A,21,5.69,5.71,1,0,1,0.6,0,0,3,1,0,0,,7,0.3,0.1,5.71,29,2,16,74,71,18,Cautela,Profilo rischioso
-C,Masini,GEN,M;C,2,4,Riserva/rotazione,0.2,Storico Serie A,22,5.93,5.86,0,1,1.9,0.9,0,0,5,0,0,0,,7,0.3,0.3,5.99,29,3,18,74,80,21,Cautela,Profilo rischioso
-C,Musah,MIL,C;W,2,6,Riserva/rotazione,0.2,Storico Serie A,16,5.94,6.09,1,0,0.6,0.8,0,0,1,0,0,0,,7,0.3,0.2,6.07,26,2,17,75,74,18,Cautela,Profilo rischioso
-C,Ordonez C.,PAR,M;C,2,5,Riserva/rotazione,0.2,Storico Serie A,21,5.67,5.69,1,0,,,0,0,3,1,0,0,,7,0.3,0,5.68,29,2,15,74,70,18,Cautela,Profilo rischioso
-C,Venturino,GEN,W,2,6,Riserva/rotazione,0.2,Campione ridotto,7,5.79,5.79,0,0,0.2,1,0,0,0,0,0,0,,7,0.2,0.3,5.92,20,2,17,87,62,13,Cautela,Profilo rischioso
-C,Anjorin,TOR,C;T,1,4,Riserva/rotazione,0.2,Storico Serie A,9,5.78,5.72,0,0,0.5,0.1,0,0,1,0,0,0,,7,0.2,0.1,5.82,21,1,14,80,100,20,Cautela,Profilo rischioso
-C,Belahyane,LAZ,M;C,1,5,Riserva/rotazione,0.2,Storico Serie A,11,5.73,5.77,0,2,0.2,0.9,0,0,1,1,0,0,,7,0.1,0.5,5.71,22,2,18,81,100,22,Cautela,Profilo rischioso
-C,Bjarkason,VEN,E;W,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.9,34,1,13,81,100,23,Cautela,Profilo rischioso
-C,Camara A.,UDI,M;C,1,3,Riserva/rotazione,0.2,Storico Serie A,18,5.67,5.64,1,0,,,0,1,1,0,0,0,,7,0.3,0,5.77,27,2,14,74,100,23,Cautela,Profilo rischioso
-C,Cremaschi,PAR,E;C,1,3,Riserva/rotazione,0.2,Campione ridotto,2,6,6,0,0,0,0,0,0,0,0,0,0,,8,0.1,0.1,5.9,34,1,13,73,100,24,Cautela,Profilo rischioso
-C,Dagasso,VEN,C,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-C,El Azzouzi A.,FRO,M;C,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.9,34,1,13,81,100,23,Cautela,Profilo rischioso
-C,Fofana Sa.,LEC,M;C,1,1,Riserva/rotazione,0.2,Campione ridotto,2,5.25,5.25,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso
-C,Gorter,LEC,M;C,1,3,Alternativa in ballottaggio,0.48,Campione ridotto,1,5.5,5.5,0,0,,0,0,0,0,0,0,0,,18,0.1,0.1,5.88,55,1,11,52,100,31,Cautela,Profilo rischioso
-C,Iannoni,SAS,M;C,1,1,Riserva/rotazione,0.2,Campione ridotto,6,6.08,6.5,1,0,0.4,0.1,0,0,3,0,0,0,,7,0.2,0,5.92,19,1,13,94,100,18,Cautela,Profilo rischioso
-C,Ilic,TOR,C,1,4,Riserva/rotazione,0.2,Storico Serie A,8,6,5.88,0,0,,0.5,0,0,2,0,0,0,,7,0.1,0.2,5.95,20,1,14,83,100,20,Cautela,Profilo rischioso
-C,Kaba,LEC,M;C,1,2,Riserva/rotazione,0.2,Storico Serie A,11,5.68,5.64,0,0,0.5,0.3,0,0,1,0,0,0,,7,0.1,0.1,5.69,22,1,13,79,100,21,Cautela,Profilo rischioso
-C,Kone B.,FRO,C,1,3,Riserva/rotazione,0.2,Storico Serie A,35,6.19,6.63,6,0,,,0,0,3,1,0,0,,8,1.4,0,6.64,38,9,26,64,100,31,Cautela,Profilo rischioso
-C,Lahdo,COM,C;T,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-C,Liteta,CAG,M;C,1,1,Riserva/rotazione,0.2,Campione ridotto,4,5.75,5.75,0,0,,0,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso
-C,Przyborek,LAZ,W;T,1,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,100,23,Cautela,Profilo rischioso
-C,Zarraga,UDI,M;C,1,4,Riserva/rotazione,0.2,Storico Serie A,13,5.81,5.77,0,0,0.3,0.2,0,0,2,0,0,0,,7,0.1,0.1,5.79,24,1,13,78,100,21,Cautela,Profilo rischioso
-A,Martinez L.,INT,Pc,35,370,Titolare,0.9,Storico Serie A,30,6.42,8.25,17,6,13.5,2.7,0,0,4,0,0,0,,33,16.4,4.4,7.98,87,74,84,15,28,69,Top,Priorità d'asta
-A,Malen,ROM,Pc,34,365,Titolare,0.9,Storico Serie A,18,6.78,9.03,14,2,14.2,2.4,3,4,1,0,0,0,,32,22,5.2,8.5,79,99,94,22,33,78,Elite,Priorità d'asta · rigorista
-A,Thuram,INT,Pc,29,280,Titolare,0.9,Storico Serie A,29,6.4,7.91,13,6,9.4,,0,0,2,0,0,0,,33,12.3,6.8,7.69,87,61,73,14,31,63,Ottimo,Titolare affidabile
-A,Hojlund,NAP,Pc,28,271,Titolare,0.9,Storico Serie A,33,6.21,7.44,12,5,10.6,2.8,1,1,1,0,0,0,,34,12,3.8,7.37,89,55,66,11,30,60,Ottimo,Titolare affidabile
-A,Ramos G.,MIL,Pc,27,240,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,18.1,5.1,7.82,86,83,78,29,37,71,Top,Priorità d'asta · rigorista
-A,Kolo Muani,JUV,Pc,26,225,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,17,4.8,7.7,86,78,74,29,37,68,Top,Priorità d'asta · rigorista
-A,Kean,FIO,Pc,25,212,Titolare,0.9,Storico Serie A,26,5.87,6.75,8,1,15.1,0.2,2,2,4,0,0,0,,33,16.2,0.7,7.29,85,68,64,17,35,63,Ottimo,Titolare affidabile
-A,Yildiz,JUV,A,23,200,Titolare,0.9,Storico Serie A,35,6.46,7.37,10,6,8.2,9.6,1,2,2,0,0,0,,34,9,8.7,7.48,91,50,65,10,36,59,Ottimo,Titolare affidabile · piazzati
-A,Douvikas,COM,Pc,20,157,Titolare,0.9,Storico Serie A,36,6.19,7.39,14,1,12.1,1.5,1,1,0,0,0,0,,34,12.6,1.2,7.34,91,54,52,9,40,59,Ottimo,Titolare affidabile
-A,Davis K.,UDI,Pc,19,121,Titolare,0.9,Storico Serie A,30,6.23,7.28,10,4,10.1,2.2,4,4,5,0,0,0,,33,12.2,3.2,7.35,87,55,54,15,42,59,Ottimo,Titolare affidabile · rigorista
-A,Scamacca,ATA,Pc,19,128,Titolare in ballottaggio,0.72,Storico Serie A,23,6.2,7.5,10,1,6.7,0.8,2,2,2,0,0,0,,26,9.9,1.1,7.34,69,43,52,32,35,46,Buono,Rotazione/copertura · rigorista
-A,Berardi,SAS,A,18,115,Titolare,0.9,Storico Serie A,26,6.21,7.1,8,4,5.8,3.3,2,3,2,1,0,0,,33,9.3,5,7.13,85,46,53,17,41,54,Buono,Titolare affidabile · rigorista · piazzati
-A,Krstovic,ATA,Pc,18,100,Alternativa in ballottaggio,0.48,Storico Serie A,32,6.12,7.16,10,5,14,2.1,0,0,4,0,0,0,,18,7.3,1.8,7.37,57,33,53,45,32,38,Scommessa,Profilo rischioso
-A,Leao,MIL,A,18,120,Titolare,0.9,Storico Serie A,28,5.8,6.79,9,3,9.9,3.4,2,2,5,0,0,0,,33,11.2,3.8,6.84,86,52,50,16,42,57,Ottimo,Titolare affidabile
-A,De Ketelaere,ATA,A,17,106,Titolare,0.9,Storico Serie A,31,6.11,6.5,3,5,3.6,8.8,0,0,4,0,0,0,,33,3.6,8.5,6.63,88,27,45,14,36,46,Buono,Titolare affidabile · piazzati
-A,Dovbyk,BOL,Pc,16,84,Titolare in ballottaggio,0.72,Storico Serie A,12,5.92,6.75,3,1,2.5,0.4,0,0,0,0,0,0,,25,5.6,1.5,6.65,62,25,36,38,31,34,Cautela,Rotazione/copertura
-A,Esposito F.P.,INT,Pc,16,93,Riserva/rotazione,0.2,Storico Serie A,32,6.27,7,7,3,,,0,0,1,0,0,0,,7,1.5,0.7,7,36,7,38,64,21,17,Cautela,Profilo rischioso
-A,Laurientè,SAS,A,15,88,Titolare in ballottaggio,0.72,Storico Serie A,37,6.11,6.86,7,9,3.8,4.7,0,0,4,0,0,0,,27,3.7,4.9,6.65,78,22,39,23,36,40,Scommessa,Rotazione/copertura
-A,Pellegrino M.,PAR,Pc,15,81,Riserva/rotazione,0.2,Storico Serie A,37,5.85,6.51,9,0,8.6,1.4,1,1,5,0,0,0,,8,1.9,0.2,6.52,39,8,34,63,21,17,Cautela,Profilo rischioso
-A,Simeone,TOR,Pc,15,82,Titolare,0.9,Storico Serie A,32,6.22,7.23,11,0,9.9,0.8,0,0,1,0,0,0,,33,10.7,0.5,7.19,89,45,39,11,48,54,Buono,Titolare affidabile
-A,Castro S.,ROM,Pc,14,83,Alternativa in ballottaggio,0.48,Storico Serie A,35,6.04,6.63,7,1,,,0,0,3,0,0,0,,18,3.6,0.5,6.62,59,16,32,42,30,29,Cautela,Rotazione/copertura
-A,Dybala,ROM,A,14,67,Titolare,0.9,Storico Serie A,21,6.21,6.69,2,7,4.8,5.1,0,1,0,0,0,0,,32,5.6,8.5,7,81,35,47,19,46,49,Buono,Titolare affidabile · piazzati
-A,Santos A.,NAP,W;A,14,60,Riserva/rotazione,0.2,Storico Serie A,13,6.38,7.27,4,0,,,0,0,1,0,0,0,,7,3,0.6,7.71,24,13,48,77,27,18,Cautela,Profilo rischioso
-A,Esposito Se.,CAG,A,13,50,Riserva/rotazione,0.2,Storico Serie A,36,6.19,6.81,7,4,,,1,1,6,0,0,0,,8,1.6,0.9,6.82,39,8,34,63,25,18,Cautela,Profilo rischioso
-A,Nkunku,MIL,A,13,52,Riserva/rotazione,0.2,Storico Serie A,26,5.9,6.83,7,3,9.5,1.5,5,5,0,0,0,0,,7,2.3,0.6,6.97,32,10,41,68,26,18,Cautela,Profilo rischioso
-A,Pinamonti,SAS,Pc,13,58,Titolare in ballottaggio,0.72,Storico Serie A,35,5.93,6.64,9,3,8.8,1.1,0,1,2,1,0,0,,27,7.1,1.4,6.71,77,32,37,24,45,44,Scommessa,Rotazione/copertura
-A,Raspadori,ATA,A,13,62,Titolare,0.9,Storico Serie A,13,6,6.77,3,1,3.2,1.5,0,0,0,0,0,0,,31,5.8,2.2,6.63,76,27,32,24,41,41,Scommessa,Rotazione/copertura
-A,Adams A.,VEN,Pc,12,52,Alternativa in ballottaggio,0.48,Storico Serie A,32,6.06,6.72,6,3,,,0,0,0,0,0,0,,18,3.7,1.7,6.77,57,18,37,43,37,31,Cautela,Rotazione/copertura · rigorista
-A,Soulè,ROM,A,12,55,Titolare in ballottaggio,0.72,Storico Serie A,32,6.11,6.81,6,5,4,4.2,0,0,1,0,0,0,,27,4.1,3.8,6.69,75,22,33,25,43,39,Scommessa,Rotazione/copertura
-A,Colombo,GEN,Pc,11,63,Titolare,0.9,Storico Serie A,37,5.91,6.39,7,1,8.3,1.3,1,2,2,0,0,0,,34,7.9,1.1,6.61,92,34,36,9,58,53,Buono,Titolare affidabile · rigorista
-A,Diao,COM,W;A,11,50,Titolare in ballottaggio,0.72,Storico Serie A,16,5.94,6.31,2,1,2.7,1.2,0,0,2,0,0,0,,25,3.6,1.5,6.37,65,17,27,37,39,32,Cautela,Rotazione/copertura
-A,Bowie,SAS,Pc,10,39,Alternativa in ballottaggio,0.48,Storico Serie A,14,5.89,6.71,4,0,4.2,0.5,0,0,1,0,0,0,,17,3.9,0.6,6.58,45,17,30,56,37,25,Cautela,Profilo rischioso
-A,Dia,LAZ,A,10,31,Titolare in ballottaggio,0.72,Storico Serie A,25,5.66,5.84,1,2,2.2,0.5,0,0,1,0,0,0,,26,1.8,1.1,5.89,70,9,20,30,37,29,Cautela,Rotazione/copertura
-A,Lukaku,NAP,Pc,10,45,Riserva/rotazione,0.2,Campione ridotto,2,6.25,7.5,1,0,0.3,,0,0,1,0,0,0,,8,2.2,0.7,6.81,34,10,37,73,33,19,Cautela,Profilo rischioso
-A,Ratkov,LAZ,Pc,10,32,Alternativa in ballottaggio,0.48,Storico Serie A,8,5.69,5.69,0,0,0.6,0,0,0,0,0,0,0,,16,1.6,0.4,6.02,41,7,21,59,26,16,Cautela,Profilo rischioso
-A,Adams C.,TOR,A,9,32,Riserva/rotazione,0.2,Storico Serie A,32,6.06,6.72,6,3,5.7,2.1,0,0,0,0,0,0,,7,1.3,0.5,6.69,36,6,29,64,32,17,Cautela,Profilo rischioso
-A,Cutrone,MON,Pc,9,33,Titolare,0.9,Storico Serie A,15,5.73,5.93,1,0,2.6,0.3,0,0,0,0,0,0,,31,3.4,0.5,6.08,77,15,23,23,49,37,Scommessa,Rotazione/copertura
-A,David,JUV,Pc,9,40,Riserva/rotazione,0.2,Storico Serie A,30,5.7,6.27,6,2,8.8,1.7,0,1,0,0,0,0,,7,1.8,0.4,6.53,35,8,33,65,33,18,Cautela,Profilo rischioso
-A,Geubbels,LEC,Pc,9,25,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,1.7,0.5,6.08,73,8,20,42,43,29,Cautela,Scommessa nuova · rigorista
-A,Ghedjemis,FRO,W;A,9,30,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,2.1,0.6,6.08,86,10,18,29,48,35,Scommessa,Titolare affidabile
-A,Dallinga,BOL,Pc,8,23,Riserva/rotazione,0.2,Storico Serie A,18,5.81,6.14,2,1,2.9,0.5,0,0,2,0,0,0,,7,1.1,0.3,6.27,27,5,25,74,28,12,Cautela,Profilo rischioso
-A,Piccoli,FIO,Pc,8,24,Riserva/rotazione,0.2,Storico Serie A,27,5.7,6.17,4,1,6.5,1,0,0,1,0,0,0,,7,1.4,0.3,6.32,33,6,27,67,32,15,Cautela,Profilo rischioso
-A,Rrahmani Al.,VEN,Pc,8,20,Alternativa in ballottaggio,0.48,Storico Serie A,21,6.26,6.48,2,0,1.4,,0,0,3,0,0,0,,17,1.4,0.1,6.44,50,6,19,52,38,21,Cautela,Profilo rischioso
-A,Vitinha O.,GEN,A,8,20,Titolare,0.9,Storico Serie A,32,5.97,6.39,5,1,6.2,2.1,0,0,5,0,0,0,,33,5.9,1.7,6.48,89,27,26,13,71,50,Buono,Occasione di valore
-A,Yeboah J.,VEN,A,8,28,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,1.9,0.6,6.06,86,9,18,29,54,36,Scommessa,Titolare affidabile
-A,Bonny,INT,Pc,7,21,Riserva/rotazione,0.2,Storico Serie A,28,6.09,6.75,5,4,,1.9,0,0,1,0,0,0,,7,1.3,0.7,6.73,33,6,30,67,40,18,Cautela,Profilo rischioso
-A,Raimondo,FRO,Pc,7,24,Titolare,0.9,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,34,1.6,0.5,6.03,86,7,16,29,59,36,Scommessa,Titolare affidabile
-A,Stulic,LEC,Pc,7,18,Alternativa in ballottaggio,0.48,Storico Serie A,31,5.61,5.98,4,0,4.5,1.3,1,1,1,0,0,0,,18,2.6,0.5,6.05,56,12,24,44,50,29,Cautela,Rotazione/copertura
-A,Zapata D.,TOR,Pc,7,18,Riserva/rotazione,0.2,Storico Serie A,23,5.89,6.2,3,1,,,0,1,0,0,0,0,,7,0.9,0.3,6.32,30,4,22,70,32,13,Cautela,Profilo rischioso
-A,Boga,JUV,W;A,6,25,Riserva/rotazione,0.2,Storico Serie A,13,6.15,7.12,4,1,2.9,3.2,0,0,1,0,0,0,,7,1.7,0.9,6.97,24,8,36,77,48,18,Cautela,Profilo rischioso
-A,Gimenez,MIL,Pc,6,14,Riserva/rotazione,0.2,Storico Serie A,16,5.41,5.41,0,1,3.4,0.6,0,0,2,0,0,0,,7,0.9,0.3,5.78,26,4,22,76,31,11,Cautela,Profilo rischioso
-A,Mutandwa,CAG,Pc,6,19,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.9,0.3,6.24,34,4,21,81,39,14,Cautela,Profilo rischioso
-A,Neres,NAP,W;A,6,22,Alternativa in ballottaggio,0.48,Storico Serie A,16,6.16,6.81,3,3,1.5,3.2,0,0,3,0,0,0,,17,2,2.3,6.55,47,12,28,55,58,28,Cautela,Profilo rischioso
-A,Noslin,LAZ,A,6,17,Riserva/rotazione,0.2,Storico Serie A,23,6.02,6.5,4,2,4.8,1,0,0,4,1,0,0,,7,1.3,0.4,6.5,30,6,27,73,42,16,Cautela,Profilo rischioso
-A,Sulemana K.,ATA,A,6,16,Riserva/rotazione,0.2,Storico Serie A,20,5.92,6.18,2,1,,,0,0,4,0,0,0,,7,0.8,0.3,6.21,28,4,21,74,35,12,Cautela,Profilo rischioso
-A,Adorante,VEN,Pc,5,14,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,18,0.8,0.2,6.01,55,4,15,60,57,24,Cautela,Profilo rischioso
-A,Camarda,MIL,Pc,5,18,Riserva/rotazione,0.2,Storico Serie A,18,5.67,5.64,1,0,1.9,,0,1,1,0,0,0,,7,0.8,0.1,6,27,3,20,74,38,12,Cautela,Profilo rischioso
-A,Frigan,PAR,A,5,13,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,27,0.8,0.3,5.96,73,4,14,42,69,32,Cautela,Scommessa nuova
-A,Maldini,ATA,T;A,5,14,Riserva/rotazione,0.2,Storico Serie A,18,5.97,6.33,2,1,3.2,1,0,0,1,0,0,0,,7,1,0.4,6.43,27,5,24,74,46,15,Cautela,Profilo rischioso
-A,Mota,MON,A,5,18,Titolare in ballottaggio,0.72,Storico Serie A,18,5.47,5.19,0,0,,,0,1,2,1,0,0,,25,0.3,0.1,5.4,66,1,13,37,56,27,Cautela,Rotazione/copertura
-A,Borrelli,CAG,Pc,4,9,Riserva/rotazione,0.2,Storico Serie A,26,5.94,6.48,5,1,3.2,0.4,0,0,4,0,0,0,,7,1.1,0.2,6.36,32,5,22,70,60,19,Cautela,Profilo rischioso
-A,Giovane,NAP,A,4,10,Riserva/rotazione,0.2,Storico Serie A,31,5.94,6.39,3,6,3.7,1.9,0,0,2,0,0,0,,7,0.8,0.8,6.36,35,4,25,66,63,21,Cautela,Profilo rischioso
-A,Gueye,UDI,Pc,4,7,Riserva/rotazione,0.2,Storico Serie A,15,5.77,5.9,1,0,1.7,0.2,0,0,2,0,0,0,,7,0.6,0.1,5.97,25,3,17,77,44,12,Cautela,Profilo rischioso
-A,Havel,GEN,Pc,4,9,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.4,0.1,6.02,34,2,15,81,50,14,Cautela,Profilo rischioso
-A,Kulenovic,TOR,Pc,4,9,Riserva/rotazione,0.2,Campione ridotto,7,5.64,5.71,0,1,0.7,0.1,0,0,2,0,0,0,,7,0.6,0.3,5.8,20,3,20,90,39,9,Cautela,Profilo rischioso
-A,Kvernadze,FRO,W;A,4,15,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.7,0.2,6.15,34,3,18,81,54,16,Cautela,Profilo rischioso
-A,Mendy P.,CAG,Pc,4,9,Alternativa in ballottaggio,0.48,Storico Serie A,8,5.94,6.62,2,0,,,0,0,1,0,0,0,,16,1.7,0.1,6.2,41,7,18,61,66,23,Cautela,Profilo rischioso
-A,Morata,COM,Pc,4,10,Riserva/rotazione,0.2,Storico Serie A,18,5.47,5.19,0,0,4.9,0.5,0,1,2,1,0,0,,7,1,0.1,5.8,27,4,21,76,47,14,Cautela,Profilo rischioso
-A,Ekhator,JUV,A,3,10,Riserva/rotazione,0.2,Storico Serie A,25,5.94,6.26,3,0,2.9,0.4,0,0,3,0,0,0,,7,0.8,0.1,6.24,31,3,19,70,71,20,Cautela,Profilo rischioso
-A,Elphege,PAR,Pc,3,11,Alternativa in ballottaggio,0.48,Storico Serie A,8,6.12,7,2,1,1.9,0.1,0,0,0,0,0,0,,16,1.7,0.4,6.46,41,8,19,59,94,30,Cautela,Profilo rischioso
-A,Kuhn,COM,W;A,3,5,Riserva/rotazione,0.2,Storico Serie A,15,5.83,6.1,1,1,1,1.2,0,0,0,0,0,0,,7,0.4,0.4,6.06,25,2,18,75,59,15,Cautela,Profilo rischioso
-A,Lang,NAP,A,3,10,Riserva/rotazione,0.2,Storico Serie A,14,5.96,6.25,1,2,0.8,,0,0,2,0,0,0,,7,0.5,0.7,6.2,24,3,22,78,65,17,Cautela,Profilo rischioso
-A,Lucca,NAP,Pc,3,10,Riserva/rotazione,0.2,Storico Serie A,9,5.61,5.89,1,0,1.3,0.6,0,0,1,0,0,0,,7,0.8,0.2,5.93,21,4,20,80,57,14,Cautela,Profilo rischioso
-A,N'Dri,LEC,W;A,3,9,Titolare,0.9,Storico Serie A,17,5.85,6.12,2,0,1,0.4,0,0,3,0,0,0,,31,1.9,0.4,5.96,79,8,15,23,100,43,Scommessa,Occasione di valore
-A,Varela G.,MON,Pc,3,7,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.3,0.1,5.98,34,1,14,81,64,16,Cautela,Profilo rischioso
-A,Buksa,UDI,Pc,2,4,Riserva/rotazione,0.2,Storico Serie A,22,5.84,6.18,3,0,2.1,0.5,0,0,3,0,0,0,,7,0.7,0.1,6.09,29,3,18,73,99,24,Cautela,Profilo rischioso
-A,Petagna,MON,Pc,2,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0.2,0.1,5.94,34,1,13,81,93,22,Cautela,Profilo rischioso
-A,Albarracin,CAG,A,1,1,Riserva/rotazione,0.2,Campione ridotto,2,6,6,0,0,,0,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso
-A,Azon,COM,Pc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-A,Bayo V.,UDI,Pc,1,3,Riserva/rotazione,0.2,Storico Serie A,12,5.75,5.83,0,1,,,0,0,0,0,0,0,,7,0.1,0.3,5.84,23,1,14,77,100,21,Cautela,Profilo rischioso
-A,Lauberbach,VEN,Pc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-A,Lisman,VEN,W;A,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0,0,0,0,,,0,0,0,0,0,0,,8,0,0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso
-A,Moro L.,SAS,Pc,1,1,Riserva/rotazione,0.2,Campione ridotto,6,5.67,5.58,0,0,,,0,0,1,0,0,0,,7,0,0,5.59,19,0,10,90,100,18,Cautela,Profilo rischioso
-A,Trepy,CAG,Pc,1,2,Riserva/rotazione,0.2,Campione ridotto,4,5.75,5.75,0,0,0.6,0.2,0,0,0,0,0,0,,8,0.1,0,5.89,34,0,11,73,100,23,Cautela,Profilo rischioso
-A,Vaz,ROM,Pc,1,4,Riserva/rotazione,0.2,Storico Serie A,9,6,6.33,1,0,0.5,0.1,0,0,0,0,0,0,,7,0.4,0.1,6.19,21,2,15,79,100,21,Cautela,Profilo rischioso
+role,name,team,mantra_role,quote,fvm,status,starter_probability,data_quality,appearances_previous,average_rating_previous,fantasy_average_previous,goals_previous,assists_previous,xg_previous,xa_previous,penalties_scored,penalties_taken,yellow_cards,red_cards,goals_conceded,penalties_saved,goals_prevented,expected_appearances,expected_goals,expected_assists,expected_fantasy_average,reliability,bonus,potential,risk,value,fantasy_score,tier,profile,penalty_taker,set_pieces,goals_minus_xg,assists_minus_xa
+P,Svilar,ROM,Por,18,65,Titolare,0.9,Storico Serie A,38,6.32,5.5,0,0,,,0,0,0,0,31,0,4.7,34,0.0,0.0,5.5,93,76,68,7,24,68,Top,Priorità d'asta,,,,
+P,Martinez Jo.,INT,Por,17,63,Titolare,0.9,Campione ridotto,5,6.0,5.2,0,0,,,0,0,0,0,4,0,,30,0.0,0.0,5.2,71,57,46,36,19,47,Buono,Rotazione/copertura,,,,
+P,Butez,COM,Por,16,56,Titolare,0.9,Storico Serie A,38,6.11,5.41,0,1,,,0,0,3,0,29,1,2.1,34,0.0,0.0,5.41,93,69,54,8,25,62,Ottimo,Titolare affidabile,,,,
+P,Carnesecchi,ATA,Por,16,52,Titolare,0.9,Storico Serie A,37,6.43,5.65,0,0,,,0,0,0,0,35,2,7.1,34,0.0,0.0,5.65,92,77,70,8,28,69,Top,Priorità d'asta,,,,
+P,Maignan,MIL,Por,15,50,Titolare,0.9,Storico Serie A,37,6.3,5.46,0,0,,,0,0,4,0,35,2,10.5,34,0.0,0.0,5.46,92,78,69,9,29,69,Top,Priorità d'asta,,,,
+P,De Gea,FIO,Por,13,45,Titolare,0.9,Storico Serie A,37,6.22,4.97,0,0,,,0,0,0,0,49,1,,34,0.0,0.0,4.97,92,62,41,8,28,58,Ottimo,Titolare affidabile,,,,
+P,Meret,NAP,Por,11,45,Titolare,0.9,Storico Serie A,11,6.18,5.14,0,1,,,0,0,1,0,12,0,,31,0.0,0.0,5.14,75,54,41,26,29,49,Buono,Rotazione/copertura,,,,
+P,Skorupski,BOL,Por,10,37,Titolare,0.9,Storico Serie A,18,6.14,5.22,0,0,,,0,0,1,1,15,0,-1.0,32,0.0,0.0,5.22,79,52,28,23,30,47,Buono,Rotazione/copertura,,,,
+P,Caprile,CAG,Por,9,27,Titolare,0.9,Storico Serie A,38,6.29,4.87,0,0,,,0,0,2,0,53,0,3.5,34,0.0,0.0,4.87,93,65,52,8,43,64,Ottimo,Titolare affidabile,,,,
+P,Di Gregorio,JUV,Por,9,40,Titolare,0.9,Storico Serie A,30,6.07,5.32,0,0,,,0,0,1,0,25,1,,33,0.0,0.0,5.32,87,58,39,13,38,56,Ottimo,Titolare affidabile,,,,
+P,Mandas,LAZ,Por,9,30,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.0,0.0,5.86,86,56,36,29,38,53,Buono,Titolare affidabile,,,,
+P,Okoye,UDI,Por,9,29,Titolare,0.9,Storico Serie A,30,6.08,5.1,0,1,,,0,0,1,1,32,1,4.4,33,0.0,0.0,5.1,87,64,63,14,43,64,Ottimo,Titolare affidabile,,,,
+P,Bijlow,GEN,Por,8,18,Titolare,0.9,Storico Serie A,16,6.09,4.81,0,0,,,0,0,1,0,20,0,,31,0.0,0.0,4.81,78,49,33,23,37,48,Buono,Rotazione/copertura,,,,
+P,Falcone,LEC,Por,8,25,Titolare,0.9,Storico Serie A,38,6.45,5.26,0,0,,,0,0,2,0,50,2,6.4,34,0.0,0.0,5.26,93,70,62,8,51,70,Top,Priorità d'asta,,,,
+P,Daffara,PAR,Por,7,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.77,34,26,29,81,24,20,Cautela,Profilo rischioso,,,,
+P,Muric,SAS,Por,7,15,Titolare,0.9,Storico Serie A,32,6.06,4.75,0,0,,,0,0,4,0,43,1,5.7,33,0.0,0.0,4.75,89,64,59,13,55,66,Top,Priorità d'asta,,,,
+P,Suzuki,PAR,Por,7,20,Riserva/rotazione,0.2,Storico Serie A,20,6.05,4.78,0,0,,,0,0,1,0,28,1,-1.4,7,0.0,0.0,4.78,28,24,21,73,19,16,Cautela,Profilo rischioso,,,,
+P,Perin,JUV,Por,6,10,Riserva/rotazione,0.2,Storico Serie A,9,6.06,5.06,0,0,,,0,0,0,0,9,0,,7,0.0,0.0,5.06,21,21,31,79,21,15,Cautela,Profilo rischioso,,,,
+P,Stankovic F.,VEN,Por,6,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.0,0.0,5.8,86,52,32,29,55,54,Buono,Titolare affidabile,,,,
+P,Milinkovic-Savic V.,NAP,Por,5,10,Riserva/rotazione,0.2,Storico Serie A,27,6.17,5.61,0,0,,,0,0,0,0,24,3,0.6,7,0.0,0.0,5.61,33,28,35,67,35,25,Cautela,Profilo rischioso,,,,
+P,Thiam,MON,Por,5,12,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.0,0.0,5.79,86,51,31,29,65,56,Ottimo,Titolare affidabile,,,,
+P,Palmisani,FRO,Por,4,8,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.0,0.0,5.78,86,50,30,29,80,58,Ottimo,Occasione di valore,,,,
+P,Desplanches,FRO,Por,2,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.78,34,27,30,81,86,33,Cautela,Profilo rischioso,,,,
+P,Provedel,INT,Por,2,5,Riserva/rotazione,0.2,Storico Serie A,27,6.28,5.37,0,0,,,0,0,1,0,27,1,5.9,7,0.0,0.0,5.37,33,37,56,67,100,46,Buono,Profilo rischioso,,,,
+P,Christensen O.,FIO,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,1,7.5,6.5,0,0,,,0,0,0,0,1,0,,8,0.0,0.0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso,,,,
+P,Ciocci,CAG,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Contini,NAP,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Corvi,PAR,Por,1,1,Titolare,0.9,Storico Serie A,17,6.24,5.15,0,0,,,0,0,1,0,18,0,,31,0.0,0.0,5.15,79,45,28,22,100,59,Ottimo,Occasione di valore,,,,
+P,De Marzi,ROM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Di Gennaro,INT,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,1,6.0,5.0,0,0,,,0,0,0,0,1,0,,8,0.0,0.0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso,,,,
+P,Fruchtl,LEC,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Gollini,ROM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Grandi,VEN,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Happonen,BOL,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Lezzerini,FIO,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Lolic,FRO,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Mascardi,TOR,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Motta,LAZ,Por,1,1,Riserva/rotazione,0.2,Storico Serie A,9,6.0,5.17,0,0,,,0,0,1,0,10,1,,7,0.0,0.0,5.17,21,19,28,80,100,30,Cautela,Profilo rischioso,,,,
+P,Padelli,UDI,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,2,6.25,5.25,0,0,,,0,0,0,0,2,0,,8,0.0,0.0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso,,,,
+P,Paleari,TOR,Por,1,1,Titolare,0.9,Storico Serie A,29,6.12,4.55,0,0,,,0,0,1,0,45,0,-0.5,33,0.0,0.0,4.55,87,48,25,13,100,62,Ottimo,Occasione di valore,,,,
+P,Pessina Mas.,BOL,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,4,6.12,5.62,0,0,,,0,0,0,0,2,0,,8,0.0,0.0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso,,,,
+P,Piana,UDI,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Pinsoglio,JUV,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Pizzignacco,MON,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Pozzi,VEN,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Renzetti,LAZ,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Rossi F.,ATA,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Russo A.,SAS,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Samooja,LEC,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Sherri,CAG,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Siviero,TOR,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Sommariva,GEN,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,2,5.75,3.75,0,0,,,0,0,0,0,4,0,,8,0.0,0.0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso,,,,
+P,Sportiello,ATA,Por,1,1,Riserva/rotazione,0.2,Campione ridotto,1,5.5,4.5,0,0,,,0,0,0,0,1,0,,8,0.0,0.0,5.75,34,25,28,73,100,36,Scommessa,Profilo rischioso,,,,
+P,Stolz,GEN,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Strajnar,MON,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Terracciano,MIL,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Tornqvist,COM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Torriani,MIL,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+P,Turati,SAS,Por,1,3,Riserva/rotazione,0.2,Campione ridotto,6,6.25,5.08,0,0,,,0,0,0,0,7,0,,7,0.0,0.0,5.08,19,19,29,88,100,28,Cautela,Profilo rischioso,,,,
+P,Vigorito,COM,Por,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.75,34,25,28,81,100,35,Scommessa,Profilo rischioso,,,,
+D,Dimarco,INT,E;W,32,265,Titolare,0.9,Storico Serie A,35,6.64,7.69,7,17,5.2,11.3,0,0,3,0,0,0,,34,5.8,12.0,7.46,91,100,91,10,23,80,Elite,Priorità d'asta,,2.0,1.7999999999999998,5.699999999999999
+D,Wesley,ROM,E,17,90,Titolare,0.9,Storico Serie A,30,6.17,6.52,5,0,1.6,3.7,0,0,5,2,0,0,,33,3.3,2.4,6.39,87,44,46,17,27,50,Buono,Titolare affidabile,,,3.4,-3.7
+D,Akanji,INT,Dc,16,55,Titolare,0.9,Storico Serie A,32,6.27,6.39,2,0,2.0,1.4,0,0,4,0,0,0,,33,2.1,0.9,6.43,89,26,30,13,24,41,Scommessa,Titolare affidabile,,,0.0,-1.4
+D,Bremer,JUV,Dc,15,50,Titolare,0.9,Storico Serie A,26,6.29,6.77,4,3,2.8,1.2,0,0,5,0,0,0,,33,4.2,2.4,6.65,85,54,45,17,33,54,Buono,Titolare affidabile,,,1.2000000000000002,1.8
+D,Mancini,ROM,Dc,15,49,Titolare,0.9,Storico Serie A,36,6.31,6.57,4,2,2.5,1.5,0,0,9,0,0,0,,34,2.9,1.6,6.49,91,37,35,12,29,47,Buono,Titolare affidabile,,,1.5,0.5
+D,Bastoni,INT,Dc,14,44,Titolare,0.9,Storico Serie A,28,6.16,6.3,1,4,1.4,3.0,0,0,6,0,0,0,,33,1.5,4.0,6.31,86,30,39,17,28,44,Scommessa,Titolare affidabile,,,-0.3999999999999999,1.0
+D,Pavlovic,MIL,Dc,14,48,Titolare,0.9,Storico Serie A,34,6.28,6.66,5,0,3.5,1.2,0,0,4,0,0,0,,34,4.1,0.7,6.6,90,46,36,11,33,51,Buono,Titolare affidabile,,,1.5,-1.2
+D,Rrahmani,NAP,Dc,14,47,Titolare,0.9,Storico Serie A,21,6.26,6.48,2,0,1.4,0.4,0,0,3,0,0,0,,32,2.3,0.5,6.42,81,26,29,21,26,38,Scommessa,Titolare affidabile,,,0.6000000000000001,-0.4
+D,Kalulu,JUV,Dd;Dc,13,46,Titolare in ballottaggio,0.72,Storico Serie A,37,6.2,6.42,2,4,1.7,,0,0,2,1,0,0,,27,1.3,2.9,6.4,78,24,38,23,27,39,Scommessa,Rotazione/copertura,,,0.30000000000000004,
+D,N'Dicka,ROM,Dc,13,44,Titolare,0.9,Storico Serie A,31,6.15,6.39,3,1,2.0,,0,0,5,0,0,0,,33,2.6,1.1,6.34,88,32,32,14,30,44,Scommessa,Titolare affidabile,,,1.0,
+D,Solet,UDI,Dc,13,46,Titolare,0.9,Storico Serie A,35,6.26,6.47,3,1,2.8,2.4,1,1,1,0,0,0,,34,2.9,1.8,6.55,91,38,37,9,34,49,Buono,Titolare affidabile,2.0,,0.20000000000000018,-1.4
+D,Di Lorenzo,NAP,Dd;E,12,40,Titolare,0.9,Storico Serie A,26,6.02,6.27,2,1,2.0,2.8,0,0,1,0,0,0,,33,2.5,2.6,6.31,85,36,37,15,34,47,Buono,Titolare affidabile,,,0.0,-1.7999999999999998
+D,Gila,MIL,Dc,12,31,Titolare,0.9,Storico Serie A,31,5.95,5.87,0,0,1.4,0.6,0,0,3,1,0,0,,33,0.9,0.4,5.96,88,11,20,14,25,33,Cautela,Titolare affidabile,,,-1.4,-0.6
+D,Stones,INT,Dc,12,38,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.7,1.0,6.02,73,11,24,42,23,27,Cautela,Scommessa nuova,,,,
+D,Bisseck,INT,Dc,11,33,Alternativa in ballottaggio,0.48,Storico Serie A,23,6.2,6.63,3,2,,1.1,0,0,2,0,0,0,,17,2.1,1.1,6.59,51,26,41,50,28,31,Cautela,Profilo rischioso,,,,0.8999999999999999
+D,Ostigard,GEN,Dc,11,40,Titolare,0.9,Storico Serie A,30,6.13,6.52,5,0,3.4,0.8,0,0,7,0,0,0,,33,4.6,0.5,6.45,87,51,39,16,43,54,Buono,Titolare affidabile,2.0,,1.6,-0.8
+D,Dodò,FIO,Dd;E,10,30,Alternativa in ballottaggio,0.48,Storico Serie A,36,6.07,6.11,1,2,2.2,5.0,0,0,7,0,0,0,,18,0.9,1.9,6.23,60,16,36,42,28,29,Cautela,Rotazione/copertura,,,-1.2000000000000002,-3.0
+D,Hermoso,ROM,Dc,10,26,Titolare in ballottaggio,0.72,Storico Serie A,27,6.17,6.41,3,2,1.8,0.8,0,0,9,0,0,0,,26,2.2,1.2,6.3,72,28,32,32,34,38,Scommessa,Rotazione/copertura,,,1.2,1.2
+D,Ramon,COM,Dc,10,32,Titolare,0.9,Storico Serie A,32,6.16,6.14,2,0,4.6,1.5,0,0,11,1,0,0,,33,3.7,0.9,6.32,89,43,34,16,44,51,Buono,Titolare affidabile,,,-2.5999999999999996,-1.5
+D,Scalvini,ATA,Dc,10,28,Titolare,0.9,Storico Serie A,24,6.04,6.42,3,1,2.6,1.6,0,0,2,0,0,0,,32,3.6,1.8,6.39,83,45,37,18,43,51,Buono,Titolare affidabile,,,0.3999999999999999,-0.6000000000000001
+D,Cambiaso,JUV,Dd;Ds;E,9,27,Titolare,0.9,Storico Serie A,36,5.79,5.97,3,4,2.9,5.5,0,0,3,1,0,0,,34,2.8,4.6,6.1,91,46,44,11,51,57,Ottimo,Titolare affidabile,,3.0,0.10000000000000009,-1.5
+D,Vasquez,GEN,Ds;Dc,9,33,Titolare,0.9,Storico Serie A,36,6.11,6.17,1,0,,0.7,0,0,2,0,0,0,,34,0.9,0.4,6.17,91,11,20,10,35,37,Scommessa,Titolare affidabile,,,,-0.7
+D,Bartesaghi,MIL,Ds;E,8,25,Titolare,0.9,Storico Serie A,31,6.0,6.08,2,0,1.1,4.1,0,0,3,0,0,0,,33,1.6,2.6,6.18,88,26,31,13,46,45,Buono,Titolare affidabile,,,0.8999999999999999,-4.1
+D,Celik,JUV,B;Dd;E,8,21,Alternativa in ballottaggio,0.48,Storico Serie A,32,6.08,6.17,1,2,1.5,2.0,0,0,2,1,0,0,,18,0.7,1.1,6.2,57,11,27,45,30,25,Cautela,Profilo rischioso,,,-0.5,0.0
+D,Delprato,PAR,B;Dd;E,8,21,Titolare,0.9,Storico Serie A,35,6.01,6.11,2,0,2.1,0.9,0,0,5,0,0,0,,34,2.0,0.5,6.13,91,23,23,11,44,43,Scommessa,Titolare affidabile,,,-0.10000000000000009,-0.9
+D,Dragusin,FIO,Dc,8,27,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.6,0.7,5.96,86,9,19,29,36,33,Cautela,Titolare affidabile,,,,
+D,Gutierrez,NAP,Ds;E,8,26,Riserva/rotazione,0.2,Storico Serie A,22,5.89,6.07,1,1,0.8,1.3,0,0,0,0,0,0,,7,0.3,0.4,6.08,29,5,27,71,19,11,Cautela,Profilo rischioso,,,0.19999999999999996,-0.30000000000000004
+D,Hien,ATA,Dc,8,16,Alternativa in ballottaggio,0.48,Storico Serie A,28,6.02,5.96,1,0,0.8,0.3,0,0,5,0,0,0,,18,0.6,0.1,6.04,54,7,18,48,25,20,Cautela,Profilo rischioso,,,0.19999999999999996,-0.3
+D,Jimenez A.,FIO,Dd;Ds;E,8,23,Titolare in ballottaggio,0.72,Campione ridotto,1,5.5,5.0,0,0,,0.1,0,0,1,0,0,0,,27,0.5,0.6,5.96,73,8,19,34,31,28,Cautela,Rotazione/copertura,,,,-0.1
+D,Koulierakis,ROM,Dc,8,20,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.4,0.5,5.97,55,6,20,60,25,19,Cautela,Profilo rischioso,,,,
+D,Lucumì,BOL,Dc,8,18,Riserva/rotazione,0.2,Storico Serie A,28,5.91,5.93,1,0,1.0,0.4,0,0,5,0,0,0,,7,0.3,0.1,5.96,33,4,20,69,18,10,Cautela,Profilo rischioso,,,0.0,-0.4
+D,Mina,CAG,Dc,8,20,Titolare,0.9,Storico Serie A,26,6.02,6.19,2,1,1.6,0.6,0,0,3,1,0,0,,33,2.2,1.0,6.15,85,27,26,17,45,43,Scommessa,Titolare affidabile,3.0,,0.3999999999999999,0.4
+D,Miranda J.,BOL,Ds;E,8,24,Titolare,0.9,Storico Serie A,31,5.94,6.03,1,3,0.6,4.1,0,0,6,0,0,0,,33,0.8,3.9,6.03,88,23,33,14,45,44,Scommessa,Titolare affidabile,,3.0,0.4,-1.0999999999999996
+D,Norton-Cuffy,GEN,Dd;E,8,22,Titolare,0.9,Storico Serie A,27,5.94,6.11,2,1,,,0,0,3,1,0,0,,33,2.4,1.2,6.1,85,30,28,17,46,45,Buono,Titolare affidabile,,,,
+D,Spinazzola,NAP,Ds;E,8,24,Titolare in ballottaggio,0.72,Storico Serie A,30,6.1,6.48,3,3,1.2,3.4,0,0,1,0,0,0,,26,1.7,2.8,6.39,74,28,38,26,45,42,Scommessa,Rotazione/copertura,,,1.8,-0.3999999999999999
+D,Valeri,PAR,Ds;E,8,24,Titolare in ballottaggio,0.72,Storico Serie A,34,6.1,6.13,0,2,0.7,4.2,0,0,2,0,0,0,,27,0.3,2.6,6.2,76,13,28,25,37,34,Cautela,Rotazione/copertura,3.0,3.0,-0.7,-2.2
+D,Vojvoda,UDI,Dd;E,8,19,Titolare,0.9,Storico Serie A,27,5.94,6.17,2,1,1.4,2.7,0,0,2,0,0,0,,33,2.0,2.5,6.16,85,30,32,16,47,46,Buono,Titolare affidabile,,,0.6000000000000001,-1.7000000000000002
+D,Zappacosta,ATA,Dd;E,8,24,Titolare in ballottaggio,0.72,Storico Serie A,35,6.03,6.27,3,1,2.3,5.0,0,0,3,0,0,0,,27,2.0,2.6,6.31,77,31,37,24,47,45,Buono,Rotazione/copertura,,,0.7000000000000002,-4.0
+D,Buongiorno,NAP,Dc,7,18,Alternativa in ballottaggio,0.48,Storico Serie A,32,5.84,5.83,0,1,1.4,0.8,0,0,3,0,0,0,,18,0.5,0.5,5.9,57,7,20,44,30,22,Cautela,Rotazione/copertura,,,-1.4,0.19999999999999996
+D,Carlos Augusto,INT,B;Ds;E,7,27,Riserva/rotazione,0.2,Storico Serie A,28,6.05,6.09,1,1,1.5,1.5,0,0,6,0,0,0,,7,0.3,0.3,6.11,33,4,26,70,23,12,Cautela,Profilo rischioso,,,-0.5,-0.5
+D,Coco,TOR,Dc,7,18,Alternativa in ballottaggio,0.48,Storico Serie A,35,5.89,5.96,1,1,0.9,0.9,0,0,3,0,0,0,,18,0.5,0.5,5.96,59,7,20,42,31,23,Cautela,Rotazione/copertura,,,0.09999999999999998,0.09999999999999998
+D,Djimsiti,ATA,Dc,7,16,Riserva/rotazione,0.2,Storico Serie A,33,5.89,5.83,0,0,1.6,0.7,0,0,4,0,0,0,,7,0.2,0.1,5.93,37,3,18,64,21,12,Cautela,Profilo rischioso,,,-1.6,-0.7
+D,Doekhi,LAZ,Dc,7,22,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.5,0.6,5.94,86,8,17,29,40,33,Cautela,Titolare affidabile,,,,
+D,Gabbia,MIL,Dc,7,23,Titolare,0.9,Storico Serie A,29,5.91,5.84,0,0,1.4,0.2,0,0,4,0,0,0,,33,1.0,0.1,5.93,87,11,18,15,42,36,Scommessa,Titolare affidabile,,,-1.4,-0.2
+D,Idzes,SAS,Dc,7,1,Titolare,0.9,Storico Serie A,35,6.01,5.97,0,0,0.2,0.6,0,0,3,0,0,0,,34,0.1,0.3,5.98,91,2,12,10,38,32,Cautela,Titolare affidabile,,,-0.2,-0.6
+D,Ismajli,TOR,Dc,7,18,Titolare in ballottaggio,0.72,Storico Serie A,24,5.96,5.94,0,2,0.3,0.3,0,0,5,0,0,0,,26,0.2,1.0,5.92,70,6,19,33,34,27,Cautela,Rotazione/copertura,,,-0.3,1.7
+D,Kaiki,COM,Ds;E,7,23,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.5,0.6,5.96,73,8,19,42,36,28,Cautela,Scommessa nuova,,,,
+D,Kristensen T.,UDI,Dd;Dc,7,15,Riserva/rotazione,0.2,Storico Serie A,28,6.04,6.29,3,0,1.0,0.2,0,0,4,0,0,0,,7,0.5,0.0,6.18,33,5,22,69,22,12,Cautela,Profilo rischioso,,,2.0,-0.2
+D,Obert,CAG,B;Ds;E,7,14,Titolare,0.9,Storico Serie A,34,5.97,5.91,0,3,1.4,2.3,0,0,8,1,0,0,,34,0.8,2.6,5.97,90,18,26,14,48,42,Scommessa,Titolare affidabile,,,-1.4,0.7000000000000002
+D,Romagnoli,LAZ,Dc,7,24,Titolare,0.9,Storico Serie A,32,6.0,5.89,0,0,1.5,,0,0,5,1,0,0,,33,0.9,0.0,5.97,89,10,17,14,42,36,Scommessa,Titolare affidabile,,,-1.5,
+D,Tiago Gabriel,LEC,Dc,7,17,Titolare,0.9,Storico Serie A,36,6.03,6.04,2,0,3.6,0.1,0,0,7,0,0,0,,34,2.8,0.1,6.18,91,30,24,11,54,48,Buono,Titolare affidabile,,,-1.6,-0.1
+D,Tomori,MIL,Dc,7,20,Riserva/rotazione,0.2,Storico Serie A,32,5.92,5.83,0,1,0.6,1.0,0,0,6,1,0,0,,7,0.1,0.2,5.87,36,2,19,67,20,11,Cautela,Profilo rischioso,,,-0.6,0.0
+D,Ahanor,ATA,B;Ds;E,6,16,Alternativa in ballottaggio,0.48,Storico Serie A,21,5.79,5.69,0,0,1.9,0.7,0,0,2,1,0,0,,17,0.8,0.4,5.86,50,10,22,52,34,22,Cautela,Profilo rischioso,,,-1.9,-0.7
+D,Bella-Kotchap,VEN,Dc,6,13,Titolare,0.9,Storico Serie A,18,5.94,5.86,0,0,0.1,0.4,0,0,3,0,0,0,,32,0.2,0.4,5.89,79,4,14,23,40,30,Cautela,Rotazione/copertura,,,-0.1,-0.4
+D,Bellanova,ATA,Dd;E,6,15,Alternativa in ballottaggio,0.48,Storico Serie A,22,5.75,5.75,0,1,0.5,2.3,0,0,2,0,0,0,,17,0.2,1.3,5.82,50,7,24,51,33,21,Cautela,Profilo rischioso,,,-0.5,-1.2999999999999998
+D,Bernasconi,ATA,Ds;E,6,17,Titolare in ballottaggio,0.72,Storico Serie A,22,6.11,6.18,0,3,0.4,3.5,0,0,3,0,0,0,,26,0.3,3.5,6.21,68,16,33,34,49,36,Scommessa,Rotazione/copertura,,,-0.4,-0.5
+D,Beukema,NAP,Dc,6,16,Titolare in ballottaggio,0.72,Storico Serie A,22,5.89,6.11,2,0,1.7,0.5,0,0,2,0,0,0,,26,1.9,0.4,6.08,68,22,25,33,49,36,Scommessa,Rotazione/copertura,,,0.30000000000000004,-0.5
+D,Circati,PAR,Dc,6,18,Titolare,0.9,Storico Serie A,31,5.98,5.98,1,0,1.0,0.5,0,0,6,0,0,0,,33,1.1,0.3,5.99,88,13,18,14,50,39,Scommessa,Titolare affidabile,,,0.0,-0.5
+D,Comuzzo,TOR,Dc,6,11,Titolare in ballottaggio,0.72,Storico Serie A,24,5.73,5.73,1,0,1.0,0.2,0,0,2,0,0,0,,26,1.0,0.1,5.81,70,11,17,31,41,30,Cautela,Rotazione/copertura,,,0.0,-0.2
+D,Gallo,LEC,Ds;E,6,13,Titolare,0.9,Storico Serie A,37,5.93,5.97,0,3,0.5,2.9,0,0,3,0,0,0,,34,0.3,2.7,6.0,92,13,24,9,54,42,Scommessa,Titolare affidabile,,3.0,-0.5,0.10000000000000009
+D,Heggem,BOL,Ds;Dc,6,15,Titolare,0.9,Storico Serie A,25,5.86,5.82,0,0,1.1,0.1,0,0,0,1,0,0,,32,0.8,0.1,5.9,84,9,16,17,46,35,Scommessa,Titolare affidabile,,,-1.1,-0.1
+D,Kamara H.,UDI,Ds;E,6,12,Titolare,0.9,Storico Serie A,26,5.9,5.88,0,2,,,0,0,5,0,0,0,,33,0.0,2.5,5.88,85,9,22,17,48,37,Scommessa,Titolare affidabile,,,,
+D,Mangas,MON,Ds;E,6,15,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.3,0.4,5.91,86,5,15,29,44,32,Cautela,Titolare affidabile,,,,
+D,Marcandalli,GEN,Dc,6,13,Titolare,0.9,Storico Serie A,31,5.89,5.85,0,1,0.3,0.8,0,0,4,0,0,0,,33,0.2,0.9,5.87,88,5,16,14,45,35,Scommessa,Titolare affidabile,,,-0.3,0.19999999999999996
+D,Marusic,LAZ,Dd;Ds;E,6,20,Titolare in ballottaggio,0.72,Storico Serie A,33,5.8,5.91,1,2,1.3,1.4,0,0,1,1,0,0,,27,1.0,1.3,5.91,76,15,25,25,48,36,Scommessa,Rotazione/copertura,,,-0.30000000000000004,0.6000000000000001
+D,Monterisi,FRO,Dc,6,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.3,0.4,5.91,86,5,15,29,44,32,Cautela,Titolare affidabile,,,,
+D,Pavard,INT,Dd;Dc,6,18,Riserva/rotazione,0.2,Campione ridotto,1,6.5,6.5,0,0,0.0,0.0,0,0,0,0,0,0,,8,0.3,0.3,6.02,34,4,23,73,25,12,Cautela,Profilo rischioso,,,,
+D,Tavares N.,LAZ,Ds;E,6,17,Riserva/rotazione,0.2,Storico Serie A,21,5.83,5.71,0,0,0.6,2.0,0,0,5,0,0,0,,7,0.2,0.4,5.85,29,4,24,74,23,11,Cautela,Profilo rischioso,,,-0.6,-2.0
+D,Valdepenas,FIO,Ds;Dc,6,18,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.4,0.5,5.94,73,6,17,42,40,28,Cautela,Scommessa nuova,,,,
+D,Valle,COM,Ds;E,6,18,Alternativa in ballottaggio,0.48,Storico Serie A,26,6.06,6.23,1,3,1.0,1.2,0,0,3,0,0,0,,17,0.7,1.3,6.2,53,12,29,48,40,26,Cautela,Profilo rischioso,,,0.0,1.8
+D,Viery,FIO,Ds;Dc,6,19,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.4,0.5,5.94,73,6,17,42,40,28,Cautela,Scommessa nuova,,,,
+D,Zortea,BOL,Dd;E,6,19,Titolare,0.9,Storico Serie A,28,5.79,5.82,0,2,0.4,2.5,0,0,2,0,0,0,,33,0.3,2.7,5.86,86,13,25,15,51,40,Scommessa,Titolare affidabile,,,-0.4,-0.5
+D,Bracaglia,FRO,Ds;Dc,5,11,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,45,27,Cautela,Scommessa nuova,,,,
+D,Gaspar K.,LEC,Dc,5,12,Titolare in ballottaggio,0.72,Storico Serie A,21,5.81,5.62,0,0,,,0,0,6,1,0,0,,26,0.0,0.1,5.62,68,0,12,37,38,23,Cautela,Rotazione/copertura,,,,
+D,Haps,VEN,Ds;E,5,11,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,3,18,81,28,11,Cautela,Profilo rischioso,,,,
+D,Holm,BOL,Dd;E,5,13,Riserva/rotazione,0.2,Storico Serie A,16,6.03,6.38,1,4,1.3,1.7,0,0,1,1,0,0,,7,0.4,0.9,6.24,26,8,38,76,35,16,Cautela,Profilo rischioso,,,-0.30000000000000004,2.3
+D,Kelly L.,JUV,Ds;Dc,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,35,6.04,6.1,1,1,,,0,0,4,0,0,0,,18,0.5,0.5,6.09,59,7,20,42,44,26,Cautela,Rotazione/copertura,,,,
+D,Kempf,COM,Dc,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,30,6.12,6.5,4,1,2.8,0.8,0,0,3,0,0,0,,18,2.0,0.5,6.43,56,23,31,45,58,35,Scommessa,Profilo rischioso,,,1.2000000000000002,0.19999999999999996
+D,Kofler,CAG,Dc,5,11,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.2,0.2,5.91,55,3,15,60,37,19,Cautela,Profilo rischioso,,,,
+D,Kolasinac,ATA,Ds;Dc,5,12,Riserva/rotazione,0.2,Storico Serie A,17,5.94,5.85,0,0,0.2,0.3,0,0,3,0,0,0,,7,0.1,0.2,5.92,26,2,18,76,23,8,Cautela,Profilo rischioso,,,-0.2,-0.3
+D,Martin,GEN,Ds;E,5,15,Alternativa in ballottaggio,0.48,Storico Serie A,29,5.91,6.05,1,5,1.8,5.6,0,1,2,0,0,0,,18,0.9,3.5,6.22,55,22,47,46,61,38,Scommessa,Profilo rischioso,,2.0,-0.8,-0.5999999999999996
+D,Moreno M.,VEN,Dc,5,11,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.2,0.2,5.91,55,3,15,60,37,19,Cautela,Profilo rischioso,,,,
+D,Olivera,NAP,B;Ds;E,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,24,5.79,5.73,0,0,1.4,0.7,0,0,3,0,0,0,,17,0.6,0.3,5.85,52,7,19,50,39,22,Cautela,Profilo rischioso,,,-1.4,-0.7
+D,Oyono A.,FRO,Dd;E,5,12,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.2,0.2,5.97,34,3,19,81,28,11,Cautela,Profilo rischioso,,,,
+D,Parisi,FIO,Ds;E,5,12,Riserva/rotazione,0.2,Storico Serie A,23,6.11,6.07,1,1,1.3,1.7,0,0,6,0,0,0,,7,0.4,0.4,6.21,30,6,28,73,33,15,Cautela,Profilo rischioso,,,-0.30000000000000004,-0.7
+D,Pedersen,TOR,Dd;E,5,13,Titolare,0.9,Storico Serie A,28,5.84,5.96,1,2,1.7,2.0,0,0,3,0,0,0,,33,1.7,2.4,6.01,86,27,29,15,72,50,Buono,Occasione di valore,,,-0.7,0.0
+D,Pedraza,LAZ,Ds;E,5,15,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.3,0.4,5.92,73,5,16,42,47,28,Cautela,Scommessa nuova,,,,
+D,Rensch,ROM,B;Dd;E,5,16,Riserva/rotazione,0.2,Storico Serie A,18,6.11,6.47,1,4,0.3,2.3,0,0,1,0,0,0,,7,0.3,1.0,6.35,27,7,38,74,36,17,Cautela,Profilo rischioso,,,0.7,1.7000000000000002
+D,Veiga D.,LEC,Dd;E,5,11,Riserva/rotazione,0.2,Storico Serie A,36,5.86,5.74,0,0,,,0,0,9,0,0,0,,8,0.0,0.0,5.74,39,0,11,64,25,11,Cautela,Profilo rischioso,,,,
+D,Vitik,BOL,Dc,5,11,Titolare in ballottaggio,0.72,Storico Serie A,18,5.81,5.72,0,0,0.4,0.1,0,0,3,0,0,0,,25,0.3,0.1,5.77,66,4,14,36,42,26,Cautela,Rotazione/copertura,,,-0.4,-0.1
+D,Zè Pedro,CAG,Dd;Dc,5,11,Titolare in ballottaggio,0.72,Storico Serie A,22,5.8,5.7,0,1,0.8,0.4,0,0,6,0,0,0,,26,0.5,0.7,5.75,68,8,18,35,46,29,Cautela,Rotazione/copertura,,,-0.8,0.6
+D,Arizala,UDI,Ds;E,4,8,Riserva/rotazione,0.2,Campione ridotto,5,5.8,5.8,0,0,0.0,0.2,0,0,0,0,0,0,,7,0.1,0.2,5.87,18,2,17,89,23,4,Cautela,Profilo rischioso,,,,-0.2
+D,Bertola,UDI,Dd;Ds;Dc,4,10,Titolare,0.9,Storico Serie A,25,5.92,5.9,0,1,0.6,0.7,0,0,3,0,0,0,,32,0.5,1.0,5.94,84,9,18,17,70,40,Scommessa,Occasione di valore,,,-0.6,0.30000000000000004
+D,Birindelli,MON,Dd;Ds;E,4,12,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.3,0.3,5.9,86,4,14,29,65,36,Scommessa,Titolare affidabile,,,,
+D,Calvani,FRO,Dc,4,10,Titolare in ballottaggio,0.72,Storico Serie A,24,6.04,6.42,3,1,,0.5,0,0,2,0,0,0,,26,3.1,0.7,6.38,70,36,32,31,92,52,Buono,Occasione di valore,,,,0.5
+D,Comert,TOR,Dc,4,10,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.2,0.3,5.89,86,3,13,29,64,35,Scommessa,Titolare affidabile,,,,
+D,Correia T.,VEN,Dd;E,4,12,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,56,29,Cautela,Scommessa nuova,,,,
+D,Delli Carri,MON,Dc,4,11,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,56,29,Cautela,Scommessa nuova,,,,
+D,Doig,SAS,Ds;E,4,13,Alternativa in ballottaggio,0.48,Storico Serie A,27,5.81,5.72,0,0,0.7,1.0,0,0,5,0,0,0,,17,0.3,0.4,5.79,54,5,18,48,47,23,Cautela,Profilo rischioso,,,-0.7,-1.0
+D,Gatti,JUV,Dc,4,10,Riserva/rotazione,0.2,Storico Serie A,16,5.97,6.25,2,0,2.1,0.1,0,0,3,0,0,0,,7,0.7,0.1,6.19,26,8,27,76,39,15,Cautela,Profilo rischioso,,,-0.10000000000000009,-0.1
+D,Ghilardi,ROM,Dc,4,10,Riserva/rotazione,0.2,Storico Serie A,21,5.88,5.86,0,0,0.3,0.3,0,0,1,0,0,0,,7,0.1,0.1,5.91,29,1,15,72,29,9,Cautela,Profilo rischioso,,,-0.3,-0.3
+D,Halhal,VEN,Dc,4,10,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.2,0.3,5.9,73,3,14,42,56,29,Cautela,Scommessa nuova,,,,
+D,Kabasele,UDI,Dc,4,9,Titolare,0.9,Storico Serie A,29,5.97,6.16,3,0,1.3,0.1,0,0,5,1,0,0,,33,2.3,0.1,6.06,87,25,21,16,86,50,Buono,Occasione di valore,,,1.7,-0.1
+D,Lucchesi,MON,Dc,4,12,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.3,0.3,5.9,86,4,14,29,65,36,Scommessa,Titolare affidabile,,,,
+D,Mitaj,GEN,Ds;E,4,9,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.2,5.92,34,2,16,81,33,11,Cautela,Profilo rischioso,,,,
+D,Pongracic,FIO,Dc,4,8,Riserva/rotazione,0.2,Storico Serie A,35,5.89,5.71,0,0,0.7,0.5,0,0,12,0,0,0,,8,0.1,0.1,5.77,38,1,15,66,33,13,Cautela,Profilo rischioso,,,-0.7,-0.5
+D,Siebert,LEC,Dc,4,12,Alternativa in ballottaggio,0.48,Storico Serie A,19,5.79,5.87,1,0,0.4,0.2,0,0,3,0,0,0,,17,0.5,0.2,5.81,49,6,17,53,45,21,Cautela,Profilo rischioso,,,0.6,-0.2
+D,Smolcic I.,COM,Dd;E,4,10,Alternativa in ballottaggio,0.48,Storico Serie A,25,6.08,5.96,0,1,0.9,0.7,0,0,8,0,0,0,,17,0.4,0.6,6.03,52,6,20,52,49,24,Cautela,Profilo rischioso,,,-0.9,0.30000000000000004
+D,Valenti,PAR,Dc,4,10,Titolare in ballottaggio,0.72,Storico Serie A,27,5.87,5.74,0,0,0.6,0.6,0,0,7,0,0,0,,26,0.3,0.3,5.79,72,4,15,31,56,31,Cautela,Rotazione/copertura,3.0,3.0,-0.6,-0.6
+D,Walukiewicz,SAS,Dd;Dc,4,10,Titolare in ballottaggio,0.72,Storico Serie A,34,5.79,5.72,0,1,0.2,2.1,0,0,7,0,0,0,,27,0.1,1.3,5.75,76,6,19,26,61,35,Scommessa,Rotazione/copertura,,,-0.2,-1.1
+D,Zanoli,UDI,Dd;E,4,10,Riserva/rotazione,0.2,Storico Serie A,19,5.95,6.18,1,2,0.1,1.1,0,0,1,0,0,0,,7,0.2,0.5,6.08,28,4,25,73,36,13,Cautela,Profilo rischioso,,,0.9,0.8999999999999999
+D,Zappa,CAG,B;Dd;E,4,9,Alternativa in ballottaggio,0.48,Storico Serie A,25,5.94,6.02,0,3,0.9,1.5,0,0,2,0,0,0,,17,0.4,1.4,6.05,52,9,26,49,54,27,Cautela,Profilo rischioso,,,-0.9,1.5
+D,Akpoguma,FRO,Dc,3,7,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.1,0.2,5.89,55,2,13,60,59,23,Cautela,Profilo rischioso,,,,
+D,Angelino,ROM,E,3,12,Riserva/rotazione,0.2,Campione ridotto,7,5.79,5.64,0,0,0.2,0.7,0,0,2,0,0,0,,7,0.2,0.3,5.78,20,3,22,90,36,9,Cautela,Profilo rischioso,,,-0.2,-0.7
+D,Athekame,MIL,Dd;E,3,8,Riserva/rotazione,0.2,Storico Serie A,19,5.89,6.24,2,2,0.4,1.1,0,0,3,0,0,0,,7,0.3,0.5,6.01,28,5,27,74,49,17,Cautela,Profilo rischioso,,,1.6,0.8999999999999999
+D,Britschgi,PAR,Dd;Ds;E,3,10,Riserva/rotazione,0.2,Storico Serie A,28,5.66,5.61,0,2,0.4,1.3,0,0,5,1,0,0,,7,0.1,0.4,5.64,33,3,21,70,44,15,Cautela,Profilo rischioso,,,-0.4,0.7
+D,Candè,SAS,Ds;Dc,3,12,Titolare,0.9,Storico Serie A,8,5.69,5.56,0,0,0.2,0.0,0,0,2,0,0,0,,30,0.3,0.2,5.6,73,4,14,30,73,34,Cautela,Occasione di valore,,,-0.2,
+D,Carboni A.,MON,Ds;Dc,3,9,Alternativa in ballottaggio,0.48,Campione ridotto,2,5.75,5.75,0,0,,,0,0,0,0,0,0,,18,0.2,0.2,5.91,55,3,14,52,61,25,Cautela,Profilo rischioso,,,,
+D,Casale,BOL,Dc,3,6,Alternativa in ballottaggio,0.48,Storico Serie A,10,5.55,5.55,0,0,0.7,0.2,0,0,0,0,0,0,,16,0.3,0.2,5.62,43,4,15,57,50,19,Cautela,Profilo rischioso,,,-0.7,-0.2
+D,Cittadini,FRO,Dc,3,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.2,5.92,34,2,16,81,44,13,Cautela,Profilo rischioso,,,,
+D,De Winter,MIL,Dd;Dc,3,12,Riserva/rotazione,0.2,Storico Serie A,24,5.71,5.85,1,1,0.7,0.4,0,0,1,0,0,0,,7,0.2,0.2,5.8,31,3,20,70,44,15,Cautela,Profilo rischioso,,,0.30000000000000004,0.6
+D,Estupinan,MIL,Ds;E,3,9,Riserva/rotazione,0.2,Storico Serie A,14,5.61,5.68,1,1,0.4,1.5,0,0,5,1,0,0,,7,0.3,0.5,5.56,24,5,27,82,42,13,Cautela,Profilo rischioso,,,0.6,-0.5
+D,Floriani Mussolini,LAZ,Dd;E,3,12,Alternativa in ballottaggio,0.48,Storico Serie A,23,5.72,5.72,0,1,0.4,0.7,0,0,2,0,0,0,,17,0.2,0.6,5.75,51,4,18,50,59,25,Cautela,Profilo rischioso,,,-0.4,0.30000000000000004
+D,Hainaut,VEN,Dd;E,3,7,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.1,0.2,5.87,86,2,12,29,83,38,Scommessa,Occasione di valore,,,,
+D,Idrissi R.,CAG,Ds;E,3,7,Riserva/rotazione,0.2,Storico Serie A,19,5.95,6.18,2,0,,3.5,0,0,3,0,0,0,,7,0.6,0.6,6.21,28,9,35,74,60,22,Cautela,Profilo rischioso,,,,-3.5
+D,Joao Mario,FIO,Dd;E,3,7,Alternativa in ballottaggio,0.48,Storico Serie A,15,5.87,6.07,1,1,0.3,0.9,0,0,2,0,0,0,,17,0.5,0.7,5.93,46,8,21,56,63,26,Cautela,Profilo rischioso,,,0.7,0.09999999999999998
+D,Kossounou,ATA,Dd;Dc,3,7,Riserva/rotazione,0.2,Storico Serie A,17,5.79,5.94,1,0,0.4,0.2,0,0,1,0,0,0,,7,0.2,0.1,5.86,26,3,17,75,39,11,Cautela,Profilo rischioso,,,0.6,-0.2
+D,Kouadio,MON,Dd;Dc,3,9,Titolare,0.9,Campione ridotto,1,6.0,6.0,0,0,2.1,0.0,0,0,0,0,0,0,,34,0.2,0.2,5.89,86,3,13,21,85,40,Scommessa,Occasione di valore,,,-2.1,
+D,Provstgaard,LAZ,Dc,3,10,Riserva/rotazione,0.2,Storico Serie A,23,5.91,5.85,0,0,0.3,0.3,0,0,3,0,0,0,,7,0.1,0.1,5.9,30,1,15,72,39,11,Cautela,Profilo rischioso,,,-0.3,-0.3
+D,Ranieri L.,FIO,Ds;Dc,3,7,Alternativa in ballottaggio,0.48,Storico Serie A,31,5.81,5.74,1,0,1.9,1.1,0,0,8,1,0,0,,18,0.9,0.4,5.82,56,11,21,48,73,32,Cautela,Profilo rischioso,,,-0.8999999999999999,-1.1
+D,Rodriguez Ju.,CAG,Ds;Dc,3,10,Titolare in ballottaggio,0.72,Storico Serie A,16,5.78,5.88,1,0,0.8,0.6,0,0,3,0,0,0,,25,1.0,0.5,5.83,65,13,20,37,82,38,Scommessa,Rotazione/copertura,,,0.19999999999999996,-0.6
+D,Schingtienne,VEN,Dc,3,7,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.1,0.2,5.87,86,2,12,29,83,38,Scommessa,Occasione di valore,,,,
+D,Sverko,VEN,Ds;Dc,3,7,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,42,12,Cautela,Profilo rischioso,,,,
+D,Troilo,PAR,Dc,3,8,Alternativa in ballottaggio,0.48,Storico Serie A,21,5.88,5.81,1,0,,0.7,0,0,5,2,0,0,,17,0.7,0.3,5.81,50,9,19,55,65,27,Cautela,Profilo rischioso,,,,-0.7
+D,Alhassane,BOL,Ds;E,2,6,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso,,,,
+D,Biraghi,TOR,B;Ds;E,2,5,Riserva/rotazione,0.2,Storico Serie A,11,5.73,5.73,0,0,0.1,0.9,0,0,0,0,0,0,,7,0.1,0.2,5.8,22,2,17,78,51,12,Cautela,Profilo rischioso,,,-0.1,-0.9
+D,Diawara S.,MIL,Ds;Dc,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso,,,,
+D,Ebosse,UDI,Ds;Dc,2,4,Riserva/rotazione,0.2,Storico Serie A,16,5.75,5.72,0,1,0.0,0.4,0,0,4,0,0,0,,7,0.0,0.2,5.65,26,1,15,77,50,12,Cautela,Profilo rischioso,,,,0.6
+D,Franjic,VEN,B;Ds;E,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso,,,,
+D,Helland,BOL,Dd;Dc,2,5,Riserva/rotazione,0.2,Campione ridotto,6,5.75,5.58,0,0,0.1,0.0,0,0,2,0,0,0,,7,0.1,0.1,5.64,19,1,15,92,41,7,Cautela,Profilo rischioso,,,-0.1,
+D,Jean,LEC,Dc,2,4,Riserva/rotazione,0.2,Campione ridotto,5,5.8,5.7,0,0,0.0,0.2,0,0,1,0,0,0,,7,0.1,0.1,5.76,18,1,15,91,42,7,Cautela,Profilo rischioso,,,,-0.2
+D,Lazzari,LAZ,Dd;E,2,8,Riserva/rotazione,0.2,Storico Serie A,17,5.74,5.68,0,0,0.2,0.3,0,0,2,0,0,0,,7,0.1,0.1,5.74,26,1,15,75,51,13,Cautela,Profilo rischioso,,,-0.2,-0.3
+D,Marin R.,NAP,Dc,2,6,Riserva/rotazione,0.2,Storico Serie A,21,5.74,5.57,0,0,,2.4,0,0,7,0,0,0,,7,0.0,0.4,5.63,29,1,19,75,56,15,Cautela,Profilo rischioso,,,,-2.4
+D,Otoa,GEN,Dc,2,5,Riserva/rotazione,0.2,Storico Serie A,10,5.65,5.4,0,0,0.1,0.0,0,0,1,0,0,0,,7,0.1,0.1,5.66,22,1,15,79,45,10,Cautela,Profilo rischioso,,,-0.1,
+D,Palma,UDI,Dc,2,5,Riserva/rotazione,0.2,Campione ridotto,4,5.5,5.5,0,0,0.0,0.1,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,73,63,17,Cautela,Profilo rischioso,,,,-0.1
+D,Pellegrini Lu.,LAZ,Ds;E,2,5,Riserva/rotazione,0.2,Storico Serie A,24,5.73,5.69,1,0,0.7,1.4,0,0,8,0,0,0,,7,0.2,0.2,5.68,31,3,19,73,63,18,Cautela,Profilo rischioso,,,0.30000000000000004,-1.4
+D,Puczka,GEN,Ds;E,2,7,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,63,16,Cautela,Profilo rischioso,,,,
+D,Sabelli,GEN,Dd;Ds;E,2,5,Riserva/rotazione,0.2,Storico Serie A,13,5.85,5.69,0,0,0.5,0.6,0,0,0,0,0,0,,7,0.1,0.2,5.92,24,2,17,76,55,14,Cautela,Profilo rischioso,,,-0.5,-0.6
+D,Sagrado,VEN,Dd;E,2,4,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.1,0.1,5.88,55,1,12,60,86,28,Cautela,Profilo rischioso,,,,
+D,Van der Brempt,COM,Dd;E,2,5,Riserva/rotazione,0.2,Storico Serie A,14,5.96,5.96,0,1,0.2,1.1,0,0,2,0,0,0,,7,0.1,0.4,5.99,24,3,21,78,61,16,Cautela,Profilo rischioso,,,-0.2,-0.10000000000000009
+D,Abankwah,UDI,Dd;Dc,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.1,5.87,34,0,12,81,100,23,Cautela,Profilo rischioso,,,,
+D,Amey,FRO,Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Antov,MON,Dc,1,2,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Bakoune,MON,Dd;E,1,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,14,81,100,24,Cautela,Profilo rischioso,,,,
+D,Cabal,JUV,B;Ds;E,1,4,Riserva/rotazione,0.2,Storico Serie A,10,5.95,6.5,2,0,0.8,0.2,0,0,1,0,0,0,,7,0.4,0.1,6.09,22,5,21,79,100,24,Cautela,Profilo rischioso,,,1.2,-0.2
+D,Carboni F.,PAR,Ds;E,1,3,Riserva/rotazione,0.2,Campione ridotto,2,5.75,5.75,0,0,,,0,0,0,0,0,0,,8,0.0,0.1,5.87,34,0,12,73,100,24,Cautela,Profilo rischioso,,,,
+D,Corrado,FRO,Ds;E,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.1,5.87,34,0,12,81,100,23,Cautela,Profilo rischioso,,,,
+D,Cuenca A.,COM,Ds;Dc,1,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.2,5.92,34,2,16,81,100,24,Cautela,Profilo rischioso,,,,
+D,De Silvestri,BOL,Dd;E,1,4,Riserva/rotazione,0.2,Storico Serie A,10,6.0,5.9,0,0,,0.1,0,0,2,0,0,0,,7,0.0,0.1,5.91,22,0,13,80,92,19,Cautela,Profilo rischioso,,,,-0.1
+D,Gelli J.,FRO,Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Goldaniga,COM,Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Gomes,VEN,Ds;Dc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Marianucci,NAP,Dc,1,5,Riserva/rotazione,0.2,Storico Serie A,11,5.73,5.73,0,1,0.0,0.2,0,0,2,0,0,0,,7,0.1,0.2,5.71,22,2,17,80,99,21,Cautela,Profilo rischioso,,,,0.8
+D,Matturro,GEN,Ds;Dc,1,2,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Mazzocchi,NAP,Dd;Ds;E,1,3,Riserva/rotazione,0.2,Storico Serie A,9,5.83,5.83,0,1,0.0,0.8,0,0,0,1,0,0,,7,0.0,0.3,5.76,21,1,16,82,93,19,Cautela,Profilo rischioso,,,,0.19999999999999996
+D,Missori,SAS,Dd;E,1,2,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.0,0.0,5.85,55,0,10,60,100,30,Cautela,Profilo rischioso,,,,
+D,Mlacic,UDI,Dc,1,3,Riserva/rotazione,0.2,Campione ridotto,4,5.88,5.62,0,0,0.0,0.0,0,0,2,0,0,0,,8,0.0,0.1,5.87,34,0,12,73,100,24,Cautela,Profilo rischioso,,,,
+D,Ndaba,LEC,Ds;E,1,4,Riserva/rotazione,0.2,Storico Serie A,10,5.55,5.55,0,0,0.1,0.1,0,0,0,0,0,0,,7,0.1,0.1,5.61,22,1,15,78,89,19,Cautela,Profilo rischioso,,,-0.1,-0.1
+D,Ndiaye,PAR,Dc,1,4,Riserva/rotazione,0.2,Storico Serie A,11,5.59,5.36,0,0,0.6,0.1,0,0,3,1,0,0,,7,0.1,0.1,5.42,22,1,15,83,84,17,Cautela,Profilo rischioso,,,-0.6,-0.1
+D,Oyono J.,FRO,Dd;E,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.1,5.87,34,0,12,81,100,23,Cautela,Profilo rischioso,,,,
+D,Patric,LAZ,Dd;Dc,1,4,Riserva/rotazione,0.2,Storico Serie A,11,5.82,5.73,0,0,0.3,0.2,0,0,2,0,0,0,,7,0.1,0.1,5.79,22,1,15,80,95,20,Cautela,Profilo rischioso,,,-0.3,-0.2
+D,Perez M.,LEC,Dd;Dc,1,1,Riserva/rotazione,0.2,Campione ridotto,1,5.5,5.5,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso,,,,
+D,Pieragnolo,SAS,Ds;E,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Raterink,CAG,Dd;E,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Rugani,JUV,Dc,1,3,Riserva/rotazione,0.2,Storico Serie A,8,5.62,5.5,0,0,0.1,0.0,0,0,2,0,0,0,,7,0.1,0.1,5.55,20,1,14,83,81,16,Cautela,Profilo rischioso,,,-0.1,
+D,Vogliacco,GEN,Dd;Dc,1,2,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+D,Ziolkowski,ROM,Dc,1,2,Riserva/rotazione,0.2,Storico Serie A,9,5.83,5.67,0,0,0.1,0.1,0,0,3,0,0,0,,7,0.0,0.1,5.68,21,0,12,83,81,16,Cautela,Profilo rischioso,,,-0.1,-0.1
+C,Paz N.,COM,T;A,30,250,Titolare,0.9,Storico Serie A,35,6.41,7.34,12,5,8.5,4.5,0,2,5,0,0,0,,34,9.6,5.0,7.33,91,70,86,11,27,69,Top,Priorità d'asta · piazzati,3.0,1.0,3.5,0.5
+C,McTominay,NAP,C;T,28,240,Titolare,0.9,Storico Serie A,33,6.35,7.21,10,2,11.0,1.6,0,1,1,0,0,0,,34,10.9,1.8,7.35,89,72,77,11,28,67,Top,Priorità d'asta,,,-1.0,0.3999999999999999
+C,Calhanoglu,INT,M;C,27,230,Titolare,0.9,Storico Serie A,22,6.43,7.55,9,4,5.7,3.5,4,5,7,0,0,0,,32,11.0,6.2,7.5,82,82,92,22,31,72,Top,Priorità d'asta · rigorista · piazzati,1.0,1.0,3.3,0.5
+C,Orsolini,BOL,W;A,26,200,Titolare,0.9,Storico Serie A,34,6.1,6.81,10,1,9.7,1.1,4,6,2,0,0,0,,34,10.8,1.2,7.06,90,70,75,11,29,67,Top,Priorità d'asta · rigorista · piazzati,1.0,1.0,0.3000000000000007,-0.10000000000000009
+C,Pulisic,MIL,T;A,25,180,Titolare,0.9,Storico Serie A,29,6.07,6.93,8,4,8.1,4.1,0,1,0,0,0,0,,33,9.5,4.9,7.08,87,70,77,13,30,66,Top,Priorità d'asta,2.0,2.0,-0.09999999999999964,-0.09999999999999964
+C,Rabiot,MIL,C;T,22,128,Titolare,0.9,Storico Serie A,29,6.33,6.98,6,4,4.3,3.4,0,0,4,1,0,0,,33,5.7,4.1,6.87,87,44,55,15,28,52,Buono,Titolare affidabile,,,1.7000000000000002,0.6000000000000001
+C,Baturina,COM,T,19,102,Titolare in ballottaggio,0.72,Storico Serie A,25,6.34,7.18,6,3,1.8,4.8,0,0,0,0,0,0,,26,3.6,4.5,6.93,70,32,53,30,27,42,Scommessa,Rotazione/copertura,,2.0,4.2,-1.7999999999999998
+C,Da Cunha,COM,C;T,18,90,Titolare,0.9,Storico Serie A,35,6.39,6.96,6,4,6.6,5.1,4,4,4,0,0,0,,34,6.8,4.5,7.07,91,52,56,10,37,59,Ottimo,Titolare affidabile · rigorista,1.0,3.0,-0.5999999999999996,-1.0999999999999996
+C,Zaniolo,UDI,T;A,18,90,Titolare,0.9,Storico Serie A,31,6.24,6.76,5,5,5.5,3.7,0,0,8,0,0,0,,33,5.6,4.9,6.77,88,45,53,15,34,54,Buono,Titolare affidabile · piazzati,3.0,1.0,-0.5,1.2999999999999998
+C,Atta,FIO,C;T,17,87,Titolare,0.9,Storico Serie A,32,6.34,6.86,5,3,4.0,2.3,0,0,3,0,0,0,,33,4.5,2.7,6.78,89,34,42,12,32,48,Buono,Titolare affidabile,,3.0,1.0,0.7000000000000002
+C,Barella,INT,C,17,82,Titolare,0.9,Storico Serie A,34,6.29,6.72,3,9,3.2,6.6,0,0,7,0,0,0,,34,3.1,7.6,6.68,90,35,50,12,33,50,Buono,Titolare affidabile,,,-0.20000000000000018,2.4000000000000004
+C,McKennie,JUV,C,17,68,Titolare in ballottaggio,0.72,Storico Serie A,34,6.18,6.72,5,6,7.5,6.1,0,0,5,0,0,0,,27,5.2,4.8,6.86,76,43,53,26,33,49,Buono,Rotazione/copertura,,,-2.5,-0.09999999999999964
+C,Zaccagni,LAZ,W;A,16,91,Titolare,0.9,Storico Serie A,26,5.92,6.0,3,0,4.1,2.7,0,1,6,1,0,0,,33,5.1,2.2,6.3,85,36,47,19,33,48,Buono,Titolare affidabile · rigorista,1.0,2.0,-1.0999999999999996,-2.7
+C,De Bruyne,NAP,T,15,100,Titolare in ballottaggio,0.72,Storico Serie A,18,6.33,7.25,5,2,4.0,3.5,3,3,1,0,0,0,,25,6.0,4.1,7.19,66,46,65,35,39,50,Buono,Rotazione/copertura · rigorista · piazzati,1.0,1.0,1.0,-1.5
+C,Vlasic,TOR,T,14,80,Titolare,0.9,Storico Serie A,37,6.07,6.7,8,3,7.0,3.3,5,5,7,0,0,0,,34,7.5,3.2,6.73,92,54,55,10,47,61,Ottimo,Titolare affidabile · rigorista · piazzati,1.0,1.0,1.0,-0.2999999999999998
+C,Gudmundsson A.,FIO,T;A,13,61,Titolare,0.9,Storico Serie A,32,5.77,6.23,5,3,5.6,,3,3,4,1,0,0,,33,6.1,3.4,6.33,89,45,49,13,45,56,Ottimo,Titolare affidabile · rigorista · piazzati,1.0,1.0,-0.5999999999999996,
+C,Taylor K.,LAZ,C;T,13,64,Titolare,0.9,Storico Serie A,17,6.03,6.53,3,2,,,0,0,5,0,0,0,,31,4.6,3.1,6.43,79,35,43,25,39,46,Buono,Rotazione/copertura,2.0,,,
+C,Alajbegovic,JUV,W;T,12,57,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,2.0,1.7,6.21,73,16,30,42,31,32,Cautela,Scommessa nuova,,,,
+C,Conceicao,JUV,W;A,12,60,Titolare,0.9,Storico Serie A,31,6.24,6.65,3,5,7.8,5.2,0,0,3,0,0,0,,33,6.3,5.5,6.93,88,51,51,13,53,59,Ottimo,Titolare affidabile,,,-4.8,-0.20000000000000018
+C,Ederson D.S.,ATA,M;C,12,45,Titolare,0.9,Storico Serie A,30,6.25,6.43,2,1,4.4,1.6,1,1,3,0,0,0,,33,3.8,1.5,6.59,87,27,31,14,40,44,Scommessa,Titolare affidabile,,,-2.4000000000000004,-0.6000000000000001
+C,Modric,MIL,M;C,12,50,Titolare,0.9,Storico Serie A,33,6.5,6.71,2,3,1.6,4.8,0,0,4,0,0,0,,34,1.8,4.6,6.73,89,21,36,12,40,44,Scommessa,Titolare affidabile · piazzati,3.0,1.0,0.3999999999999999,-1.7999999999999998
+C,Rodriguez Je.,COM,W;A,12,32,Alternativa in ballottaggio,0.48,Storico Serie A,28,6.29,6.7,2,8,4.0,,0,0,3,1,0,0,,18,2.1,5.1,6.83,54,24,50,48,35,34,Cautela,Profilo rischioso,,,-2.0,
+C,Samardzic,ATA,C;T,12,42,Titolare in ballottaggio,0.72,Storico Serie A,22,5.86,6.2,2,2,3.0,2.6,0,0,1,0,0,0,,26,2.9,2.7,6.28,68,24,36,33,34,36,Scommessa,Rotazione/copertura,3.0,2.0,-1.0,-0.6000000000000001
+C,Baldanzi,GEN,T,11,30,Titolare in ballottaggio,0.72,Storico Serie A,17,6.0,6.24,1,2,2.0,1.4,0,0,2,0,0,0,,25,2.0,2.1,6.27,65,17,31,36,33,31,Cautela,Rotazione/copertura · piazzati,,1.0,-1.0,0.6000000000000001
+C,Rowe,BOL,W;T,11,37,Titolare in ballottaggio,0.72,Storico Serie A,28,6.09,6.48,3,3,4.0,2.0,0,0,2,0,0,0,,26,3.3,2.2,6.52,72,25,34,29,39,38,Scommessa,Rotazione/copertura,,,-1.0,1.0
+C,Zambo Anguissa,NAP,C,11,55,Alternativa in ballottaggio,0.48,Storico Serie A,18,6.14,6.83,4,1,2.5,1.3,0,0,1,0,0,0,,17,2.7,1.3,6.67,48,20,39,53,32,28,Cautela,Profilo rischioso,,,1.5,-0.30000000000000004
+C,Casadei,TOR,C;T,10,37,Titolare in ballottaggio,0.72,Storico Serie A,32,6.03,6.52,6,0,4.2,1.6,0,0,5,0,0,0,,27,4.2,0.8,6.45,75,28,32,27,44,41,Scommessa,Rotazione/copertura,,,1.7999999999999998,-1.6
+C,Ekkelenkamp,UDI,C;T,10,41,Titolare in ballottaggio,0.72,Storico Serie A,31,6.0,6.56,5,3,4.9,1.8,0,0,1,0,0,0,,27,4.3,2.1,6.54,74,31,38,26,47,44,Scommessa,Rotazione/copertura,,2.0,0.09999999999999964,1.2
+C,Konè M.,ROM,M;C,10,42,Titolare,0.9,Storico Serie A,29,6.19,6.47,2,3,,,0,0,2,0,0,0,,33,2.3,3.4,6.47,87,21,31,14,45,43,Scommessa,Titolare affidabile,,,,
+C,Perrone,COM,M;C,10,38,Titolare,0.9,Storico Serie A,36,6.31,6.56,3,4,2.1,2.9,0,0,8,0,0,0,,34,2.3,3.2,6.5,91,21,30,12,46,44,Scommessa,Titolare affidabile,,,0.8999999999999999,1.1
+C,Politano,NAP,W,10,47,Titolare in ballottaggio,0.72,Storico Serie A,33,6.06,6.33,2,5,2.4,4.9,0,0,4,0,0,0,,27,1.8,4.2,6.35,76,20,38,25,42,40,Scommessa,Rotazione/copertura,3.0,2.0,-0.3999999999999999,0.09999999999999964
+C,Saelemaekers,MIL,E;W,10,43,Titolare in ballottaggio,0.72,Storico Serie A,35,6.23,6.5,3,3,3.3,4.8,0,0,5,0,0,0,,27,2.5,3.1,6.55,77,22,35,25,44,40,Scommessa,Rotazione/copertura,,3.0,-0.2999999999999998,-1.7999999999999998
+C,Thorstvedt,SAS,C;T,10,41,Titolare,0.9,Storico Serie A,31,6.27,6.61,4,3,6.3,2.0,0,0,9,0,0,0,,33,5.7,2.6,6.72,88,41,38,15,56,54,Buono,Titolare affidabile,,,-2.3,1.0
+C,Thuram K.,JUV,C,10,41,Riserva/rotazione,0.2,Storico Serie A,35,6.03,6.31,3,2,,,0,0,2,0,0,0,,8,0.7,0.5,6.33,38,5,29,63,23,15,Cautela,Profilo rischioso,,,,
+C,Zielinski,INT,C,10,41,Titolare in ballottaggio,0.72,Storico Serie A,31,6.35,6.89,6,2,2.5,3.1,1,1,3,0,0,0,,27,3.5,2.3,6.78,74,27,37,27,46,42,Scommessa,Rotazione/copertura,2.0,3.0,3.5,-1.1
+C,Bernardeschi,BOL,W;T,9,21,Titolare in ballottaggio,0.72,Storico Serie A,25,6.08,6.58,4,2,3.0,2.3,1,1,3,0,0,0,,26,3.7,2.4,6.54,70,28,37,31,49,41,Scommessa,Rotazione/copertura,2.0,2.0,1.0,-0.2999999999999998
+C,Cancellieri,LAZ,W;A,9,28,Titolare in ballottaggio,0.72,Storico Serie A,28,5.82,6.18,4,1,4.3,1.6,0,0,6,0,0,0,,26,3.9,1.3,6.21,72,27,32,31,47,40,Scommessa,Rotazione/copertura,,,-0.2999999999999998,-0.6000000000000001
+C,Isaksen,LAZ,W;A,9,25,Alternativa in ballottaggio,0.48,Storico Serie A,27,5.96,6.56,5,1,5.0,1.2,0,0,0,0,0,0,,17,3.1,0.7,6.55,54,21,34,46,40,31,Cautela,Profilo rischioso,,,0.0,-0.19999999999999996
+C,Konè I.,SAS,C,9,20,Riserva/rotazione,0.2,Storico Serie A,35,6.19,6.63,6,0,,,0,0,3,1,0,0,,8,1.4,0.0,6.64,38,9,29,64,29,18,Cautela,Profilo rischioso,,,,
+C,Mandragora,FIO,C,9,28,Alternativa in ballottaggio,0.48,Storico Serie A,34,5.99,6.56,7,2,4.7,2.6,1,1,7,0,0,0,,18,3.0,1.2,6.45,58,21,35,44,41,33,Cautela,Rotazione/copertura,3.0,,2.3,-0.6000000000000001
+C,Pasalic,ATA,C;T,9,32,Alternativa in ballottaggio,0.48,Storico Serie A,32,5.94,6.27,3,3,2.7,2.9,0,0,3,0,0,0,,18,1.6,1.7,6.25,57,14,31,44,36,28,Cautela,Rotazione/copertura,,,0.2999999999999998,0.10000000000000009
+C,Cambiaghi,BOL,W;A,8,25,Alternativa in ballottaggio,0.48,Storico Serie A,25,5.96,6.38,3,4,2.1,2.4,0,0,3,1,0,0,,17,1.7,2.1,6.28,52,15,34,50,40,28,Cautela,Profilo rischioso,,,0.8999999999999999,1.6
+C,Colpani,MON,T,8,25,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,1.0,0.8,6.0,86,8,19,29,44,34,Cautela,Titolare affidabile,,2.0,,
+C,Cristante,ROM,M;C,8,29,Titolare,0.9,Storico Serie A,37,6.09,6.2,2,1,2.1,2.8,0,0,6,0,0,0,,34,1.9,1.9,6.23,92,16,24,10,53,43,Scommessa,Titolare affidabile,,,-0.10000000000000009,-1.7999999999999998
+C,Diouf,INT,E;C,8,37,Alternativa in ballottaggio,0.48,Storico Serie A,11,6.14,6.41,1,0,0.6,1.5,0,0,1,0,0,0,,16,1.2,1.2,6.39,43,10,29,58,33,21,Cautela,Profilo rischioso,,,0.4,-1.5
+C,Fagioli,FIO,M;C,8,23,Alternativa in ballottaggio,0.48,Storico Serie A,33,6.08,6.27,2,3,2.5,3.7,0,0,5,0,0,0,,18,1.3,1.9,6.33,58,12,29,44,40,28,Cautela,Rotazione/copertura,,,-0.5,-0.7000000000000002
+C,Locatelli,JUV,M;C,8,32,Titolare,0.9,Storico Serie A,36,6.28,6.21,1,2,2.8,5.0,0,1,9,0,0,0,,34,2.0,3.8,6.44,91,20,31,12,57,46,Buono,Titolare affidabile,3.0,2.0,-1.7999999999999998,-3.0
+C,Ndour,FIO,C,8,25,Titolare in ballottaggio,0.72,Storico Serie A,30,5.72,5.98,3,0,2.6,1.2,0,0,2,0,0,0,,26,2.4,0.6,5.99,74,16,24,27,45,35,Scommessa,Rotazione/copertura,,,0.3999999999999999,-1.2
+C,Odgaard,BOL,T,8,22,Alternativa in ballottaggio,0.48,Storico Serie A,22,5.91,6.61,5,1,2.5,,0,0,1,0,0,0,,17,2.5,0.8,6.38,50,17,31,51,40,28,Cautela,Profilo rischioso,,,2.5,
+C,Sucic P.,INT,C,8,26,Riserva/rotazione,0.2,Storico Serie A,28,5.96,6.16,2,2,,,0,0,5,0,0,0,,7,0.5,0.5,6.16,33,4,26,69,25,13,Cautela,Profilo rischioso,,,,
+C,Vergara,NAP,W;T,8,34,Alternativa in ballottaggio,0.48,Storico Serie A,9,6.11,6.33,1,0,0.8,0.8,0,0,2,0,0,0,,16,1.3,0.9,6.3,42,10,27,61,32,20,Cautela,Profilo rischioso,,,0.19999999999999996,-0.8
+C,Bernabè,PAR,C,7,36,Titolare,0.9,Storico Serie A,32,6.08,6.39,3,1,2.2,3.1,0,0,0,0,0,0,,33,2.6,2.6,6.4,89,22,31,11,65,48,Buono,Titolare affidabile · piazzati,,1.0,0.7999999999999998,-2.1
+C,Calò,FRO,M;C,7,25,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,1.1,0.9,6.01,86,9,24,29,53,37,Scommessa,Titolare affidabile · rigorista · piazzati,1.0,1.0,,
+C,Fazzini,CAG,C;T,7,19,Titolare,0.9,Storico Serie A,12,5.79,5.75,0,0,1.1,0.8,0,0,2,0,0,0,,31,1.2,1.0,5.86,75,10,21,27,47,33,Cautela,Rotazione/copertura · piazzati,,1.0,-1.1,-0.8
+C,Ferguson,BOL,M;C,7,18,Titolare,0.9,Storico Serie A,23,5.87,5.85,1,0,0.7,1.2,0,0,5,1,0,0,,32,1.1,1.0,5.85,83,9,18,21,49,35,Scommessa,Titolare affidabile,,,0.30000000000000004,-1.2
+C,Frattesi,INT,C;T,7,13,Riserva/rotazione,0.2,Storico Serie A,15,5.9,5.9,0,0,2.2,0.2,0,0,0,0,0,0,,7,0.6,0.2,6.19,25,4,22,75,24,9,Cautela,Profilo rischioso,,,-2.2,-0.2
+C,Frendrup,GEN,M;C,7,19,Titolare,0.9,Storico Serie A,36,6.0,6.01,1,0,0.4,,0,0,5,0,0,0,,34,0.6,0.0,5.98,91,4,14,11,49,36,Scommessa,Titolare affidabile,,,0.6,
+C,Gaetano,ATA,M;C,7,24,Titolare,0.9,Storico Serie A,32,6.08,6.33,2,4,1.9,1.8,0,0,4,0,0,0,,33,2.0,2.8,6.28,89,18,26,13,61,45,Buono,Titolare affidabile,,3.0,0.10000000000000009,2.2
+C,Lobotka,NAP,M;C,7,20,Titolare,0.9,Storico Serie A,31,6.08,6.13,1,0,0.5,1.8,0,0,3,0,0,0,,33,0.7,1.1,6.13,88,7,18,13,51,37,Scommessa,Titolare affidabile,,,0.5,-1.8
+C,Oristanio,TOR,W;T,7,27,Alternativa in ballottaggio,0.48,Storico Serie A,18,5.72,5.83,1,0,2.0,0.9,0,0,1,0,0,0,,17,1.4,0.6,5.97,48,10,25,53,37,23,Cautela,Profilo rischioso,,2.0,-1.0,-0.9
+C,Pessina,MON,M;C,7,20,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.8,0.7,5.99,73,6,23,42,45,30,Cautela,Scommessa nuova · rigorista · piazzati,1.0,1.0,,
+C,Unai Gomez,UDI,T,7,23,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.6,0.5,6.17,34,5,26,81,29,13,Cautela,Profilo rischioso,,3.0,,
+C,Volpato,SAS,W;T,7,23,Riserva/rotazione,0.2,Storico Serie A,21,6.05,6.43,2,4,1.7,1.6,0,0,4,0,0,0,,7,0.6,0.8,6.33,29,5,31,73,30,14,Cautela,Profilo rischioso,,,0.30000000000000004,2.4
+C,Adopo,CAG,M;C,6,13,Titolare,0.9,Storico Serie A,38,5.89,5.95,1,1,2.5,1.2,0,0,4,0,0,0,,34,1.7,1.0,6.02,93,13,19,8,66,44,Scommessa,Titolare affidabile,,,-1.5,-0.19999999999999996
+C,Akinsanmiro,MON,C,6,16,Titolare,0.9,Storico Serie A,24,5.77,5.77,0,1,0.9,1.3,0,0,2,0,0,0,,32,0.7,1.5,5.84,83,7,18,18,56,36,Scommessa,Titolare affidabile,,,-0.9,-0.30000000000000004
+C,Basic,VEN,M;C,6,19,Titolare,0.9,Storico Serie A,23,5.98,6.33,2,3,1.4,2.0,0,0,0,1,0,0,,32,2.2,3.1,6.24,83,20,28,18,70,46,Buono,Occasione di valore,,,0.6000000000000001,1.0
+C,Caqueret,COM,C;T,6,20,Alternativa in ballottaggio,0.48,Storico Serie A,29,6.12,6.41,2,4,2.3,2.3,0,0,3,0,0,0,,18,1.4,1.8,6.4,55,12,29,46,52,30,Cautela,Profilo rischioso,,,-0.2999999999999998,1.7000000000000002
+C,Chukwueze,MIL,W,6,11,Alternativa in ballottaggio,0.48,Campione ridotto,1,5.5,5.5,0,0,,0.1,0,0,0,0,0,0,,18,0.3,0.3,5.93,55,3,15,52,38,20,Cautela,Profilo rischioso,,,,-0.1
+C,Coulibaly L.,LEC,M;C,6,14,Titolare,0.9,Storico Serie A,33,6.03,6.27,3,1,,,0,0,4,0,0,0,,34,3.1,1.0,6.27,89,21,23,12,72,47,Buono,Occasione di valore,,,,
+C,Ellertsson,GEN,E;C,6,18,Titolare in ballottaggio,0.72,Storico Serie A,35,5.8,5.87,1,1,2.3,1.7,0,0,1,1,0,0,,27,1.4,1.1,5.95,77,11,21,24,57,36,Scommessa,Rotazione/copertura,,,-1.2999999999999998,-0.7
+C,Karlstrom,UDI,M;C,6,20,Titolare,0.9,Storico Serie A,36,5.9,5.9,1,0,0.8,1.1,0,0,6,0,0,0,,34,0.8,0.6,5.9,91,6,17,11,59,39,Scommessa,Titolare affidabile,,,0.19999999999999996,-1.1
+C,Liberali,COM,T,6,22,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.6,0.5,6.17,34,5,25,81,34,14,Cautela,Profilo rischioso,,,,
+C,Nicolussi Caviglia,PAR,M;C,6,18,Titolare in ballottaggio,0.72,Storico Serie A,23,5.85,5.98,0,4,0.9,1.8,0,0,4,0,0,0,,26,0.6,3.0,5.95,69,10,26,33,54,33,Cautela,Rotazione/copertura,,2.0,-0.9,2.2
+C,Oulai,FIO,M;C,6,20,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.7,0.6,5.98,73,6,17,42,50,30,Cautela,Scommessa nuova,,,,
+C,Pierotti,LEC,W,6,19,Titolare,0.9,Storico Serie A,37,5.73,5.78,1,1,3.3,1.5,0,0,4,0,0,0,,34,2.2,1.3,5.91,92,16,24,9,68,46,Buono,Titolare affidabile · piazzati,,1.0,-2.3,-0.5
+C,Pobega,BOL,M;C,6,14,Riserva/rotazione,0.2,Storico Serie A,23,5.87,6.22,3,1,,0.7,0,0,2,1,0,0,,7,0.9,0.3,6.21,30,6,27,72,34,15,Cautela,Profilo rischioso,,,,0.30000000000000004
+C,Rovella,LAZ,M;C,6,16,Titolare,0.9,Storico Serie A,11,5.82,5.73,0,1,0.0,1.0,0,0,2,1,0,0,,31,0.3,1.7,5.72,75,5,20,29,50,32,Cautela,Rotazione/copertura · piazzati,,1.0,,0.0
+C,Winks,CAG,M;C,6,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.5,0.4,5.93,86,4,14,29,54,34,Cautela,Titolare affidabile,,3.0,,
+C,Zalewski,ATA,W,6,21,Riserva/rotazione,0.2,Storico Serie A,31,6.08,6.39,2,5,2.9,4.5,0,0,3,0,0,0,,7,0.6,1.1,6.45,35,6,35,66,40,19,Cautela,Profilo rischioso,,,-0.8999999999999999,0.5
+C,Zhegrova,JUV,W,6,18,Riserva/rotazione,0.2,Storico Serie A,12,6.04,6.04,0,0,0.8,1.4,0,0,1,0,0,0,,7,0.5,0.5,6.28,23,4,25,78,29,10,Cautela,Profilo rischioso,,,-0.8,-1.4
+C,Addai,COM,W;A,5,10,Riserva/rotazione,0.2,Storico Serie A,12,6.0,6.58,3,0,1.5,1.2,0,0,4,0,0,0,,7,0.8,0.4,6.23,23,6,27,81,36,12,Cautela,Profilo rischioso,,,1.5,-1.2
+C,Adzic,SAS,C;T,5,14,Titolare in ballottaggio,0.72,Campione ridotto,4,6.12,6.88,1,0,0.2,0.2,0,0,0,0,0,0,,27,0.5,0.4,5.94,73,4,15,34,58,31,Cautela,Rotazione/copertura,,3.0,0.8,-0.2
+C,Amondarain,BOL,M;C,5,12,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.4,0.3,5.95,55,3,15,60,46,21,Cautela,Profilo rischioso,,,,
+C,Bakola,SAS,C;T,5,16,Alternativa in ballottaggio,0.48,Campione ridotto,3,6.17,6.17,0,0,0.1,0.1,0,0,0,0,0,0,,18,0.5,0.4,5.98,55,4,17,52,48,23,Cautela,Profilo rischioso,,,-0.1,-0.1
+C,Berisha M.,LEC,C;T,5,16,Titolare,0.9,Storico Serie A,12,6.25,7.0,2,3,,,0,0,0,0,0,0,,31,2.8,4.2,6.66,75,26,34,25,89,50,Buono,Occasione di valore,3.0,2.0,,
+C,Busio,VEN,M;C,5,14,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.5,0.5,5.93,86,4,17,29,66,37,Scommessa,Titolare affidabile · piazzati,,1.0,,
+C,Cacciamani,TOR,E;W,5,18,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.7,0.6,5.95,86,6,16,29,68,38,Scommessa,Titolare affidabile,,,,
+C,Dele-Bashiru,LAZ,C;T,5,13,Riserva/rotazione,0.2,Storico Serie A,21,5.71,5.86,1,0,0.9,0.6,0,0,0,0,0,0,,7,0.3,0.2,5.87,29,2,18,71,30,10,Cautela,Profilo rischioso,,,0.09999999999999998,-0.6
+C,Felici,CAG,W,5,10,Alternativa in ballottaggio,0.48,Storico Serie A,11,6.0,6.5,2,1,0.6,0.3,0,0,3,0,0,0,,16,0.9,0.5,6.06,43,7,19,60,45,20,Cautela,Profilo rischioso,,,1.4,0.7
+C,Fofana Y.,MIL,M;C,5,23,Riserva/rotazione,0.2,Storico Serie A,33,5.83,6.05,2,3,,,0,0,4,0,0,0,,7,0.4,0.6,6.03,37,4,26,64,41,18,Cautela,Profilo rischioso,,,,
+C,Gandelman,LEC,C;T,5,14,Alternativa in ballottaggio,0.48,Storico Serie A,17,5.85,6.26,2,1,1.4,0.7,0,0,0,0,0,0,,17,1.3,0.7,6.12,47,10,23,53,51,25,Cautela,Profilo rischioso,,,0.6000000000000001,0.30000000000000004
+C,Gineitis,TOR,M;C,5,13,Titolare,0.9,Storico Serie A,28,5.82,5.77,0,1,1.0,2.4,0,0,5,0,0,0,,33,0.7,2.2,5.86,86,9,20,16,71,41,Scommessa,Occasione di valore,,3.0,-1.0,-1.4
+C,Keita M.,PAR,M;C,5,15,Titolare,0.9,Storico Serie A,36,6.0,6.04,1,1,,,0,0,1,0,0,0,,34,0.9,0.9,6.09,91,8,17,9,74,43,Scommessa,Occasione di valore,,,,
+C,Koopmeiners,JUV,C;T,5,14,Riserva/rotazione,0.2,Storico Serie A,30,5.72,5.63,0,0,1.5,1.3,0,0,5,0,0,0,,7,0.2,0.2,5.75,35,2,17,67,33,13,Cautela,Profilo rischioso,,,-1.5,-1.3
+C,Matic,SAS,M;C,5,15,Titolare,0.9,Storico Serie A,34,6.0,6.0,1,1,0.4,1.5,0,0,6,1,0,0,,34,0.6,1.3,5.97,90,6,17,13,71,41,Scommessa,Occasione di valore,,,0.6,-0.5
+C,Meichtry,GEN,W;T,5,14,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.4,0.4,5.96,55,3,16,60,47,21,Cautela,Profilo rischioso,,,,
+C,Milla,COM,M;C,5,14,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.4,0.3,6.06,34,3,20,81,36,13,Cautela,Profilo rischioso,,,,
+C,Mkhitaryan,INT,C,5,19,Riserva/rotazione,0.2,Storico Serie A,28,6.12,6.5,4,1,4.9,3.1,0,0,5,0,0,0,,7,1.1,0.6,6.59,33,8,35,69,50,21,Cautela,Profilo rischioso,,,-0.9000000000000004,-2.1
+C,Ondrejka,PAR,W;A,5,18,Riserva/rotazione,0.2,Storico Serie A,15,5.67,5.6,0,0,1.2,0.5,0,0,2,0,0,0,,7,0.5,0.3,5.86,25,4,23,77,32,11,Cautela,Profilo rischioso,,,-1.2,-0.5
+C,Perez K.,VEN,C;T,5,14,Riserva/rotazione,0.2,Campione ridotto,1,5.5,5.5,0,0,,,0,0,0,0,0,0,,8,0.4,0.3,6.06,34,3,20,73,36,13,Cautela,Profilo rischioso,,,,
+C,Piotrowski,UDI,M;C,5,15,Titolare in ballottaggio,0.72,Storico Serie A,31,5.84,5.9,1,0,2.7,0.8,0,0,2,0,0,0,,27,1.8,0.4,6.02,74,12,19,27,67,37,Scommessa,Rotazione/copertura,,,-1.7000000000000002,-0.8
+C,Pisilli,ROM,C,5,17,Riserva/rotazione,0.2,Storico Serie A,23,6.07,6.43,2,4,1.7,1.2,0,0,3,0,0,0,,7,0.6,0.7,6.36,30,5,29,72,41,16,Cautela,Profilo rischioso,,,0.30000000000000004,2.8
+C,Romano,CAG,M;C,5,12,Titolare in ballottaggio,0.72,Storico Serie A,32,6.0,5.89,0,0,0.4,0.0,0,0,5,1,0,0,,27,0.2,0.0,5.91,75,1,12,28,55,30,Cautela,Rotazione/copertura,,,-0.4,
+C,Sohm,VEN,C,5,14,Alternativa in ballottaggio,0.48,Storico Serie A,24,5.6,5.58,0,1,0.8,1.5,0,0,3,0,0,0,,17,0.3,0.9,5.64,52,4,18,50,44,22,Cautela,Profilo rischioso,,,-0.8,-0.5
+C,Traorè Hj.,GEN,W;T,5,11,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.3,0.2,6.0,34,2,17,81,34,11,Cautela,Profilo rischioso,,,,
+C,Zerbin,FRO,W,5,13,Alternativa in ballottaggio,0.48,Storico Serie A,30,5.77,5.8,0,2,1.6,2.0,0,0,2,0,0,0,,18,0.6,1.2,5.9,56,6,21,45,51,26,Cautela,Profilo rischioso,,,-1.6,0.0
+C,Almqvist,PAR,W;A,4,14,Riserva/rotazione,0.2,Storico Serie A,10,5.9,6.0,0,1,0.4,0.9,0,0,0,0,0,0,,7,0.4,0.5,6.14,22,4,24,78,40,12,Cautela,Profilo rischioso,,,-0.4,0.09999999999999998
+C,Amorim,GEN,M;C,4,11,Alternativa in ballottaggio,0.48,Storico Serie A,9,5.72,5.67,0,0,0.2,,0,0,1,0,0,0,,16,0.3,0.2,5.73,42,2,14,59,44,17,Cautela,Profilo rischioso,,,-0.2,
+C,Cataldi,LAZ,M;C,4,12,Riserva/rotazione,0.2,Storico Serie A,27,6.0,6.33,3,3,3.0,1.4,2,2,6,0,0,0,,7,0.8,0.5,6.3,33,6,28,70,54,20,Cautela,Profilo rischioso,3.0,3.0,0.0,1.6
+C,Cichella,FRO,M;C,4,11,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.3,0.3,5.93,55,3,15,60,58,23,Cautela,Profilo rischioso,,,,
+C,De Roon,ATA,M;C,4,12,Riserva/rotazione,0.2,Storico Serie A,34,5.97,6.0,1,2,0.8,2.0,0,0,6,1,0,0,,7,0.2,0.4,6.0,37,2,19,66,46,16,Cautela,Profilo rischioso,,,0.19999999999999996,0.0
+C,Douglas Luiz,JUV,C,4,12,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.3,0.3,6.02,34,3,18,81,44,14,Cautela,Profilo rischioso,,,,
+C,El Aynaoui,ROM,M;C,4,18,Riserva/rotazione,0.2,Storico Serie A,21,5.93,6.05,1,2,1.1,0.9,0,0,5,0,0,0,,7,0.4,0.5,6.05,29,4,24,74,45,15,Cautela,Profilo rischioso,,,-0.10000000000000009,1.1
+C,Fabbian,FIO,C;T,4,8,Riserva/rotazione,0.2,Storico Serie A,22,5.75,6.0,2,0,2.4,0.9,0,0,2,0,0,0,,7,0.7,0.2,6.03,29,5,23,72,45,15,Cautela,Profilo rischioso,,,-0.3999999999999999,-0.9
+C,Fitz-Jim,TOR,M;C,4,13,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,0.5,0.4,5.92,86,4,14,29,81,39,Scommessa,Occasione di valore,,,,
+C,Folorunsho,NAP,C;T,4,10,Riserva/rotazione,0.2,Storico Serie A,26,5.92,6.1,2,0,3.4,1.1,0,0,3,0,0,0,,7,0.8,0.2,6.23,32,5,24,69,50,18,Cautela,Profilo rischioso,,,-1.4,-1.1
+C,Ilkhan,TOR,M;C,4,10,Riserva/rotazione,0.2,Storico Serie A,18,5.92,6.08,1,2,2.2,0.7,0,0,2,1,0,0,,7,0.6,0.4,6.12,27,5,24,76,45,15,Cautela,Profilo rischioso,,,-1.2000000000000002,1.3
+C,Jashari,MIL,C,4,11,Riserva/rotazione,0.2,Storico Serie A,12,5.67,5.75,0,1,0.2,0.6,0,0,0,0,0,0,,7,0.2,0.4,5.81,23,2,19,77,33,9,Cautela,Profilo rischioso,,,-0.2,0.4
+C,Koutsoupias,FRO,C,4,12,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.3,0.3,6.02,34,3,18,81,44,14,Cautela,Profilo rischioso,,,,
+C,Loftus-Cheek,MIL,C;T,4,11,Riserva/rotazione,0.2,Storico Serie A,22,6.07,6.48,3,1,3.2,1.1,0,0,2,0,0,0,,7,0.9,0.3,6.45,29,6,27,72,52,18,Cautela,Profilo rischioso,,,-0.20000000000000018,-0.10000000000000009
+C,Luis Henrique,INT,E;W,4,13,Riserva/rotazione,0.2,Storico Serie A,27,5.87,6.04,1,2,0.9,1.8,0,0,1,0,0,0,,7,0.2,0.5,6.01,33,2,21,67,44,15,Cautela,Profilo rischioso,,,0.09999999999999998,0.19999999999999996
+C,Moro N.,BOL,M;C,4,10,Titolare,0.9,Storico Serie A,28,5.96,6.16,2,0,,,0,0,1,0,0,0,,33,2.4,0.0,6.16,86,15,18,14,96,48,Buono,Occasione di valore,,,,
+C,Ngom,LEC,M;C,4,11,Titolare in ballottaggio,0.72,Storico Serie A,13,5.62,5.58,0,0,0.2,,0,0,1,0,0,0,,25,0.3,0.2,5.63,63,2,13,38,59,27,Cautela,Rotazione/copertura,,,-0.2,
+C,Njie,TOR,W;A,4,12,Riserva/rotazione,0.2,Storico Serie A,11,5.86,6.18,1,1,1.0,,0,0,2,0,0,0,,7,0.5,0.5,6.05,22,4,25,80,40,12,Cautela,Profilo rischioso,,,0.0,
+C,Prati,CAG,M;C,4,7,Alternativa in ballottaggio,0.48,Storico Serie A,32,5.83,5.83,1,0,1.6,0.2,0,0,6,0,0,0,,18,0.8,0.1,5.88,57,5,15,45,61,27,Cautela,Profilo rischioso,,,-0.6000000000000001,-0.2
+C,Ricci S.,MIL,M;C,4,11,Riserva/rotazione,0.2,Storico Serie A,29,5.98,6.16,1,3,,,0,0,3,0,0,0,,7,0.2,0.7,6.11,34,3,23,67,48,17,Cautela,Profilo rischioso,,,,
+C,Aboukhlal,TOR,W;A,3,5,Riserva/rotazione,0.2,Storico Serie A,12,5.79,5.62,0,0,0.3,0.4,0,0,4,0,0,0,,7,0.1,0.1,5.68,23,1,13,81,38,8,Cautela,Profilo rischioso,,,-0.3,-0.4
+C,Brescianini,FIO,C;T,3,7,Riserva/rotazione,0.2,Storico Serie A,19,5.95,6.26,2,1,1.8,0.8,0,0,2,0,0,0,,7,0.6,0.3,6.2,28,4,23,73,60,18,Cautela,Profilo rischioso,,,0.19999999999999996,0.19999999999999996
+C,Colombo L.,MON,M;C,3,7,Alternativa in ballottaggio,0.48,Storico Serie A,37,5.91,6.39,7,1,,,1,2,2,0,0,0,,18,3.4,0.5,6.48,60,22,30,41,100,45,Buono,Rotazione/copertura,,,,
+C,Deiola,CAG,M;C,3,8,Riserva/rotazione,0.2,Storico Serie A,20,6.05,6.02,0,1,1.5,0.4,0,0,3,0,0,0,,7,0.3,0.2,6.13,28,2,18,74,53,15,Cautela,Profilo rischioso,,,-1.5,0.6
+C,Diallo O.,PAR,W;A,3,12,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.4,0.3,5.95,55,3,15,60,77,27,Cautela,Profilo rischioso,,,,
+C,Dominguez B.,BOL,W;A,3,8,Riserva/rotazione,0.2,Storico Serie A,13,5.81,6.0,0,3,0.7,0.4,0,0,1,0,0,0,,7,0.3,0.5,5.97,24,3,21,77,50,14,Cautela,Profilo rischioso,,,-0.7,2.6
+C,Fini,FRO,W,3,9,Riserva/rotazione,0.2,Campione ridotto,1,5.5,5.5,0,0,,0.0,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,2,16,73,55,16,Cautela,Profilo rischioso,,,,
+C,Gelli F.,FRO,C;T,3,8,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,2,16,81,55,15,Cautela,Profilo rischioso,,,,
+C,Gilmour,NAP,M;C,3,9,Riserva/rotazione,0.2,Storico Serie A,14,6.07,6.25,1,0,0.7,1.0,0,0,1,0,0,0,,7,0.4,0.3,6.25,24,3,20,77,53,14,Cautela,Profilo rischioso,,,0.30000000000000004,-1.0
+C,Helgason,VEN,C;T,3,7,Riserva/rotazione,0.2,Campione ridotto,4,5.62,5.62,0,0,0.2,0.1,0,0,0,0,0,0,,8,0.2,0.2,5.96,34,2,15,73,55,16,Cautela,Profilo rischioso,,,-0.2,-0.1
+C,Messias,GEN,W;T,3,8,Riserva/rotazione,0.2,Storico Serie A,19,6.16,6.66,3,1,1.9,1.6,1,1,1,0,0,0,,7,0.7,0.4,6.49,28,5,25,73,66,20,Cautela,Profilo rischioso,,,1.1,-0.6000000000000001
+C,Miller L.,UDI,M;C,3,12,Alternativa in ballottaggio,0.48,Storico Serie A,19,5.87,5.89,0,2,,,0,0,4,0,0,0,,17,0.1,1.4,5.86,49,4,20,54,75,27,Cautela,Profilo rischioso,,,,
+C,Miretti,JUV,C;T,3,11,Riserva/rotazione,0.2,Storico Serie A,16,6.0,6.22,1,1,2.1,1.8,0,0,1,0,0,0,,7,0.6,0.5,6.3,26,5,26,75,62,18,Cautela,Profilo rischioso,,,-1.1,-0.8
+C,Sorensen O.,PAR,C,3,12,Alternativa in ballottaggio,0.48,Storico Serie A,31,5.76,5.85,1,1,,,0,0,2,0,0,0,,18,0.6,0.6,5.86,56,5,18,45,82,31,Cautela,Profilo rischioso,,,,
+C,Stankovic A.,INT,M;C,3,10,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.3,0.2,6.0,34,2,17,81,57,16,Cautela,Profilo rischioso,,,,
+C,Sulemana I.,ATA,M;C,3,7,Riserva/rotazione,0.2,Storico Serie A,18,5.69,5.78,1,0,,,0,0,3,0,0,0,,7,0.4,0.1,5.79,27,3,17,75,48,13,Cautela,Profilo rischioso,,,,
+C,Boloca,SAS,M;C,2,5,Riserva/rotazione,0.2,Campione ridotto,2,5.75,5.75,0,0,0.2,0.0,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,73,77,20,Cautela,Profilo rischioso,,,-0.2,
+C,Chakvetadze,UDI,W;T,2,6,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.2,0.1,5.95,34,1,14,81,79,19,Cautela,Profilo rischioso,,,,
+C,Ciurria,MON,E;W,2,6,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.2,0.1,5.95,34,1,14,81,79,19,Cautela,Profilo rischioso,,,,
+C,Duncan,VEN,C,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,77,19,Cautela,Profilo rischioso,,,,
+C,El Azzouzi O.,BOL,M;C,2,4,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,77,19,Cautela,Profilo rischioso,,,,
+C,Fadera,COM,W,2,3,Riserva/rotazione,0.2,Storico Serie A,24,5.92,6.15,2,1,2.1,1.2,0,0,5,0,0,0,,7,0.6,0.3,6.12,31,4,22,72,92,25,Cautela,Profilo rischioso,,,-0.10000000000000009,-0.19999999999999996
+C,Hasa,FRO,C;T,2,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,77,19,Cautela,Profilo rischioso,,,,
+C,Lipani,SAS,M;C,2,5,Riserva/rotazione,0.2,Storico Serie A,22,5.91,5.89,0,1,0.9,0.5,0,0,3,0,0,0,,7,0.2,0.2,5.96,29,2,16,73,76,19,Cautela,Profilo rischioso,,,-0.9,0.5
+C,Maleh,LEC,M;C,2,5,Riserva/rotazione,0.2,Storico Serie A,21,5.69,5.71,1,0,1.0,0.6,0,0,3,1,0,0,,7,0.3,0.1,5.71,29,2,16,74,71,18,Cautela,Profilo rischioso,,,0.0,-0.6
+C,Masini,GEN,M;C,2,4,Riserva/rotazione,0.2,Storico Serie A,22,5.93,5.86,0,1,1.9,0.9,0,0,5,0,0,0,,7,0.3,0.3,5.99,29,3,18,74,80,21,Cautela,Profilo rischioso,,,-1.9,0.09999999999999998
+C,Musah,MIL,C;W,2,6,Riserva/rotazione,0.2,Storico Serie A,16,5.94,6.09,1,0,0.6,0.8,0,0,1,0,0,0,,7,0.3,0.2,6.07,26,2,17,75,74,18,Cautela,Profilo rischioso,,,0.4,-0.8
+C,Ordonez C.,PAR,M;C,2,5,Riserva/rotazione,0.2,Storico Serie A,21,5.67,5.69,1,0,,,0,0,3,1,0,0,,7,0.3,0.0,5.68,29,2,15,74,70,18,Cautela,Profilo rischioso,,,,
+C,Venturino,GEN,W,2,6,Riserva/rotazione,0.2,Campione ridotto,7,5.79,5.79,0,0,0.2,1.0,0,0,0,0,0,0,,7,0.2,0.3,5.92,20,2,17,87,62,13,Cautela,Profilo rischioso,,,-0.2,-1.0
+C,Anjorin,TOR,C;T,1,4,Riserva/rotazione,0.2,Storico Serie A,9,5.78,5.72,0,0,0.5,0.1,0,0,1,0,0,0,,7,0.2,0.1,5.82,21,1,14,80,100,20,Cautela,Profilo rischioso,,,-0.5,-0.1
+C,Belahyane,LAZ,M;C,1,5,Riserva/rotazione,0.2,Storico Serie A,11,5.73,5.77,0,2,0.2,0.9,0,0,1,1,0,0,,7,0.1,0.5,5.71,22,2,18,81,100,22,Cautela,Profilo rischioso,,,-0.2,1.1
+C,Bjarkason,VEN,E;W,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.9,34,1,13,81,100,23,Cautela,Profilo rischioso,,,,
+C,Camara A.,UDI,M;C,1,3,Riserva/rotazione,0.2,Storico Serie A,18,5.67,5.64,1,0,,,0,1,1,0,0,0,,7,0.3,0.0,5.77,27,2,14,74,100,23,Cautela,Profilo rischioso,,,,
+C,Cremaschi,PAR,E;C,1,3,Riserva/rotazione,0.2,Campione ridotto,2,6.0,6.0,0,0,0.0,0.0,0,0,0,0,0,0,,8,0.1,0.1,5.9,34,1,13,73,100,24,Cautela,Profilo rischioso,,,,
+C,Dagasso,VEN,C,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+C,El Azzouzi A.,FRO,M;C,1,3,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.9,34,1,13,81,100,23,Cautela,Profilo rischioso,,,,
+C,Fofana Sa.,LEC,M;C,1,1,Riserva/rotazione,0.2,Campione ridotto,2,5.25,5.25,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso,,,,
+C,Gorter,LEC,M;C,1,3,Alternativa in ballottaggio,0.48,Campione ridotto,1,5.5,5.5,0,0,,0.0,0,0,0,0,0,0,,18,0.1,0.1,5.88,55,1,11,52,100,31,Cautela,Profilo rischioso,,,,
+C,Iannoni,SAS,M;C,1,1,Riserva/rotazione,0.2,Campione ridotto,6,6.08,6.5,1,0,0.4,0.1,0,0,3,0,0,0,,7,0.2,0.0,5.92,19,1,13,94,100,18,Cautela,Profilo rischioso,,,0.6,-0.1
+C,Ilic,TOR,C,1,4,Riserva/rotazione,0.2,Storico Serie A,8,6.0,5.88,0,0,,0.5,0,0,2,0,0,0,,7,0.1,0.2,5.95,20,1,14,83,100,20,Cautela,Profilo rischioso,,,,-0.5
+C,Kaba,LEC,M;C,1,2,Riserva/rotazione,0.2,Storico Serie A,11,5.68,5.64,0,0,0.5,0.3,0,0,1,0,0,0,,7,0.1,0.1,5.69,22,1,13,79,100,21,Cautela,Profilo rischioso,,,-0.5,-0.3
+C,Kone B.,FRO,C,1,3,Riserva/rotazione,0.2,Storico Serie A,35,6.19,6.63,6,0,,,0,0,3,1,0,0,,8,1.4,0.0,6.64,38,9,26,64,100,31,Cautela,Profilo rischioso,,,,
+C,Lahdo,COM,C;T,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+C,Liteta,CAG,M;C,1,1,Riserva/rotazione,0.2,Campione ridotto,4,5.75,5.75,0,0,,0.0,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso,,,,
+C,Przyborek,LAZ,W;T,1,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.1,0.1,5.91,34,1,13,81,100,23,Cautela,Profilo rischioso,,,,
+C,Zarraga,UDI,M;C,1,4,Riserva/rotazione,0.2,Storico Serie A,13,5.81,5.77,0,0,0.3,0.2,0,0,2,0,0,0,,7,0.1,0.1,5.79,24,1,13,78,100,21,Cautela,Profilo rischioso,,,-0.3,-0.2
+A,Martinez L.,INT,Pc,35,370,Titolare,0.9,Storico Serie A,30,6.42,8.25,17,6,13.5,2.7,0,0,4,0,0,0,,33,16.4,4.4,7.98,87,74,84,15,28,69,Top,Priorità d'asta,3.0,,3.5,3.3
+A,Malen,ROM,Pc,34,365,Titolare,0.9,Storico Serie A,18,6.78,9.03,14,2,14.2,2.4,3,4,1,0,0,0,,32,22.0,5.2,8.5,79,99,94,22,33,78,Elite,Priorità d'asta · rigorista,1.0,2.0,-0.1999999999999993,-0.3999999999999999
+A,Thuram,INT,Pc,29,280,Titolare,0.9,Storico Serie A,29,6.4,7.91,13,6,9.4,,0,0,2,0,0,0,,33,12.3,6.8,7.69,87,61,73,14,31,63,Ottimo,Titolare affidabile,,,3.5999999999999996,
+A,Hojlund,NAP,Pc,28,271,Titolare,0.9,Storico Serie A,33,6.21,7.44,12,5,10.6,2.8,1,1,1,0,0,0,,34,12.0,3.8,7.37,89,55,66,11,30,60,Ottimo,Titolare affidabile,2.0,,1.4000000000000004,2.2
+A,Ramos G.,MIL,Pc,27,240,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,18.1,5.1,7.82,86,83,78,29,37,71,Top,Priorità d'asta · rigorista,1.0,,,
+A,Kolo Muani,JUV,Pc,26,225,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,17.0,4.8,7.7,86,78,74,29,37,68,Top,Priorità d'asta · rigorista,1.0,,,
+A,Kean,FIO,Pc,25,212,Titolare,0.9,Storico Serie A,26,5.87,6.75,8,1,15.1,0.2,2,2,4,0,0,0,,33,16.2,0.7,7.29,85,68,64,17,35,63,Ottimo,Titolare affidabile,2.0,,-7.1,0.8
+A,Yildiz,JUV,A,23,200,Titolare,0.9,Storico Serie A,35,6.46,7.37,10,6,8.2,9.6,1,2,2,0,0,0,,34,9.0,8.7,7.48,91,50,65,10,36,59,Ottimo,Titolare affidabile · piazzati,2.0,1.0,1.8000000000000007,-3.5999999999999996
+A,Douvikas,COM,Pc,20,157,Titolare,0.9,Storico Serie A,36,6.19,7.39,14,1,12.1,1.5,1,1,0,0,0,0,,34,12.6,1.2,7.34,91,54,52,9,40,59,Ottimo,Titolare affidabile,2.0,,1.9000000000000004,-0.5
+A,Davis K.,UDI,Pc,19,121,Titolare,0.9,Storico Serie A,30,6.23,7.28,10,4,10.1,2.2,4,4,5,0,0,0,,33,12.2,3.2,7.35,87,55,54,15,42,59,Ottimo,Titolare affidabile · rigorista,1.0,,-0.09999999999999964,1.7999999999999998
+A,Scamacca,ATA,Pc,19,128,Titolare in ballottaggio,0.72,Storico Serie A,23,6.2,7.5,10,1,6.7,0.8,2,2,2,0,0,0,,26,9.9,1.1,7.34,69,43,52,32,35,46,Buono,Rotazione/copertura · rigorista,1.0,,3.3,0.19999999999999996
+A,Berardi,SAS,A,18,115,Titolare,0.9,Storico Serie A,26,6.21,7.1,8,4,5.8,3.3,2,3,2,1,0,0,,33,9.3,5.0,7.13,85,46,53,17,41,54,Buono,Titolare affidabile · rigorista · piazzati,1.0,1.0,2.2,0.7000000000000002
+A,Krstovic,ATA,Pc,18,100,Alternativa in ballottaggio,0.48,Storico Serie A,32,6.12,7.16,10,5,14.0,2.1,0,0,4,0,0,0,,18,7.3,1.8,7.37,57,33,53,45,32,38,Scommessa,Profilo rischioso,2.0,,-4.0,2.9
+A,Leao,MIL,A,18,120,Titolare,0.9,Storico Serie A,28,5.8,6.79,9,3,9.9,3.4,2,2,5,0,0,0,,33,11.2,3.8,6.84,86,52,50,16,42,57,Ottimo,Titolare affidabile,,,-0.9000000000000004,-0.3999999999999999
+A,De Ketelaere,ATA,A,17,106,Titolare,0.9,Storico Serie A,31,6.11,6.5,3,5,3.6,8.8,0,0,4,0,0,0,,33,3.6,8.5,6.63,88,27,45,14,36,46,Buono,Titolare affidabile · piazzati,,1.0,-0.6000000000000001,-3.8000000000000007
+A,Dovbyk,BOL,Pc,16,84,Titolare in ballottaggio,0.72,Storico Serie A,12,5.92,6.75,3,1,2.5,0.4,0,0,0,0,0,0,,25,5.6,1.5,6.65,62,25,36,38,31,34,Cautela,Rotazione/copertura,3.0,,0.5,0.6
+A,Esposito F.P.,INT,Pc,16,93,Riserva/rotazione,0.2,Storico Serie A,32,6.27,7.0,7,3,,,0,0,1,0,0,0,,7,1.5,0.7,7.0,36,7,38,64,21,17,Cautela,Profilo rischioso,,,,
+A,Laurientè,SAS,A,15,88,Titolare in ballottaggio,0.72,Storico Serie A,37,6.11,6.86,7,9,3.8,4.7,0,0,4,0,0,0,,27,3.7,4.9,6.65,78,22,39,23,36,40,Scommessa,Rotazione/copertura,3.0,2.0,3.2,4.3
+A,Pellegrino M.,PAR,Pc,15,81,Riserva/rotazione,0.2,Storico Serie A,37,5.85,6.51,9,0,8.6,1.4,1,1,5,0,0,0,,8,1.9,0.2,6.52,39,8,34,63,21,17,Cautela,Profilo rischioso,,,0.40000000000000036,-1.4
+A,Simeone,TOR,Pc,15,82,Titolare,0.9,Storico Serie A,32,6.22,7.23,11,0,9.9,0.8,0,0,1,0,0,0,,33,10.7,0.5,7.19,89,45,39,11,48,54,Buono,Titolare affidabile,3.0,,1.0999999999999996,-0.8
+A,Castro S.,ROM,Pc,14,83,Alternativa in ballottaggio,0.48,Storico Serie A,35,6.04,6.63,7,1,,,0,0,3,0,0,0,,18,3.6,0.5,6.62,59,16,32,42,30,29,Cautela,Rotazione/copertura,3.0,,,
+A,Dybala,ROM,A,14,67,Titolare,0.9,Storico Serie A,21,6.21,6.69,2,7,4.8,5.1,0,1,0,0,0,0,,32,5.6,8.5,7.0,81,35,47,19,46,49,Buono,Titolare affidabile · piazzati,2.0,1.0,-2.8,1.9000000000000004
+A,Santos A.,NAP,W;A,14,60,Riserva/rotazione,0.2,Storico Serie A,13,6.38,7.27,4,0,,,0,0,1,0,0,0,,7,3.0,0.6,7.71,24,13,48,77,27,18,Cautela,Profilo rischioso,,,,
+A,Esposito Se.,CAG,A,13,50,Riserva/rotazione,0.2,Storico Serie A,36,6.19,6.81,7,4,,,1,1,6,0,0,0,,8,1.6,0.9,6.82,39,8,34,63,25,18,Cautela,Profilo rischioso,,,,
+A,Nkunku,MIL,A,13,52,Riserva/rotazione,0.2,Storico Serie A,26,5.9,6.83,7,3,9.5,1.5,5,5,0,0,0,0,,7,2.3,0.6,6.97,32,10,41,68,26,18,Cautela,Profilo rischioso,,,-2.5,1.5
+A,Pinamonti,SAS,Pc,13,58,Titolare in ballottaggio,0.72,Storico Serie A,35,5.93,6.64,9,3,8.8,1.1,0,1,2,1,0,0,,27,7.1,1.4,6.71,77,32,37,24,45,44,Scommessa,Rotazione/copertura,2.0,,0.1999999999999993,1.9
+A,Raspadori,ATA,A,13,62,Titolare,0.9,Storico Serie A,13,6.0,6.77,3,1,3.2,1.5,0,0,0,0,0,0,,31,5.8,2.2,6.63,76,27,32,24,41,41,Scommessa,Rotazione/copertura,,,-0.20000000000000018,-0.5
+A,Adams A.,VEN,Pc,12,52,Alternativa in ballottaggio,0.48,Storico Serie A,32,6.06,6.72,6,3,,,0,0,0,0,0,0,,18,3.7,1.7,6.77,57,18,37,43,37,31,Cautela,Rotazione/copertura · rigorista,1.0,,,
+A,Soulè,ROM,A,12,55,Titolare in ballottaggio,0.72,Storico Serie A,32,6.11,6.81,6,5,4.0,4.2,0,0,1,0,0,0,,27,4.1,3.8,6.69,75,22,33,25,43,39,Scommessa,Rotazione/copertura,,3.0,2.0,0.7999999999999998
+A,Colombo,GEN,Pc,11,63,Titolare,0.9,Storico Serie A,37,5.91,6.39,7,1,8.3,1.3,1,2,2,0,0,0,,34,7.9,1.1,6.61,92,34,36,9,58,53,Buono,Titolare affidabile · rigorista,1.0,,-1.3000000000000007,-0.30000000000000004
+A,Diao,COM,W;A,11,50,Titolare in ballottaggio,0.72,Storico Serie A,16,5.94,6.31,2,1,2.7,1.2,0,0,2,0,0,0,,25,3.6,1.5,6.37,65,17,27,37,39,32,Cautela,Rotazione/copertura,,,-0.7000000000000002,-0.19999999999999996
+A,Bowie,SAS,Pc,10,39,Alternativa in ballottaggio,0.48,Storico Serie A,14,5.89,6.71,4,0,4.2,0.5,0,0,1,0,0,0,,17,3.9,0.6,6.58,45,17,30,56,37,25,Cautela,Profilo rischioso,,,-0.20000000000000018,-0.5
+A,Dia,LAZ,A,10,31,Titolare in ballottaggio,0.72,Storico Serie A,25,5.66,5.84,1,2,2.2,0.5,0,0,1,0,0,0,,26,1.8,1.1,5.89,70,9,20,30,37,29,Cautela,Rotazione/copertura,,,-1.2000000000000002,1.5
+A,Lukaku,NAP,Pc,10,45,Riserva/rotazione,0.2,Campione ridotto,2,6.25,7.5,1,0,0.3,,0,0,1,0,0,0,,8,2.2,0.7,6.81,34,10,37,73,33,19,Cautela,Profilo rischioso,,,0.7,
+A,Ratkov,LAZ,Pc,10,32,Alternativa in ballottaggio,0.48,Storico Serie A,8,5.69,5.69,0,0,0.6,0.0,0,0,0,0,0,0,,16,1.6,0.4,6.02,41,7,21,59,26,16,Cautela,Profilo rischioso,,,-0.6,
+A,Adams C.,TOR,A,9,32,Riserva/rotazione,0.2,Storico Serie A,32,6.06,6.72,6,3,5.7,2.1,0,0,0,0,0,0,,7,1.3,0.5,6.69,36,6,29,64,32,17,Cautela,Profilo rischioso,,,0.2999999999999998,0.8999999999999999
+A,Cutrone,MON,Pc,9,33,Titolare,0.9,Storico Serie A,15,5.73,5.93,1,0,2.6,0.3,0,0,0,0,0,0,,31,3.4,0.5,6.08,77,15,23,23,49,37,Scommessa,Rotazione/copertura,2.0,,-1.6,-0.3
+A,David,JUV,Pc,9,40,Riserva/rotazione,0.2,Storico Serie A,30,5.7,6.27,6,2,8.8,1.7,0,1,0,0,0,0,,7,1.8,0.4,6.53,35,8,33,65,33,18,Cautela,Profilo rischioso,,,-2.8000000000000007,0.30000000000000004
+A,Geubbels,LEC,Pc,9,25,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,1.7,0.5,6.08,73,8,20,42,43,29,Cautela,Scommessa nuova · rigorista,1.0,,,
+A,Ghedjemis,FRO,W;A,9,30,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,2.1,0.6,6.08,86,10,18,29,48,35,Scommessa,Titolare affidabile,,3.0,,
+A,Dallinga,BOL,Pc,8,23,Riserva/rotazione,0.2,Storico Serie A,18,5.81,6.14,2,1,2.9,0.5,0,0,2,0,0,0,,7,1.1,0.3,6.27,27,5,25,74,28,12,Cautela,Profilo rischioso,,,-0.8999999999999999,0.5
+A,Piccoli,FIO,Pc,8,24,Riserva/rotazione,0.2,Storico Serie A,27,5.7,6.17,4,1,6.5,1.0,0,0,1,0,0,0,,7,1.4,0.3,6.32,33,6,27,67,32,15,Cautela,Profilo rischioso,,,-2.5,0.0
+A,Rrahmani Al.,VEN,Pc,8,20,Alternativa in ballottaggio,0.48,Storico Serie A,21,6.26,6.48,2,0,1.4,,0,0,3,0,0,0,,17,1.4,0.1,6.44,50,6,19,52,38,21,Cautela,Profilo rischioso,2.0,,0.6000000000000001,
+A,Vitinha O.,GEN,A,8,20,Titolare,0.9,Storico Serie A,32,5.97,6.39,5,1,6.2,2.1,0,0,5,0,0,0,,33,5.9,1.7,6.48,89,27,26,13,71,50,Buono,Occasione di valore,3.0,3.0,-1.2000000000000002,-1.1
+A,Yeboah J.,VEN,A,8,28,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,1.9,0.6,6.06,86,9,18,29,54,36,Scommessa,Titolare affidabile,,2.0,,
+A,Bonny,INT,Pc,7,21,Riserva/rotazione,0.2,Storico Serie A,28,6.09,6.75,5,4,,1.9,0,0,1,0,0,0,,7,1.3,0.7,6.73,33,6,30,67,40,18,Cautela,Profilo rischioso,,,,2.1
+A,Raimondo,FRO,Pc,7,24,Titolare,0.9,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,34,1.6,0.5,6.03,86,7,16,29,59,36,Scommessa,Titolare affidabile,,,,
+A,Stulic,LEC,Pc,7,18,Alternativa in ballottaggio,0.48,Storico Serie A,31,5.61,5.98,4,0,4.5,1.3,1,1,1,0,0,0,,18,2.6,0.5,6.05,56,12,24,44,50,29,Cautela,Rotazione/copertura,2.0,,-0.5,-1.3
+A,Zapata D.,TOR,Pc,7,18,Riserva/rotazione,0.2,Storico Serie A,23,5.89,6.2,3,1,,,0,1,0,0,0,0,,7,0.9,0.3,6.32,30,4,22,70,32,13,Cautela,Profilo rischioso,,,,
+A,Boga,JUV,W;A,6,25,Riserva/rotazione,0.2,Storico Serie A,13,6.15,7.12,4,1,2.9,3.2,0,0,1,0,0,0,,7,1.7,0.9,6.97,24,8,36,77,48,18,Cautela,Profilo rischioso,,,1.1,-2.2
+A,Gimenez,MIL,Pc,6,14,Riserva/rotazione,0.2,Storico Serie A,16,5.41,5.41,0,1,3.4,0.6,0,0,2,0,0,0,,7,0.9,0.3,5.78,26,4,22,76,31,11,Cautela,Profilo rischioso,,,-3.4,0.4
+A,Mutandwa,CAG,Pc,6,19,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.9,0.3,6.24,34,4,21,81,39,14,Cautela,Profilo rischioso,,,,
+A,Neres,NAP,W;A,6,22,Alternativa in ballottaggio,0.48,Storico Serie A,16,6.16,6.81,3,3,1.5,3.2,0,0,3,0,0,0,,17,2.0,2.3,6.55,47,12,28,55,58,28,Cautela,Profilo rischioso,,3.0,1.5,-0.20000000000000018
+A,Noslin,LAZ,A,6,17,Riserva/rotazione,0.2,Storico Serie A,23,6.02,6.5,4,2,4.8,1.0,0,0,4,1,0,0,,7,1.3,0.4,6.5,30,6,27,73,42,16,Cautela,Profilo rischioso,,,-0.7999999999999998,1.0
+A,Sulemana K.,ATA,A,6,16,Riserva/rotazione,0.2,Storico Serie A,20,5.92,6.18,2,1,,,0,0,4,0,0,0,,7,0.8,0.3,6.21,28,4,21,74,35,12,Cautela,Profilo rischioso,,,,
+A,Adorante,VEN,Pc,5,14,Alternativa in ballottaggio,0.48,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,18,0.8,0.2,6.01,55,4,15,60,57,24,Cautela,Profilo rischioso,3.0,,,
+A,Camarda,MIL,Pc,5,18,Riserva/rotazione,0.2,Storico Serie A,18,5.67,5.64,1,0,1.9,,0,1,1,0,0,0,,7,0.8,0.1,6.0,27,3,20,74,38,12,Cautela,Profilo rischioso,,,-0.8999999999999999,
+A,Frigan,PAR,A,5,13,Titolare in ballottaggio,0.72,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,27,0.8,0.3,5.96,73,4,14,42,69,32,Cautela,Scommessa nuova,,,,
+A,Maldini,ATA,T;A,5,14,Riserva/rotazione,0.2,Storico Serie A,18,5.97,6.33,2,1,3.2,1.0,0,0,1,0,0,0,,7,1.0,0.4,6.43,27,5,24,74,46,15,Cautela,Profilo rischioso,,,-1.2000000000000002,0.0
+A,Mota,MON,A,5,18,Titolare in ballottaggio,0.72,Storico Serie A,18,5.47,5.19,0,0,,,0,1,2,1,0,0,,25,0.3,0.1,5.4,66,1,13,37,56,27,Cautela,Rotazione/copertura,,3.0,,
+A,Borrelli,CAG,Pc,4,9,Riserva/rotazione,0.2,Storico Serie A,26,5.94,6.48,5,1,3.2,0.4,0,0,4,0,0,0,,7,1.1,0.2,6.36,32,5,22,70,60,19,Cautela,Profilo rischioso,,,1.7999999999999998,0.6
+A,Giovane,NAP,A,4,10,Riserva/rotazione,0.2,Storico Serie A,31,5.94,6.39,3,6,3.7,1.9,0,0,2,0,0,0,,7,0.8,0.8,6.36,35,4,25,66,63,21,Cautela,Profilo rischioso,,,-0.7000000000000002,4.1
+A,Gueye,UDI,Pc,4,7,Riserva/rotazione,0.2,Storico Serie A,15,5.77,5.9,1,0,1.7,0.2,0,0,2,0,0,0,,7,0.6,0.1,5.97,25,3,17,77,44,12,Cautela,Profilo rischioso,,,-0.7,-0.2
+A,Havel,GEN,Pc,4,9,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.4,0.1,6.02,34,2,15,81,50,14,Cautela,Profilo rischioso,,,,
+A,Kulenovic,TOR,Pc,4,9,Riserva/rotazione,0.2,Campione ridotto,7,5.64,5.71,0,1,0.7,0.1,0,0,2,0,0,0,,7,0.6,0.3,5.8,20,3,20,90,39,9,Cautela,Profilo rischioso,2.0,,-0.7,0.9
+A,Kvernadze,FRO,W;A,4,15,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.7,0.2,6.15,34,3,18,81,54,16,Cautela,Profilo rischioso,,,,
+A,Mendy P.,CAG,Pc,4,9,Alternativa in ballottaggio,0.48,Storico Serie A,8,5.94,6.62,2,0,,,0,0,1,0,0,0,,16,1.7,0.1,6.2,41,7,18,61,66,23,Cautela,Profilo rischioso,,,,
+A,Morata,COM,Pc,4,10,Riserva/rotazione,0.2,Storico Serie A,18,5.47,5.19,0,0,4.9,0.5,0,1,2,1,0,0,,7,1.0,0.1,5.8,27,4,21,76,47,14,Cautela,Profilo rischioso,,,-4.9,-0.5
+A,Ekhator,JUV,A,3,10,Riserva/rotazione,0.2,Storico Serie A,25,5.94,6.26,3,0,2.9,0.4,0,0,3,0,0,0,,7,0.8,0.1,6.24,31,3,19,70,71,20,Cautela,Profilo rischioso,,,0.10000000000000009,-0.4
+A,Elphege,PAR,Pc,3,11,Alternativa in ballottaggio,0.48,Storico Serie A,8,6.12,7.0,2,1,1.9,0.1,0,0,0,0,0,0,,16,1.7,0.4,6.46,41,8,19,59,94,30,Cautela,Profilo rischioso,,,0.10000000000000009,0.9
+A,Kuhn,COM,W;A,3,5,Riserva/rotazione,0.2,Storico Serie A,15,5.83,6.1,1,1,1.0,1.2,0,0,0,0,0,0,,7,0.4,0.4,6.06,25,2,18,75,59,15,Cautela,Profilo rischioso,,,0.0,-0.19999999999999996
+A,Lang,NAP,A,3,10,Riserva/rotazione,0.2,Storico Serie A,14,5.96,6.25,1,2,0.8,,0,0,2,0,0,0,,7,0.5,0.7,6.2,24,3,22,78,65,17,Cautela,Profilo rischioso,,,0.19999999999999996,
+A,Lucca,NAP,Pc,3,10,Riserva/rotazione,0.2,Storico Serie A,9,5.61,5.89,1,0,1.3,0.6,0,0,1,0,0,0,,7,0.8,0.2,5.93,21,4,20,80,57,14,Cautela,Profilo rischioso,,,-0.30000000000000004,-0.6
+A,N'Dri,LEC,W;A,3,9,Titolare,0.9,Storico Serie A,17,5.85,6.12,2,0,1.0,0.4,0,0,3,0,0,0,,31,1.9,0.4,5.96,79,8,15,23,100,43,Scommessa,Occasione di valore,,,1.0,-0.4
+A,Varela G.,MON,Pc,3,7,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.3,0.1,5.98,34,1,14,81,64,16,Cautela,Profilo rischioso,,,,
+A,Buksa,UDI,Pc,2,4,Riserva/rotazione,0.2,Storico Serie A,22,5.84,6.18,3,0,2.1,0.5,0,0,3,0,0,0,,7,0.7,0.1,6.09,29,3,18,73,99,24,Cautela,Profilo rischioso,,,0.8999999999999999,-0.5
+A,Petagna,MON,Pc,2,5,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.2,0.1,5.94,34,1,13,81,93,22,Cautela,Profilo rischioso,3.0,,,
+A,Albarracin,CAG,A,1,1,Riserva/rotazione,0.2,Campione ridotto,2,6.0,6.0,0,0,,0.0,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,73,100,23,Cautela,Profilo rischioso,,,,
+A,Azon,COM,Pc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+A,Bayo V.,UDI,Pc,1,3,Riserva/rotazione,0.2,Storico Serie A,12,5.75,5.83,0,1,,,0,0,0,0,0,0,,7,0.1,0.3,5.84,23,1,14,77,100,21,Cautela,Profilo rischioso,,,,
+A,Lauberbach,VEN,Pc,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+A,Lisman,VEN,W;A,1,1,Riserva/rotazione,0.2,Nuovo/senza dati 25-26,0,0.0,0.0,0,0,,,0,0,0,0,0,0,,8,0.0,0.0,5.85,34,0,10,81,100,22,Cautela,Profilo rischioso,,,,
+A,Moro L.,SAS,Pc,1,1,Riserva/rotazione,0.2,Campione ridotto,6,5.67,5.58,0,0,,,0,0,1,0,0,0,,7,0.0,0.0,5.59,19,0,10,90,100,18,Cautela,Profilo rischioso,,,,
+A,Trepy,CAG,Pc,1,2,Riserva/rotazione,0.2,Campione ridotto,4,5.75,5.75,0,0,0.6,0.2,0,0,0,0,0,0,,8,0.1,0.0,5.89,34,0,11,73,100,23,Cautela,Profilo rischioso,,,-0.6,-0.2
+A,Vaz,ROM,Pc,1,4,Riserva/rotazione,0.2,Storico Serie A,9,6.0,6.33,1,0,0.5,0.1,0,0,0,0,0,0,,7,0.4,0.1,6.19,21,2,15,79,100,21,Cautela,Profilo rischioso,,,0.5,-0.1

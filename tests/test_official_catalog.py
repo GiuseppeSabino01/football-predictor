@@ -1,4 +1,9 @@
-from fantasy.official_catalog import load_seed_catalog, merge_catalog_updates, parse_official_html
+from fantasy.official_catalog import (
+    catalog_fingerprint,
+    load_seed_catalog,
+    merge_catalog_updates,
+    parse_official_html,
+)
 
 
 def test_bundled_analysis_contains_full_classic_list() -> None:
@@ -24,6 +29,19 @@ def test_official_html_updates_quote_and_uses_last_number_as_fvm() -> None:
 
     assert players[0]["quote"] == 35
     assert players[0]["fvm"] == 93
+
+
+def test_generic_role_player_class_does_not_turn_everyone_into_goalkeeper() -> None:
+    seed = [{"id": "defender", "name": "Difensore Test", "team": "ROM", "role": "D"}]
+    html = """
+    <table><thead><tr><th>Nome</th><th>Squadra</th><th>Qt.I</th><th>Qt.A</th><th>FVM</th></tr></thead>
+    <tbody><tr class="role-player"><td><a href="/serie-a/squadre/roma/test">Difensore Test</a></td>
+    <td>ROM</td><td>8</td><td>9</td><td>30</td></tr></tbody></table>
+    """
+
+    players = parse_official_html(html, seed)
+
+    assert players[0]["role"] == "D"
 
 
 def test_official_update_preserves_analysis_fields() -> None:
@@ -62,3 +80,14 @@ def test_authoritative_catalog_removes_players_no_longer_official() -> None:
 
     assert len(merged) == 1
     assert merged[0]["expected_goals"] == seed_player["expected_goals"]
+
+
+def test_saved_corrupted_roles_are_repaired_from_analyzed_seed() -> None:
+    seed = load_seed_catalog()
+    corrupted = [{**player, "role": "P"} for player in seed]
+
+    repaired = merge_catalog_updates(corrupted, [])
+    counts = {role: sum(player["role"] == role for player in repaired) for role in "PDCA"}
+
+    assert counts == {"P": 60, "D": 177, "C": 172, "A": 85}
+    assert catalog_fingerprint(seed) != catalog_fingerprint(corrupted)

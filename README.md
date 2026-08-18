@@ -22,6 +22,8 @@ La voce `Fantacalcio` nel menu laterale permette di creare piu fanta indipendent
 
 Il listone non richiede caricamenti manuali: a ogni apertura l'app controlla le [quotazioni ufficiali Fantacalcio.it](https://www.fantacalcio.it/quotazioni-fantacalcio), salva l'ultima versione disponibile e mantiene come fallback la base analizzata 2026/27. In modalita Listone non vengono richiesti i partecipanti e ogni calciatore costa automaticamente la quotazione ufficiale; in modalita Asta si registrano partecipanti e prezzo battuto.
 
+Il player board mostra quotazione, fantamedia attesa, bonus previsti e titolarita. Selezionando una riga si apre la scheda completa con storico 2025/26, proiezioni 2026/27, xG/xA, disciplina, rigoristi, piazzati e indicatori di rischio/valore.
+
 Una volta configurato Supabase, workspace, listone e squadre vengono sincronizzati usando la tabella `llm_prediction_cache` gia prevista dallo schema, quindi non serve una nuova migrazione SQL.
 
 ## Setup locale
