@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import date, datetime
 import hashlib
+import importlib
 import inspect
 import json
 from html import escape
@@ -21,7 +22,7 @@ import streamlit.components.v1 as components
 
 from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
 from config.settings import load_settings
-from fantasy.ui import render_fantasy_page
+import fantasy.ui as fantasy_ui
 from features.market_features import fair_odd, recommendation, value_score
 from features.team_strength import canonical_team_name
 from nlp.gemini_client import GeminiClient
@@ -92,7 +93,8 @@ def main() -> None:
     elif page == "Road To New York":
         render_road_to_new_york()
     elif page == "Fantacalcio":
-        render_fantasy_page(settings())
+        importlib.reload(fantasy_ui)
+        fantasy_ui.render_fantasy_page(settings())
     elif page == "GiGi":
         render_jarvis_page()
     elif page == "Predict manuale":
