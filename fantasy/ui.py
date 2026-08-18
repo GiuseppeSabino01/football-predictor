@@ -20,14 +20,18 @@ from fantasy.service import (
     GAME_MODE_LIST,
     ROLE_LABELS,
     add_purchase,
+    add_purchases_batch,
     create_league,
     delete_league,
     find_league,
     remove_purchase,
+    reset_preferred_xi,
+    role_balance_recommendation,
     roster_summary,
     set_captain,
-    suggest_lineup,
+    set_preferred_xi,
     toggle_watchlist,
+    top_xi_summary,
     touch_workspace,
     utc_now,
     update_league_settings,
@@ -41,7 +45,7 @@ WORKSPACE_SESSION_KEY = "fantasy_workspace"
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Player Board v2 · build 2026.08.18")
+    st.caption("Fantacalcio · Player Board v4 · rosa integrata")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -57,15 +61,12 @@ def render_fantasy_page(settings: Settings) -> None:
     summary = roster_summary(league)
     _render_league_hero(league, summary)
     list_mode = league.get("game_mode") == GAME_MODE_LIST
-    preparation_tab, auction_tab, squad_tab = st.tabs([
+    preparation_tab, squad_tab = st.tabs([
         "Studia il listone" if list_mode else "Preparati all'asta",
-        "Componi rosa" if list_mode else "Asta",
         "La mia squadra",
     ])
     with preparation_tab:
         _render_preparation(workspace, league, storage)
-    with auction_tab:
-        _render_auction(workspace, league, storage)
     with squad_tab:
         _render_my_squad(workspace, league, storage, settings)
     _render_sync_status(storage)
@@ -151,6 +152,7 @@ def _refresh_purchased_player_data(
                     changed = league_changed = True
         if league_changed:
             league["analysis"] = ""
+            league["sasa_analysis"] = ""
             league["updated_at"] = utc_now()
     return changed
 
@@ -350,8 +352,6 @@ def _render_league_hero(league: dict[str, Any], summary: dict[str, Any]) -> None
     list_mode = league.get("game_mode") == GAME_MODE_LIST
     context = "LISTONE" if list_mode else f"{league.get('participants', 0)} PARTECIPANTI"
     chips = ["LISTONE" if list_mode else "ASTA"]
-    if league.get("modifier_enabled"):
-        chips.append("MOD")
     if league.get("captain_enabled"):
         chips.append("CAP")
     chips_html = "".join(f'<span class="fantasy-mode-chip">{label}</span>' for label in chips)
@@ -378,6 +378,8 @@ def _render_preparation(
 ) -> None:
     catalog = workspace.get("catalog", [])
     watchlist = set(league.get("watchlist", []))
+    summary = roster_summary(league)
+    purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
     metric_a, metric_b, metric_c = st.columns(3)
     metric_a.metric("Giocatori nel listone", len(catalog))
     metric_b.metric("Osservati", len(watchlist))
@@ -409,6 +411,13 @@ def _render_preparation(
         st.info("Il listone e in aggiornamento. Riprova tra poco.")
         return
 
+    st.markdown("### La tua rosa in costruzione")
+    _render_budget_metrics(summary)
+    progress = summary["roster_size"] / max(summary["target_size"], 1)
+    st.progress(min(progress, 1.0), text=f"Rosa completata al {progress:.0%}")
+    _render_role_plan(league, summary)
+    _render_role_advisors(workspace, league, storage, catalog)
+
     search_column, role_column, team_column, sort_column = st.columns([1.5, 0.8, 1.1, 1.1])
     search = search_column.text_input("Cerca", placeholder="Nome giocatore")
     selected_roles = role_column.multiselect("Ruolo", list(ROLE_LABELS), default=list(ROLE_LABELS))
@@ -431,13 +440,29 @@ def _render_preparation(
 
     st.markdown(
         '<div class="fantasy-table-heading"><div><strong>Player board</strong>'
-        '<span>Confronta i profili e clicca una riga per aprire la scheda completa</span></div>'
+        '<span>Spunta piu righe per aggiungerle insieme alla rosa; la prima apre la scheda completa</span></div>'
         f'<b>{len(frame)}</b></div>',
         unsafe_allow_html=True,
     )
-    selected_id = _render_catalog_table(frame, key=f"catalog_board_{league['id']}")
-    if selected_id:
-        st.session_state[f"fantasy_selected_player_{league['id']}"] = selected_id
+    version_key = f"catalog_board_version_{league['id']}"
+    board_version = int(st.session_state.get(version_key, 0))
+    selected_ids = _render_catalog_table(
+        frame,
+        key=f"catalog_board_{league['id']}_{board_version}",
+        selection_mode="multi-row",
+        purchased_ids=purchased_ids,
+        watchlist=watchlist,
+    )
+    if selected_ids:
+        st.session_state[f"fantasy_selected_player_{league['id']}"] = selected_ids[0]
+    _render_board_actions(
+        selected_ids,
+        catalog,
+        league,
+        workspace,
+        storage,
+        version_key=version_key,
+    )
 
     selected_id = st.session_state.get(f"fantasy_selected_player_{league['id']}")
     selected_player = next((player for player in catalog if player.get("id") == selected_id), None)
@@ -450,13 +475,29 @@ def _render_preparation(
     if watched_players:
         with st.expander(f"Watchlist · {len(watched_players)} giocatori"):
             watch_frame = catalog_dataframe(watched_players)
-            _render_catalog_table(watch_frame, key=f"watchlist_board_{league['id']}", height=260)
+            _render_catalog_table(
+                watch_frame,
+                key=f"watchlist_board_{league['id']}",
+                height=260,
+                purchased_ids=purchased_ids,
+                watchlist=watchlist,
+            )
+    if league.get("game_mode") == GAME_MODE_AUCTION:
+        _render_quick_purchase(workspace, league, storage)
 
 
-def _render_catalog_table(frame: pd.DataFrame, *, key: str, height: int = 560) -> str | None:
+def _render_catalog_table(
+    frame: pd.DataFrame,
+    *,
+    key: str,
+    height: int = 560,
+    selection_mode: str = "single-row",
+    purchased_ids: set[str] | None = None,
+    watchlist: set[str] | None = None,
+) -> list[str]:
     if frame.empty:
         st.warning("Nessun giocatore corrisponde ai filtri selezionati.")
-        return None
+        return []
     indexed = frame.reset_index(drop=True)
     compact_columns = [
         "Ruolo",
@@ -471,6 +512,16 @@ def _render_catalog_table(frame: pd.DataFrame, *, key: str, height: int = 560) -
         "Fascia",
     ]
     display = indexed[compact_columns].copy()
+    display.insert(
+        0,
+        "Rosa",
+        indexed["_id"].map(lambda player_id: "✓" if player_id in (purchased_ids or set()) else ""),
+    )
+    display.insert(
+        1,
+        "Watch",
+        indexed["_id"].map(lambda player_id: "★" if player_id in (watchlist or set()) else ""),
+    )
     display["Ruolo"] = display["Ruolo"].map(
         {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
     ).fillna(display["Ruolo"])
@@ -481,9 +532,11 @@ def _render_catalog_table(frame: pd.DataFrame, *, key: str, height: int = 560) -
         height=min(height, 88 + max(len(display), 1) * 38),
         row_height=38,
         on_select="rerun",
-        selection_mode="single-row",
+        selection_mode=selection_mode,
         key=key,
         column_config={
+            "Rosa": st.column_config.TextColumn("In rosa", width="small"),
+            "Watch": st.column_config.TextColumn("★", width="small"),
             "Ruolo": st.column_config.TextColumn(width="small"),
             "Giocatore": st.column_config.TextColumn(width="large"),
             "Squadra": st.column_config.TextColumn(width="small"),
@@ -501,10 +554,11 @@ def _render_catalog_table(frame: pd.DataFrame, *, key: str, height: int = 560) -
         },
     )
     rows = _selected_dataframe_rows(event)
-    if not rows:
-        return None
-    position = rows[0]
-    return str(indexed.iloc[position]["_id"]) if 0 <= position < len(indexed) else None
+    return [
+        str(indexed.iloc[position]["_id"])
+        for position in rows
+        if 0 <= position < len(indexed)
+    ]
 
 
 def _selected_dataframe_rows(event: Any) -> list[int]:
@@ -514,6 +568,210 @@ def _selected_dataframe_rows(event: Any) -> list[int]:
         if isinstance(event, dict):
             return list(event.get("selection", {}).get("rows", []))
     return []
+
+
+def _render_board_actions(
+    selected_ids: list[str],
+    catalog: list[dict[str, Any]],
+    league: dict[str, Any],
+    workspace: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    *,
+    version_key: str,
+) -> None:
+    if not selected_ids:
+        st.caption("Usa le caselle a sinistra della tabella per selezionare uno o piu giocatori.")
+        return
+    by_id = {str(player.get("id")): player for player in catalog}
+    purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
+    selected_players = [
+        by_id[player_id]
+        for player_id in selected_ids
+        if player_id in by_id and player_id not in purchased_ids
+    ]
+    already_owned = len(selected_ids) - len(selected_players)
+    total_quote = sum(_number_or_none(player.get("quote"), 0) or 0 for player in selected_players)
+    names = ", ".join(str(player.get("name")) for player in selected_players[:3])
+    if len(selected_players) > 3:
+        names += f" e altri {len(selected_players) - 3}"
+    st.markdown(
+        f'<div class="fantasy-selection-bar"><div><strong>{len(selected_players)} selezionati</strong>'
+        f'<span>{escape(names or "Solo giocatori gia in rosa")}</span></div>'
+        f'<b>{total_quote:.0f} crediti</b></div>',
+        unsafe_allow_html=True,
+    )
+    if already_owned:
+        st.caption(f"{already_owned} giocatori selezionati sono gia presenti nella rosa e verranno ignorati.")
+
+    list_mode = league.get("game_mode") == GAME_MODE_LIST
+    price = None
+    if not list_mode and len(selected_players) == 1:
+        player = selected_players[0]
+        summary = roster_summary(league)
+        default_price = min(
+            max(float(player.get("quote") or 1), 0.0),
+            float(summary["remaining_budget"]),
+        )
+        price = st.number_input(
+            "Prezzo asta",
+            min_value=0.0,
+            max_value=float(max(summary["remaining_budget"], 1)),
+            value=default_price,
+            step=1.0,
+            key=f"board_price_{league['id']}_{player.get('id')}",
+        )
+    elif not list_mode and len(selected_players) > 1:
+        st.info("In modalita asta seleziona un solo giocatore alla volta per indicare il prezzo battuto.")
+
+    add_column, watch_column, clear_column = st.columns([1.25, 1, 0.65])
+    add_disabled = not selected_players or (not list_mode and len(selected_players) != 1)
+    add_label = (
+        f"Aggiungi {len(selected_players)} alla rosa"
+        if list_mode else "Registra acquisto"
+    )
+    if add_column.button(
+        add_label,
+        type="primary",
+        use_container_width=True,
+        disabled=add_disabled,
+        key=f"board_add_{league['id']}",
+    ):
+        try:
+            prices = (
+                {str(selected_players[0].get("id")): float(price or 0)}
+                if not list_mode else None
+            )
+            add_purchases_batch(league, selected_players, prices)
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            touch_workspace(workspace)
+            _save_workspace(workspace, storage)
+            st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
+            st.rerun()
+
+    missing_watchlist = [
+        player for player in selected_players if str(player.get("id")) not in league.get("watchlist", [])
+    ]
+    if watch_column.button(
+        f"Osserva selezionati ({len(missing_watchlist)})",
+        use_container_width=True,
+        disabled=not missing_watchlist,
+        key=f"board_watch_{league['id']}",
+    ):
+        for player in missing_watchlist:
+            toggle_watchlist(league, str(player.get("id")))
+        touch_workspace(workspace)
+        _save_workspace(workspace, storage)
+        st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
+        st.rerun()
+    if clear_column.button(
+        "Deseleziona",
+        use_container_width=True,
+        key=f"board_clear_{league['id']}",
+    ):
+        st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
+        st.rerun()
+
+
+def _render_role_advisors(
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    catalog: list[dict[str, Any]],
+) -> None:
+    advices = [
+        advice
+        for role in ROLE_LABELS
+        if (advice := role_balance_recommendation(league, catalog, role)) is not None
+    ]
+    if not advices:
+        st.caption("I consigli di completamento si attivano quando raggiungi almeno meta degli slot di un ruolo.")
+        return
+
+    st.markdown(
+        '<div class="fantasy-advisor-heading"><span>SCOUT INTELLIGENTE</span>'
+        '<strong>Cosa manca alla tua rosa</strong></div>',
+        unsafe_allow_html=True,
+    )
+    tabs = st.tabs([
+        f"{advice['role']} · {advice['count']}/{advice['target']}"
+        for advice in advices
+    ])
+    for tab, advice in zip(tabs, advices):
+        with tab:
+            st.markdown(f"#### {advice['title']}")
+            st.write(advice["reason"])
+            candidates = advice.get("candidates", [])
+            if not candidates:
+                st.info("Nessun giocatore compatibile con ruolo e budget rimasto.")
+                continue
+            candidate_rows = [
+                {
+                    "Giocatore": player.get("name"),
+                    "Squadra": player.get("team"),
+                    "Q": player.get("quote"),
+                    "FM attesa": player.get("expected_fantasy_average"),
+                    "Gol attesi": player.get("expected_goals"),
+                    "Assist attesi": player.get("expected_assists"),
+                    "Titolarita %": player.get("starter_probability"),
+                }
+                for player in candidates
+            ]
+            st.dataframe(
+                pd.DataFrame(candidate_rows),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Q": st.column_config.NumberColumn(format="%.0f"),
+                    "FM attesa": st.column_config.NumberColumn(format="%.2f"),
+                    "Gol attesi": st.column_config.NumberColumn(format="%.1f"),
+                    "Assist attesi": st.column_config.NumberColumn(format="%.1f"),
+                    "Titolarita %": st.column_config.ProgressColumn(
+                        min_value=0, max_value=100, format="%.0f%%"
+                    ),
+                },
+            )
+            by_id = {str(player.get("id")): player for player in candidates}
+            select_column, price_column, action_column = st.columns([1.7, 0.7, 0.75])
+            candidate_id = select_column.selectbox(
+                "Scegli un profilo consigliato",
+                list(by_id),
+                format_func=lambda value: (
+                    f"{by_id[value].get('name')} · {by_id[value].get('team')} · "
+                    f"Q {float(by_id[value].get('quote') or 0):.0f}"
+                ),
+                key=f"advisor_candidate_{league['id']}_{advice['role']}",
+            )
+            candidate = by_id[candidate_id]
+            if league.get("game_mode") == GAME_MODE_LIST:
+                price_column.metric("Costo", f"{float(candidate.get('quote') or 0):.0f}")
+                price = float(candidate.get("quote") or 0)
+            else:
+                summary = roster_summary(league)
+                price = price_column.number_input(
+                    "Prezzo",
+                    min_value=0.0,
+                    max_value=float(max(summary["remaining_budget"], 1)),
+                    value=min(float(candidate.get("quote") or 1), float(summary["remaining_budget"])),
+                    key=f"advisor_price_{league['id']}_{advice['role']}_{candidate_id}",
+                )
+            if action_column.button(
+                "Aggiungi alla rosa" if league.get("game_mode") == GAME_MODE_LIST else "Acquista",
+                type="primary",
+                use_container_width=True,
+                key=f"advisor_add_{league['id']}_{advice['role']}",
+            ):
+                try:
+                    add_purchase(league, candidate, price)
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    touch_workspace(workspace)
+                    _save_workspace(workspace, storage)
+                    version_key = f"catalog_board_version_{league['id']}"
+                    st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
+                    st.rerun()
 
 
 def _render_player_detail(
@@ -792,11 +1050,8 @@ def _render_role_plan(league: dict[str, Any], summary: dict[str, Any]) -> None:
         target = int(slots.get(role, 0))
         status = "complete" if count >= target else "open"
         cards.append(
-            f"""
-            <div class="fantasy-role-card {status}">
-                <span>{role}</span><strong>{count}/{target}</strong><small>{label}</small>
-            </div>
-            """
+            f'<div class="fantasy-role-card {status}"><span>{role}</span>'
+            f'<strong>{count}/{target}</strong><small>{escape(label)}</small></div>'
         )
     st.markdown(f'<div class="fantasy-role-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
@@ -872,29 +1127,130 @@ def _render_my_squad(
 ) -> None:
     summary = roster_summary(league)
     if not league.get("purchases"):
-        destination = "Componi rosa" if league.get("game_mode") == GAME_MODE_LIST else "Asta"
-        st.info(f"Aggiungi i giocatori nella sezione {destination}: qui compariranno analisi e formazione.")
+        st.info("Aggiungi i giocatori da Studia il listone: qui compariranno rosa, analisi e formazione.")
         return
 
-    goals, assists, modifier, coverage = st.columns(4)
-    goals.metric("Gol attesi", f"{summary['expected_goals']:.1f}")
-    assists.metric("Assist attesi", f"{summary['expected_assists']:.1f}")
-    modifier.metric(
-        "Modificatore",
-        ("Pronto" if summary["modifier_ready"] else "Da completare")
-        if league.get("modifier_enabled") else "Non attivo",
+    _render_top_xi_editor(workspace, league, storage)
+    xi_summary = top_xi_summary(league)
+    goals, assists, fantasy_average = st.columns(3)
+    goals.metric(
+        "Media gol Top 11",
+        _format_stat(xi_summary["expected_goals_average"], 2),
     )
-    coverage.metric("Copertura", f"{summary['roster_size']}/{summary['target_size']}")
-
-    _render_squad_insights(league, summary)
+    assists.metric(
+        "Media assist Top 11",
+        _format_stat(xi_summary["expected_assists_average"], 2),
+    )
+    fantasy_average.metric(
+        "Fantamedia Top 11",
+        _format_stat(xi_summary["expected_fantasy_average"], 2),
+    )
+    _render_top_xi_table(xi_summary)
     if league.get("captain_enabled"):
         _render_captain_control(workspace, league, storage)
-    lineup = suggest_lineup(league)
-    if lineup:
-        _render_lineup(lineup, league.get("captain_player_id"))
-    else:
-        st.warning("Non ci sono ancora abbastanza giocatori per costruire un undici valido.")
-    _render_ai_analysis(workspace, league, storage, settings, summary)
+    with st.expander(f"Rosa completa · {len(league.get('purchases', []))} giocatori"):
+        _render_roster_table(workspace, league, storage)
+    _render_sasa_analysis(workspace, league, storage, settings, summary, xi_summary)
+
+
+def _render_top_xi_editor(
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+) -> None:
+    purchases = league.get("purchases", [])
+    by_id = {str(row.get("player_id")): row for row in purchases}
+    current = top_xi_summary(league)
+    expected_size = min(11, len(purchases))
+    mode = "personalizzata" if league.get("preferred_xi_customized") else "automatica"
+    st.markdown(
+        f'<section class="fantasy-xi-hero"><div><span>TOP 11 · {mode.upper()}</span>'
+        f'<strong>Scegli i titolari della tua squadra</strong>'
+        f'<small>Di default uso i {expected_size} giocatori pagati di piu. Puoi sostituirli e salvare la tua scelta.</small>'
+        f'</div><b>{current["count"]}/11</b></section>',
+        unsafe_allow_html=True,
+    )
+    selector_key = (
+        f"preferred_xi_{league['id']}_{len(purchases)}_"
+        f"{int(bool(league.get('preferred_xi_customized')))}"
+    )
+    selected_ids = st.multiselect(
+        "La mia Top 11",
+        list(by_id),
+        default=current["player_ids"],
+        max_selections=11,
+        format_func=lambda player_id: (
+            f"{by_id[player_id].get('role')} · {by_id[player_id].get('name')} · "
+            f"{by_id[player_id].get('team')} · {float(by_id[player_id].get('price') or 0):.0f} cr"
+        ),
+        key=selector_key,
+        help="Seleziona esattamente 11 giocatori, oppure tutti quelli disponibili finche la rosa ne contiene meno di 11.",
+    )
+    save_column, reset_column = st.columns([1.35, 0.85])
+    selection_complete = len(selected_ids) == expected_size
+    if save_column.button(
+        "Salva la mia Top 11",
+        type="primary",
+        use_container_width=True,
+        disabled=not selection_complete,
+        key=f"save_preferred_xi_{league['id']}",
+    ):
+        try:
+            set_preferred_xi(league, selected_ids)
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            touch_workspace(workspace)
+            _save_workspace(workspace, storage)
+            st.rerun()
+    if reset_column.button(
+        "Ripristina i piu costosi",
+        use_container_width=True,
+        disabled=not league.get("preferred_xi_customized"),
+        key=f"reset_preferred_xi_{league['id']}",
+    ):
+        reset_preferred_xi(league)
+        touch_workspace(workspace)
+        _save_workspace(workspace, storage)
+        st.rerun()
+    if not selection_complete:
+        st.warning(f"Seleziona {expected_size} giocatori: ne hai scelti {len(selected_ids)}.")
+    elif expected_size < 11:
+        st.caption(f"La Top 11 si completera automaticamente: mancano ancora {11 - expected_size} giocatori in rosa.")
+
+
+def _render_top_xi_table(summary: dict[str, Any]) -> None:
+    players = summary.get("players", [])
+    if not players:
+        return
+    rows = [
+        {
+            "#": index,
+            "Ruolo": row.get("role"),
+            "Giocatore": row.get("name"),
+            "Squadra": row.get("team"),
+            "Costo": row.get("price"),
+            "Gol attesi": row.get("expected_goals"),
+            "Assist attesi": row.get("expected_assists"),
+            "FM attesa": row.get("expected_fantasy_average"),
+        }
+        for index, row in enumerate(players, start=1)
+    ]
+    st.dataframe(
+        pd.DataFrame(rows),
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "#": st.column_config.NumberColumn(width="small"),
+            "Ruolo": st.column_config.TextColumn(width="small"),
+            "Giocatore": st.column_config.TextColumn(width="large"),
+            "Squadra": st.column_config.TextColumn(width="small"),
+            "Costo": st.column_config.NumberColumn(format="%.0f", width="small"),
+            "Gol attesi": st.column_config.NumberColumn(format="%.2f", width="small"),
+            "Assist attesi": st.column_config.NumberColumn(format="%.2f", width="small"),
+            "FM attesa": st.column_config.NumberColumn(format="%.2f", width="small"),
+        },
+    )
 
 
 def _render_squad_insights(league: dict[str, Any], summary: dict[str, Any]) -> None:
@@ -968,42 +1324,49 @@ def _render_lineup(lineup: dict[str, Any], captain_player_id: str | None = None)
     st.markdown(f'<div class="fantasy-pitch">{"".join(role_lines)}</div>', unsafe_allow_html=True)
 
 
-def _render_ai_analysis(
+def _render_sasa_analysis(
     workspace: dict[str, Any],
     league: dict[str, Any],
     storage: FantasyWorkspaceStorage,
     settings: Settings,
     summary: dict[str, Any],
+    xi_summary: dict[str, Any],
 ) -> None:
-    st.markdown("#### GiGi · Analisi della rosa")
-    st.caption("L'IA usa rosa, prezzi, statistiche attese e regolamento di questo fanta.")
+    st.markdown("#### SaSa · Il tuo analista di fantacalcio")
+    st.caption(
+        "SaSa e separato da GiGi: studia Top 11, rosa, costi, bonus attesi e regole del tuo fanta."
+    )
     if st.button(
-        "Analizza la mia squadra",
+        "Chiedi l'analisi a SaSa",
         type="primary",
         disabled=not settings.has_gemini,
-        key=f"fantasy_ai_{league['id']}",
+        key=f"sasa_ai_{league['id']}",
     ):
-        prompt = _fantasy_analysis_prompt(league, summary)
+        prompt = _sasa_analysis_prompt(league, summary, xi_summary)
         try:
-            with st.spinner("GiGi sta studiando la rosa..."):
+            with st.spinner("SaSa sta studiando la tua Top 11..."):
                 analysis = GeminiClient(settings).generate_text(prompt).strip()
         except Exception as error:
             st.error(f"Analisi non disponibile: {error}")
         else:
             if analysis:
-                league["analysis"] = analysis
+                league["sasa_analysis"] = analysis
                 league["updated_at"] = utc_now()
                 touch_workspace(workspace)
                 _save_workspace(workspace, storage)
                 st.rerun()
     if not settings.has_gemini:
-        st.info("Configura GEMINI_API_KEY per attivare l'analisi IA.")
-    if league.get("analysis"):
+        st.info("Configura GEMINI_API_KEY per attivare SaSa.")
+    if league.get("sasa_analysis"):
         with st.container(border=True):
-            st.markdown(league["analysis"])
+            st.markdown(league["sasa_analysis"])
 
 
-def _fantasy_analysis_prompt(league: dict[str, Any], summary: dict[str, Any]) -> str:
+def _sasa_analysis_prompt(
+    league: dict[str, Any],
+    summary: dict[str, Any],
+    xi_summary: dict[str, Any],
+) -> str:
     roster_lines = []
     for row in league.get("purchases", []):
         roster_lines.append(
@@ -1020,6 +1383,21 @@ def _fantasy_analysis_prompt(league: dict[str, Any], summary: dict[str, Any]) ->
                 ]
             )
         )
+    top_xi_lines = []
+    for row in xi_summary.get("players", []):
+        top_xi_lines.append(
+            " | ".join(
+                [
+                    str(row.get("role", "")),
+                    str(row.get("name", "")),
+                    str(row.get("team", "")),
+                    f"costo {row.get('price', 0)}",
+                    f"gol attesi {row.get('expected_goals')}",
+                    f"assist attesi {row.get('expected_assists')}",
+                    f"fantamedia attesa {row.get('expected_fantasy_average')}",
+                ]
+            )
+        )
     list_mode = league.get("game_mode") == GAME_MODE_LIST
     participants = "non previsto (modalita listone)" if list_mode else league.get("participants")
     captain_id = league.get("captain_player_id")
@@ -1028,17 +1406,21 @@ def _fantasy_analysis_prompt(league: dict[str, Any], summary: dict[str, Any]) ->
         "non assegnato",
     )
     return f"""
-Sei un analista esperto di fantacalcio Classic italiano. Analizza in italiano questa rosa senza inventare dati mancanti.
+Ti chiami SaSa. Sei un assistente IA specializzato esclusivamente nel fantacalcio Classic italiano.
+Analizza in italiano questa squadra senza inventare dati mancanti e distingui sempre la Top 11 dal resto della rosa.
 Fanta: {league.get('name')} - stagione {league.get('season')} - modalita {'listone' if list_mode else 'asta'} - partecipanti {participants}.
 Budget iniziale: {league.get('initial_budget')}; spesi: {summary['spent']}; rimasti: {summary['remaining_budget']}.
-Modificatore difesa: {'attivo' if league.get('modifier_enabled') else 'non attivo'}.
 Capitano: {'regola attiva, ' + str(captain_name) if league.get('captain_enabled') else 'regola non attiva'}.
 Composizione rosa prevista: {league.get('roster_slots')}.
 Slot mancanti: {summary['missing']}.
-Rosa:
+Top 11 selezionata ({xi_summary.get('count', 0)}/11):
+{chr(10).join(top_xi_lines) or 'non ancora disponibile'}
+Medie Top 11: gol {xi_summary.get('expected_goals_average')}; assist {xi_summary.get('expected_assists_average')}; fantamedia {xi_summary.get('expected_fantasy_average')}.
+
+Rosa completa:
 {chr(10).join(roster_lines)}
 
-Rispondi con queste sezioni brevi: Voto attuale su 10, Punti di forza, Rischi, Priorita per i prossimi acquisti, Strategia modificatore. Sii concreto e conciso.
+Rispondi con queste sezioni brevi: Voto Top 11 su 10, Potenziale bonus, Punti deboli, Cambi consigliati nella Top 11, Priorita per i prossimi acquisti. Sii concreto, conciso e cita i giocatori per nome.
 """.strip()
 
 
@@ -1092,6 +1474,19 @@ def render_fantasy_styles() -> None:
         .fantasy-table-heading strong { color:#f4fbf7; font-size:1rem; }
         .fantasy-table-heading span { color:#899791; font-size:.78rem; }
         .fantasy-table-heading b { min-width:42px; text-align:center; color:#07100d; background:#19e6b0; border-radius:999px; padding:.32rem .55rem; }
+        .fantasy-selection-bar { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin:.55rem 0; padding:.75rem .9rem; border:1px solid rgba(25,230,176,.3); border-radius:10px; background:linear-gradient(110deg,rgba(25,230,176,.12),rgba(98,216,255,.05)); }
+        .fantasy-selection-bar>div { display:flex; flex-direction:column; gap:.1rem; }
+        .fantasy-selection-bar strong,.fantasy-selection-bar b { color:#f4fbf7; }
+        .fantasy-selection-bar span { color:#95a39e; font-size:.78rem; }
+        .fantasy-advisor-heading { display:flex; flex-direction:column; gap:.15rem; margin:1rem 0 .55rem; padding:.8rem .95rem; border-left:3px solid #ffb020; border-radius:0 10px 10px 0; background:linear-gradient(90deg,rgba(255,176,32,.12),transparent); }
+        .fantasy-advisor-heading span { color:#ffcf72; font-size:.62rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-advisor-heading strong { color:#f4fbf7; font-size:1.05rem; }
+        .fantasy-xi-hero { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin:.25rem 0 .8rem; padding:1rem 1.1rem; border:1px solid rgba(98,216,255,.28); border-radius:13px; background:radial-gradient(circle at 92% 15%,rgba(98,216,255,.18),transparent 30%),linear-gradient(120deg,rgba(25,230,176,.1),rgba(8,10,11,.78)); }
+        .fantasy-xi-hero>div { display:flex; flex-direction:column; gap:.18rem; }
+        .fantasy-xi-hero span { color:#62d8ff; font-size:.65rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-xi-hero strong { color:#f4fbf7; font-size:1.12rem; }
+        .fantasy-xi-hero small { color:#95a39e; }
+        .fantasy-xi-hero b { min-width:66px; height:66px; display:grid; place-items:center; border:1px solid rgba(98,216,255,.55); border-radius:50%; color:#07100d; background:#62d8ff; font-size:1.08rem; box-shadow:0 0 30px rgba(98,216,255,.18); }
         div[data-testid="stDataFrame"] { overflow:hidden; border:1px solid rgba(25,230,176,.2); border-radius:4px 4px 12px 12px; box-shadow:0 14px 36px rgba(0,0,0,.18); }
         .fantasy-player-hero { --role:#19e6b0; display:grid; grid-template-columns:auto 1fr auto; gap:.9rem; align-items:center; margin:1.15rem 0 .75rem; padding:1rem; border:1px solid color-mix(in srgb,var(--role) 42%,transparent); border-radius:13px; background:radial-gradient(circle at 88% 12%,color-mix(in srgb,var(--role) 18%,transparent),transparent 32%),linear-gradient(125deg,rgba(244,251,247,.055),rgba(8,10,11,.92)); }
         .fantasy-player-hero.role-p { --role:#ffb020; }
@@ -1136,6 +1531,11 @@ def render_fantasy_styles() -> None:
             .fantasy-player-score strong { font-size:1.35rem; }
             .fantasy-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-table-heading span { display:none; }
+            .fantasy-selection-bar { align-items:flex-start; }
+            .fantasy-selection-bar span { display:none; }
+            .fantasy-xi-hero { align-items:flex-start; padding:.85rem; }
+            .fantasy-xi-hero small { font-size:.72rem; }
+            .fantasy-xi-hero b { min-width:54px; height:54px; }
             .fantasy-role-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-insights { grid-template-columns:1fr; }
             .fantasy-empty { padding:1.25rem .8rem; }
