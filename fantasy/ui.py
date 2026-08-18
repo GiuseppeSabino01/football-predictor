@@ -93,7 +93,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v18 · Decision Center")
+    st.caption("Fantacalcio · Build 2026.08.18 v19 · Explainable Alerts")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -146,8 +146,23 @@ def _cached_fantasy_news() -> list[dict[str, str]]:
             href = f"https://www.fantacalcio.it{href}"
         if not href.startswith("http") or href in seen:
             continue
+        summary = ""
+        card = link.find_parent(["article", "li"])
+        if card:
+            paragraph = card.find("p")
+            if paragraph:
+                candidate = " ".join(paragraph.get_text(" ", strip=True).split())
+                if candidate.casefold() != title.casefold():
+                    summary = candidate[:280]
         seen.add(href)
-        news.append({"title": title[:180], "url": href, "source": "Fantacalcio.it"})
+        news.append(
+            {
+                "title": title[:180],
+                "summary": summary,
+                "url": href,
+                "source": "Fantacalcio.it",
+            }
+        )
         if len(news) >= 40:
             break
     return news
@@ -2829,11 +2844,22 @@ def _render_alert_center(
         source_html = escape(str(alert.get("source") or "Analisi rosa"))
         if url.startswith("http"):
             source_html = f'<a href="{escape(url, quote=True)}" target="_blank">{source_html} ↗</a>'
+        evidence_title = str(alert.get("evidence_title") or "").strip()
+        evidence_html = (
+            f'<div class="fantasy-alert-evidence"><em>NOTIZIA COLLEGATA</em>'
+            f'<b>{escape(evidence_title)}</b></div>'
+            if evidence_title else
+            '<div class="fantasy-alert-evidence no-news"><em>NESSUNA NOTIZIA VERIFICATA</em>'
+            '<b>Segnale generato dagli indicatori statistici, non da una news.</b></div>'
+            if severity in {"high", "medium"} and "Rischio fisico" in str(alert.get("title"))
+            else ""
+        )
         st.markdown(
             f'<article class="fantasy-alert-card {severity}{unread_class}"><span></span><div>'
             f'<small>{"NUOVO · " if unread_class else ""}{source_html}</small>'
             f'<strong>{escape(str(alert.get("title") or ""))}</strong>'
-            f'<p>{escape(str(alert.get("message") or ""))}</p></div></article>',
+            f'{evidence_html}<p><b>MOTIVO</b>{escape(str(alert.get("message") or ""))}</p>'
+            f'</div></article>',
             unsafe_allow_html=True,
         )
     st.caption(
@@ -3571,7 +3597,14 @@ def render_fantasy_styles() -> None:
         .fantasy-alert-card>div { display:flex; flex-direction:column; gap:.12rem; }
         .fantasy-alert-card small,.fantasy-alert-card small a { color:#62d8ff; font-size:.52rem; font-weight:900; letter-spacing:.07em; text-decoration:none; }
         .fantasy-alert-card strong { color:#f4fbf7; }
-        .fantasy-alert-card p { margin:0; color:#9eaca7; font-size:.76rem; }
+        .fantasy-alert-card p { display:flex; flex-direction:column; gap:.14rem; margin:.28rem 0 0; color:#b3c0bb; font-size:.76rem; line-height:1.42; }
+        .fantasy-alert-card p>b { color:#ffcf72; font-size:.5rem; letter-spacing:.1em; }
+        .fantasy-alert-evidence { display:flex; flex-direction:column; gap:.18rem; margin:.32rem 0 .08rem; padding:.62rem .7rem; border:1px solid rgba(244,83,138,.34); border-left:4px solid #f4538a; border-radius:8px; background:linear-gradient(110deg,rgba(244,83,138,.13),rgba(8,10,11,.42)); }
+        .fantasy-alert-evidence em { color:#ff8db4; font-size:.5rem; font-style:normal; font-weight:950; letter-spacing:.1em; }
+        .fantasy-alert-evidence b { color:#f9fffc; font-size:.8rem; line-height:1.35; }
+        .fantasy-alert-evidence.no-news { border-color:rgba(255,176,32,.26); border-left-color:#ffb020; background:linear-gradient(110deg,rgba(255,176,32,.08),rgba(8,10,11,.42)); }
+        .fantasy-alert-evidence.no-news em { color:#ffcf72; }
+        .fantasy-alert-evidence.no-news b { color:#a8b5b0; font-size:.7rem; font-weight:700; }
         @media (max-width:720px) {
             .fantasy-league-hero { grid-template-columns:1fr auto; }
             .fantasy-mode-stack { grid-column:1/3; justify-content:flex-start; }
