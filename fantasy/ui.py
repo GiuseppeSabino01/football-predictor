@@ -73,7 +73,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v15 · Barre scouting native")
+    st.caption("Fantacalcio · Build 2026.08.18 v16 · Contrasto fasce e valori")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -809,7 +809,8 @@ def _auction_metric_style(color: str) -> JsCode:
                 backgroundPosition: 'center calc(100% - 4px)',
                 backgroundRepeat: 'no-repeat',
                 fontWeight: '800',
-                textAlign: 'right'
+                textAlign: 'right',
+                color: '#f4fbf7'
             }};
         }}"""
     )
@@ -959,9 +960,6 @@ def _render_auction_catalog_editor(
             ),
             "border-left": f"5px solid {hex_color} !important",
             "box-shadow": f"inset 0 0 18px color-mix(in srgb, {hex_color} 10%, transparent)",
-        }
-        tier_row_css[f".{class_name} .ag-cell"] = {
-            "background": "transparent !important",
         }
     grid_options = {
         "defaultColDef": {
@@ -1119,7 +1117,6 @@ def _render_auction_catalog_editor(
                 "filter": "grayscale(1) !important",
             },
             ".fantasy-player-assigned .ag-cell": {
-                "background": "transparent !important",
                 "color": "#5b6661 !important",
             },
         },
