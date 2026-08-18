@@ -22,12 +22,20 @@ from fantasy.service import (
     ROLE_LABELS,
     add_purchase,
     add_purchases_batch,
+    auction_manager_summary,
+    auction_managers,
+    auction_price_board,
+    auction_taken_player_ids,
     create_league,
     delete_league,
     find_league,
+    list_trade_analysis,
+    record_auction_purchase,
+    remove_auction_purchase,
     remove_purchase,
     reset_preferred_xi,
     role_balance_recommendation,
+    rename_auction_manager,
     roster_summary,
     set_captain,
     set_preferred_xi,
@@ -49,7 +57,7 @@ SASA_ANALYSIS_VERSION = 2
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Player Board v5 · campo Top 11 + SaSa rosa completa")
+    st.caption("Fantacalcio · Build 2026.08.18 v6 · Top 11 WOW + Swap Lab + Asta Live")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -186,8 +194,7 @@ def _render_league_switcher(
     current_id = workspace.get("active_league_id")
     current_index = league_ids.index(current_id) if current_id in league_ids else 0
 
-    selector, create_column, settings_column = st.columns([2.35, 0.75, 0.75])
-    selected_id = selector.selectbox(
+    selected_id = st.selectbox(
         "Il mio fantacalcio",
         league_ids,
         index=current_index,
@@ -200,16 +207,44 @@ def _render_league_switcher(
         workspace["active_league_id"] = selected_id
         _save_workspace(workspace, storage)
 
-    with create_column.popover("+ Nuovo", use_container_width=True):
-        st.markdown("#### Nuovo fantacalcio")
-        _render_create_form(workspace, storage, "popover")
-
     league = find_league(workspace, selected_id)
     if not league:
         return None
-    with settings_column.popover("Gestisci", use_container_width=True):
+
+    create_column, settings_column, delete_column = st.columns(3)
+    with create_column.popover("+ Nuovo", use_container_width=True):
+        st.markdown("#### Nuovo fantacalcio")
+        _render_create_form(workspace, storage, "popover")
+    with settings_column.popover("Impostazioni", use_container_width=True):
         _render_manage_form(workspace, league, storage)
+    with delete_column.popover("Elimina", use_container_width=True):
+        _render_delete_league(workspace, league, storage)
     return league
+
+
+def _render_delete_league(
+    workspace: dict[str, Any], league: dict[str, Any], storage: FantasyWorkspaceStorage
+) -> None:
+    league_name = str(league.get("name") or "")
+    st.markdown("#### Elimina fantacalcio")
+    st.warning(
+        "Verranno eliminati rosa, Top 11, preferenze e analisi di questo fantacalcio. "
+        "Gli altri fanta non verranno modificati."
+    )
+    typed_name = st.text_input(
+        f"Scrivi {league_name} per confermare",
+        key=f"delete_name_{league['id']}",
+    )
+    if st.button(
+        "Elimina definitivamente",
+        disabled=typed_name.strip() != league_name,
+        use_container_width=True,
+        key=f"delete_league_{league['id']}",
+    ):
+        delete_league(workspace, league["id"])
+        _save_workspace(workspace, storage)
+        st.session_state.pop("fantasy_league_selector", None)
+        st.rerun()
 
 
 def _render_create_form(
@@ -228,10 +263,22 @@ def _render_create_form(
     )
     with st.form(f"create_fantasy_league_{key_suffix}"):
         name = st.text_input("Nome", placeholder="Es. Fanta amici")
-        budget = st.number_input("Budget", min_value=50, max_value=2000, value=250, step=10)
+        budget = st.number_input(
+            "Crediti iniziali per ogni partecipante"
+            if game_mode == GAME_MODE_AUCTION else "Budget rosa",
+            min_value=50,
+            max_value=2000,
+            value=500 if game_mode == GAME_MODE_AUCTION else 250,
+            step=10,
+        )
         participants = None
         if game_mode == GAME_MODE_AUCTION:
-            participants = st.number_input("Partecipanti", min_value=2, max_value=30, value=10)
+            participants = st.number_input(
+                "Numero totale partecipanti (te compreso)",
+                min_value=2,
+                max_value=30,
+                value=10,
+            )
         season = st.text_input("Stagione", value="2026/27")
         st.markdown("**Composizione rosa**")
         slot_columns = st.columns(4)
@@ -286,7 +333,8 @@ def _render_manage_form(
     with st.form(f"manage_league_{league['id']}"):
         name = st.text_input("Nome", value=league["name"])
         budget = st.number_input(
-            "Budget iniziale",
+            "Crediti iniziali per ogni partecipante"
+            if game_mode == GAME_MODE_AUCTION else "Budget rosa",
             min_value=1,
             max_value=5000,
             value=int(league.get("initial_budget", 250)),
@@ -294,7 +342,7 @@ def _render_manage_form(
         participants = None
         if game_mode == GAME_MODE_AUCTION:
             participants = st.number_input(
-                "Partecipanti",
+                "Numero totale partecipanti (te compreso)",
                 min_value=2,
                 max_value=30,
                 value=int(league.get("participants") or 10),
@@ -338,20 +386,6 @@ def _render_manage_form(
             _save_workspace(workspace, storage)
             st.rerun()
 
-    st.divider()
-    confirm_delete = st.checkbox("Confermo l'eliminazione", key=f"confirm_delete_{league['id']}")
-    if st.button(
-        "Elimina questo fanta",
-        disabled=not confirm_delete,
-        use_container_width=True,
-        key=f"delete_league_{league['id']}",
-    ):
-        delete_league(workspace, league["id"])
-        _save_workspace(workspace, storage)
-        st.session_state.pop("fantasy_league_selector", None)
-        st.rerun()
-
-
 def _render_league_hero(league: dict[str, Any], summary: dict[str, Any]) -> None:
     completion = int(100 * summary["roster_size"] / max(summary["target_size"], 1))
     list_mode = league.get("game_mode") == GAME_MODE_LIST
@@ -384,11 +418,20 @@ def _render_preparation(
     catalog = workspace.get("catalog", [])
     watchlist = set(league.get("watchlist", []))
     summary = roster_summary(league)
-    purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
+    list_mode = league.get("game_mode") == GAME_MODE_LIST
+    if not list_mode:
+        _render_auction_room(workspace, league, storage, catalog)
+    purchased_ids = (
+        {str(row.get("player_id")) for row in league.get("purchases", [])}
+        if list_mode else auction_taken_player_ids(league)
+    )
     metric_a, metric_b, metric_c = st.columns(3)
     metric_a.metric("Giocatori nel listone", len(catalog))
     metric_b.metric("Osservati", len(watchlist))
-    metric_c.metric("Gia acquistati", len(league.get("purchases", [])))
+    metric_c.metric(
+        "Gia acquistati" if list_mode else "Aggiudicati nell'asta",
+        len(league.get("purchases", [])) if list_mode else len(purchased_ids),
+    )
 
     meta = workspace.get("catalog_meta", {})
     source_status = "AGGIORNATO" if meta.get("remote_ok") else "BASE VERIFICATA"
@@ -421,19 +464,41 @@ def _render_preparation(
     progress = summary["roster_size"] / max(summary["target_size"], 1)
     st.progress(min(progress, 1.0), text=f"Rosa completata al {progress:.0%}")
     _render_role_plan(league, summary)
-    _render_role_advisors(workspace, league, storage, catalog)
+    advisor_catalog = (
+        catalog if list_mode else [
+            player for player in catalog if str(player.get("id")) not in purchased_ids
+        ]
+    )
+    _render_role_advisors(workspace, league, storage, advisor_catalog)
 
     search_column, role_column, team_column, sort_column = st.columns([1.5, 0.8, 1.1, 1.1])
     search = search_column.text_input("Cerca", placeholder="Nome giocatore")
     selected_roles = role_column.multiselect("Ruolo", list(ROLE_LABELS), default=list(ROLE_LABELS))
     teams = sorted({str(player.get("team", "")) for player in catalog if player.get("team")})
     selected_teams = team_column.multiselect("Squadra", teams)
+    sort_options = ["Indice", "Quotazione", "FVM / 1000", "Quotazione prevista", "Gol attesi", "Assist attesi", "Titolarita %"]
+    if not list_mode:
+        sort_options = ["Spesa strategica", "Spesa aggiornata", "Spesa iniziale", *sort_options]
     sort_label = sort_column.selectbox(
         "Ordina per",
-        ["Indice", "Quotazione", "FVM / 1000", "Quotazione prevista", "Gol attesi", "Assist attesi", "Titolarita %"],
+        sort_options,
     )
 
     frame = catalog_dataframe(catalog)
+    if not list_mode:
+        price_board = auction_price_board(league, catalog)
+        frame["Spesa iniziale"] = frame["_id"].map(
+            lambda player_id: price_board.get(str(player_id), {}).get("initial")
+        )
+        frame["Spesa aggiornata"] = frame["_id"].map(
+            lambda player_id: price_board.get(str(player_id), {}).get("updated")
+        )
+        frame["Spesa strategica"] = frame["_id"].map(
+            lambda player_id: price_board.get(str(player_id), {}).get("strategic")
+        )
+        frame["Comparabili"] = frame["_id"].map(
+            lambda player_id: price_board.get(str(player_id), {}).get("comparables", 0)
+        )
     if search:
         frame = frame[frame["Giocatore"].str.contains(search, case=False, na=False)]
     if selected_roles:
@@ -454,7 +519,7 @@ def _render_preparation(
     selected_ids = _render_catalog_table(
         frame,
         key=f"catalog_board_{league['id']}_{board_version}",
-        selection_mode="multi-row",
+        selection_mode="multi-row" if list_mode else "single-row",
         purchased_ids=purchased_ids,
         watchlist=watchlist,
     )
@@ -491,6 +556,134 @@ def _render_preparation(
         _render_quick_purchase(workspace, league, storage)
 
 
+def _render_auction_room(
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    catalog: list[dict[str, Any]],
+) -> None:
+    managers = auction_managers(league)
+    summaries = {
+        str(manager.get("id")): auction_manager_summary(league, str(manager.get("id")))
+        for manager in managers
+    }
+    total_purchases = sum(summary["roster_size"] for summary in summaries.values())
+    highest_opponent = max(
+        (
+            summary["remaining_budget"]
+            for manager_id, summary in summaries.items()
+            if not summary["manager"].get("is_user")
+        ),
+        default=0,
+    )
+    cards = []
+    for manager in managers:
+        manager_id = str(manager.get("id"))
+        summary = summaries[manager_id]
+        owner_class = " owner" if manager.get("is_user") else ""
+        cards.append(
+            f'<div class="fantasy-manager-card{owner_class}"><span>'
+            f'{"TU" if manager.get("is_user") else "RIVALE"}</span>'
+            f'<strong>{escape(str(manager.get("name") or ""))}</strong>'
+            f'<small>{summary["roster_size"]}/{summary["target_size"]} giocatori</small>'
+            f'<b>{summary["remaining_budget"]:.0f} CR</b></div>'
+        )
+    st.markdown(
+        f'<section class="fantasy-auction-hero"><div><span>LIVE AUCTION ROOM</span>'
+        f'<strong>Mercato adattivo</strong><small>{len(managers)} partecipanti · '
+        f'{total_purchases} aggiudicazioni registrate</small></div>'
+        f'<aside><small>PIU CREDITO TRA I RIVALI</small><b>{highest_opponent:.0f}</b></aside></section>'
+        f'<div class="fantasy-manager-grid">{"".join(cards)}</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "La spesa aggiornata usa tutte le aggiudicazioni di giocatori dello stesso ruolo e fascia. "
+        "Il massimo strategico considera anche i crediti residui degli avversari e il budget da "
+        "conservare per completare la tua rosa."
+    )
+    with st.expander("Gestisci partecipanti e rose dell'asta"):
+        st.markdown("##### Nomi delle squadre")
+        with st.form(f"auction_manager_names_{league['id']}"):
+            name_columns = st.columns(2)
+            manager_names = {
+                str(manager.get("id")): name_columns[index % 2].text_input(
+                    "La mia squadra" if manager.get("is_user") else f"Partecipante {index + 1}",
+                    value=str(manager.get("name") or ""),
+                    key=f"auction_manager_name_{league['id']}_{manager.get('id')}",
+                )
+                for index, manager in enumerate(managers)
+            }
+            save_names = st.form_submit_button(
+                "Salva nomi", type="primary", use_container_width=True
+            )
+        if save_names:
+            clean_names = [name.strip() for name in manager_names.values()]
+            if any(not name for name in clean_names):
+                st.error("Inserisci un nome per ogni partecipante.")
+            elif len({name.casefold() for name in clean_names}) != len(clean_names):
+                st.error("I nomi dei partecipanti devono essere diversi.")
+            else:
+                for manager_id, name in manager_names.items():
+                    rename_auction_manager(league, manager_id, name)
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.rerun()
+
+        st.markdown("##### Rose registrate")
+        selected_manager_id = st.selectbox(
+            "Visualizza squadra",
+            [str(manager.get("id")) for manager in managers],
+            format_func=lambda value: next(
+                str(manager.get("name")) for manager in managers if manager.get("id") == value
+            ),
+            key=f"auction_roster_manager_{league['id']}",
+        )
+        selected_summary = summaries[selected_manager_id]
+        purchases = selected_summary["purchases"]
+        budget_a, budget_b, budget_c = st.columns(3)
+        budget_a.metric("Spesi", f"{selected_summary['spent']:.0f}")
+        budget_b.metric("Crediti residui", f"{selected_summary['remaining_budget']:.0f}")
+        budget_c.metric("Giocatori", f"{selected_summary['roster_size']}/{selected_summary['target_size']}")
+        if purchases:
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Ruolo": row.get("role"),
+                            "Giocatore": row.get("name"),
+                            "Squadra": row.get("team"),
+                            "Prezzo": row.get("price"),
+                            "Fascia": row.get("tier"),
+                        }
+                        for row in purchases
+                    ]
+                ),
+                hide_index=True,
+                use_container_width=True,
+            )
+            correction_column, remove_column = st.columns([2.2, 0.8])
+            correction_id = correction_column.selectbox(
+                "Correggi un'aggiudicazione",
+                [str(row.get("player_id")) for row in purchases],
+                format_func=lambda value: next(
+                    str(row.get("name")) for row in purchases
+                    if str(row.get("player_id")) == value
+                ),
+                key=f"auction_remove_select_{league['id']}_{selected_manager_id}",
+            )
+            if remove_column.button(
+                "Rimuovi",
+                use_container_width=True,
+                key=f"auction_remove_{league['id']}_{selected_manager_id}",
+            ):
+                remove_auction_purchase(league, selected_manager_id, correction_id)
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.rerun()
+        else:
+            st.info("Nessuna aggiudicazione registrata per questa squadra.")
+
+
 def _render_catalog_table(
     frame: pd.DataFrame,
     *,
@@ -516,6 +709,12 @@ def _render_catalog_table(
         "Indice",
         "Fascia",
     ]
+    auction_columns = [
+        column
+        for column in ("Spesa iniziale", "Spesa aggiornata", "Spesa strategica", "Comparabili")
+        if column in indexed.columns
+    ]
+    compact_columns = compact_columns[:4] + auction_columns + compact_columns[4:]
     display = indexed[compact_columns].copy()
     display.insert(
         0,
@@ -546,6 +745,18 @@ def _render_catalog_table(
             "Giocatore": st.column_config.TextColumn(width="large"),
             "Squadra": st.column_config.TextColumn(width="small"),
             "Quotazione": st.column_config.NumberColumn("Q", format="%.0f", width="small"),
+            "Spesa iniziale": st.column_config.NumberColumn(
+                "Spesa iniziale", format="%.0f", width="small"
+            ),
+            "Spesa aggiornata": st.column_config.NumberColumn(
+                "Spesa aggiornata", format="%.0f", width="small"
+            ),
+            "Spesa strategica": st.column_config.NumberColumn(
+                "Max strategico", format="%.0f", width="small"
+            ),
+            "Comparabili": st.column_config.NumberColumn(
+                "Confronti", format="%d", width="small"
+            ),
             "FM attesa": st.column_config.NumberColumn(format="%.2f", width="small"),
             "Gol attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
             "Assist attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
@@ -585,10 +796,14 @@ def _render_board_actions(
     version_key: str,
 ) -> None:
     if not selected_ids:
-        st.caption("Usa le caselle a sinistra della tabella per selezionare uno o piu giocatori.")
+        st.caption("Seleziona un giocatore dalla tabella per registrare l'aggiudicazione.")
         return
     by_id = {str(player.get("id")): player for player in catalog}
-    purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
+    list_mode = league.get("game_mode") == GAME_MODE_LIST
+    purchased_ids = (
+        {str(row.get("player_id")) for row in league.get("purchases", [])}
+        if list_mode else auction_taken_player_ids(league)
+    )
     selected_players = [
         by_id[player_id]
         for player_id in selected_ids
@@ -608,22 +823,39 @@ def _render_board_actions(
     if already_owned:
         st.caption(f"{already_owned} giocatori selezionati sono gia presenti nella rosa e verranno ignorati.")
 
-    list_mode = league.get("game_mode") == GAME_MODE_LIST
     price = None
+    manager_id = None
     if not list_mode and len(selected_players) == 1:
         player = selected_players[0]
-        summary = roster_summary(league)
-        default_price = min(
-            max(float(player.get("quote") or 1), 0.0),
-            float(summary["remaining_budget"]),
+        managers = auction_managers(league)
+        price_board = auction_price_board(league, catalog)
+        estimate = price_board.get(str(player.get("id")), {})
+        manager_column, price_column = st.columns([1.45, 0.75])
+        manager_id = manager_column.selectbox(
+            "Squadra che ha acquistato",
+            [str(manager.get("id")) for manager in managers],
+            format_func=lambda value: next(
+                str(manager.get("name")) for manager in managers if manager.get("id") == value
+            ),
+            key=f"board_manager_{league['id']}_{player.get('id')}",
         )
-        price = st.number_input(
+        manager_summary = auction_manager_summary(league, manager_id)
+        default_price = min(
+            float(estimate.get("strategic") or estimate.get("updated") or 1),
+            float(manager_summary["remaining_budget"]),
+        )
+        price = price_column.number_input(
             "Prezzo asta",
             min_value=0.0,
-            max_value=float(max(summary["remaining_budget"], 1)),
+            max_value=float(max(manager_summary["remaining_budget"], 1)),
             value=default_price,
             step=1.0,
             key=f"board_price_{league['id']}_{player.get('id')}",
+        )
+        st.caption(
+            f"Base {estimate.get('initial', 0):.0f} · aggiornata {estimate.get('updated', 0):.0f} · "
+            f"massimo strategico {estimate.get('strategic', 0):.0f} · "
+            f"{estimate.get('comparables', 0)} acquisti comparabili"
         )
     elif not list_mode and len(selected_players) > 1:
         st.info("In modalita asta seleziona un solo giocatore alla volta per indicare il prezzo battuto.")
@@ -642,11 +874,15 @@ def _render_board_actions(
         key=f"board_add_{league['id']}",
     ):
         try:
-            prices = (
-                {str(selected_players[0].get("id")): float(price or 0)}
-                if not list_mode else None
-            )
-            add_purchases_batch(league, selected_players, prices)
+            if list_mode:
+                add_purchases_batch(league, selected_players)
+            else:
+                record_auction_purchase(
+                    league,
+                    str(manager_id),
+                    selected_players[0],
+                    float(price or 0),
+                )
         except ValueError as error:
             st.error(str(error))
         else:
@@ -1154,6 +1390,8 @@ def _render_my_squad(
         _render_captain_control(workspace, league, storage)
     with st.expander(f"Rosa completa · {len(league.get('purchases', []))} giocatori"):
         _render_roster_table(workspace, league, storage)
+    if league.get("game_mode") == GAME_MODE_LIST and summary["complete"]:
+        _render_swap_lab(league, workspace.get("catalog", []))
     _render_sasa_analysis(workspace, league, storage, settings, summary, xi_summary)
 
 
@@ -1208,7 +1446,8 @@ def _render_top_xi_editor(
     role_titles = {"A": "ATTACCO", "C": "CENTROCAMPO", "D": "DIFESA", "P": "PORTA"}
     with st.container(key="top_xi_pitch"):
         st.markdown(
-            f'<div class="fantasy-pitch-title"><span>FORMAZIONE TITOLARE</span>'
+            f'<div class="fantasy-pitch-title"><div><span>STARTING XI</span>'
+            f'<small>{escape(str(league.get("name", "")))}</small></div>'
             f'<strong>{escape(formation)}</strong></div>',
             unsafe_allow_html=True,
         )
@@ -1221,7 +1460,6 @@ def _render_top_xi_editor(
             slot_columns = _pitch_slot_columns(required)
             for slot_index, column in enumerate(slot_columns):
                 with column:
-                    st.caption(f"{role}{slot_index + 1}")
                     default_id = (
                         defaults_by_role[role][slot_index]
                         if slot_index < len(defaults_by_role[role]) else None
@@ -1252,6 +1490,24 @@ def _render_top_xi_editor(
                     )
                     if selected_id is not None:
                         selected_ids.append(selected_id)
+                        st.markdown(
+                            _lineup_player_card(
+                                by_id[selected_id], f"{role}{slot_index + 1}"
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            f'<div class="fantasy-lineup-card empty role-{role.lower()}">'
+                            f'<span>{role}{slot_index + 1}</span><strong>POSTO LIBERO</strong></div>',
+                            unsafe_allow_html=True,
+                        )
+        selected_cost = sum(float(by_id[player_id].get("price") or 0) for player_id in selected_ids)
+        st.markdown(
+            f'<div class="fantasy-pitch-footer"><span>XI LAB · {len(selected_ids)}/11</span>'
+            f'<strong>{selected_cost:.0f} CREDITI IN CAMPO</strong></div>',
+            unsafe_allow_html=True,
+        )
     save_column, reset_column = st.columns([1.35, 0.85])
     selection_complete = len(selected_ids) == 11 and len(set(selected_ids)) == 11
     if save_column.button(
@@ -1282,6 +1538,21 @@ def _render_top_xi_editor(
     if not selection_complete:
         missing = 11 - len(set(selected_ids))
         st.warning(f"Completa il campo: mancano {missing} giocatori alla Top 11.")
+
+
+def _lineup_player_card(player: dict[str, Any], position: str) -> str:
+    name = str(player.get("name") or "Giocatore")
+    parts = [part for part in name.replace(".", " ").split() if part]
+    initials = "".join(part[0] for part in parts[:2]).upper() or "XI"
+    role = str(player.get("role") or "").lower()
+    fantasy_average = _format_stat(player.get("expected_fantasy_average"), 2)
+    return (
+        f'<div class="fantasy-lineup-card role-{role}">'
+        f'<div class="fantasy-lineup-shirt"><i>{escape(initials)}</i><span>{escape(position)}</span></div>'
+        f'<div class="fantasy-lineup-copy"><small>{escape(str(player.get("team") or "—"))}</small>'
+        f'<strong>{escape(name)}</strong><div><span>Q {float(player.get("price") or 0):.0f}</span>'
+        f'<span>FM {fantasy_average}</span></div></div></div>'
+    )
 
 
 def _pitch_slot_columns(count: int) -> list[Any]:
@@ -1393,6 +1664,59 @@ def _render_lineup(lineup: dict[str, Any], captain_player_id: str | None = None)
             f'<div class="fantasy-line"><span>{role}</span><div>{names}</div></div>'
         )
     st.markdown(f'<div class="fantasy-pitch">{"".join(role_lines)}</div>', unsafe_allow_html=True)
+
+
+def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
+    analysis = list_trade_analysis(league, catalog, limit=5)
+    weak_names = " · ".join(
+        escape(str(row.get("name") or "")) for row in analysis.get("weakest", [])
+    )
+    st.markdown(
+        f'<section class="fantasy-swap-hero"><div><span>SASA · SWAP LAB</span>'
+        f'<strong>Upgrade a somma zero</strong><small>Ho analizzato tutti i '
+        f'{analysis.get("evaluated_players", 0)} giocatori della rosa e il listone completo.</small></div>'
+        f'<b>{len(analysis.get("trades", []))}</b></section>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Ogni proposta mantiene gli stessi ruoli, crediti in uscita = crediti in entrata "
+        f"e spesa totale entro {analysis.get('budget', 0):.0f}. "
+        + (f"Profili piu migliorabili: {weak_names}." if weak_names else "")
+    )
+    trades = analysis.get("trades", [])
+    if not trades:
+        st.info(str(analysis.get("reason") or "Nessun cambio migliorativo trovato."))
+        return
+    for index, trade in enumerate(trades, start=1):
+        outgoing = "".join(_swap_player_chip(row, "out") for row in trade["outgoing"])
+        incoming = "".join(_swap_player_chip(row, "in") for row in trade["incoming"])
+        deltas = trade["deltas"]
+        st.markdown(
+            f'<article class="fantasy-swap-card"><header><span>PROPOSTA {index}</span>'
+            f'<b>+{trade["improvement"]:.1f} UPGRADE SCORE</b></header>'
+            f'<div class="fantasy-swap-flow"><section><small>FUORI</small>{outgoing}</section>'
+            f'<div class="fantasy-swap-arrow"><strong>→</strong>'
+            f'<span>{trade["outgoing_total"]:.0f} = {trade["incoming_total"]:.0f} CR</span></div>'
+            f'<section><small>DENTRO</small>{incoming}</section></div>'
+            f'<div class="fantasy-swap-deltas">'
+            f'<span>Gol {deltas["goals"]:+.1f}</span>'
+            f'<span>Assist {deltas["assists"]:+.1f}</span>'
+            f'<span>Somma FM {deltas["fantasy_average"]:+.2f}</span>'
+            f'<span>Rosa {trade["projected_spent"]:.0f}/{analysis["budget"]:.0f} CR</span></div>'
+            f'<p>{escape(str(trade["motivation"]))}</p></article>',
+            unsafe_allow_html=True,
+        )
+
+
+def _swap_player_chip(player: dict[str, Any], direction: str) -> str:
+    role = escape(str(player.get("role") or ""))
+    name = escape(str(player.get("name") or ""))
+    team = escape(str(player.get("team") or ""))
+    quote = player.get("price") if direction == "out" else player.get("quote")
+    return (
+        f'<div class="fantasy-swap-player {direction}"><span>{role}</span>'
+        f'<div><strong>{name}</strong><small>{team} · Q {float(quote or 0):.0f}</small></div></div>'
+    )
 
 
 def _render_sasa_analysis(
@@ -1625,6 +1949,75 @@ def render_fantasy_styles() -> None:
         .fantasy-line { display:grid; grid-template-columns:32px 1fr; align-items:center; gap:.5rem; }
         .fantasy-line>span { width:30px; height:30px; display:grid; place-items:center; border-radius:50%; background:#19e6b0; color:#07100d; font-weight:950; }
         .fantasy-line>div { padding:.55rem .7rem; border-radius:8px; color:#f4fbf7; text-align:center; background:rgba(8,10,11,.72); border:1px solid rgba(255,255,255,.12); font-weight:750; }
+        .st-key-top_xi_pitch { padding:1rem 1.2rem 1.25rem; border:1px solid rgba(104,255,190,.52); border-radius:24px; background:radial-gradient(ellipse at 8% 0,rgba(132,255,218,.23),transparent 18%),radial-gradient(ellipse at 92% 0,rgba(132,255,218,.23),transparent 18%),radial-gradient(circle at 50% 50%,transparent 0 65px,rgba(237,255,246,.22) 66px 68px,transparent 69px),linear-gradient(to bottom,transparent 49.7%,rgba(237,255,246,.24) 49.8% 50.2%,transparent 50.3%),repeating-linear-gradient(90deg,rgba(7,69,49,.97) 0 12.5%,rgba(10,91,62,.97) 12.5% 25%); box-shadow:inset 0 0 100px rgba(0,0,0,.38),inset 0 14px 24px rgba(151,255,221,.08),0 28px 70px rgba(0,0,0,.36),0 0 0 7px rgba(5,15,13,.7); }
+        .st-key-top_xi_pitch:before { inset:1.1rem; border:2px solid rgba(237,255,246,.27); border-radius:7px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }
+        .st-key-top_xi_pitch:after { left:35%; right:35%; bottom:1.1rem; height:14%; border-color:rgba(237,255,246,.24); }
+        .fantasy-pitch-title { margin:0 0 .25rem; padding:.55rem .7rem; border:1px solid rgba(255,255,255,.1); background:linear-gradient(100deg,rgba(2,20,14,.86),rgba(8,44,31,.68)); box-shadow:0 10px 24px rgba(0,0,0,.2); }
+        .fantasy-pitch-title>div { display:flex; flex-direction:column; gap:.05rem; }
+        .fantasy-pitch-title small { color:#88a99c; font-size:.62rem; }
+        .fantasy-pitch-title strong { padding:.24rem .55rem; border:1px solid rgba(98,216,255,.35); border-radius:7px; color:#b8efff; background:rgba(98,216,255,.1); letter-spacing:.08em; }
+        .fantasy-pitch-role { margin:.42rem auto .05rem; border:1px solid rgba(255,255,255,.28); box-shadow:0 6px 18px rgba(0,0,0,.24); }
+        .st-key-top_xi_pitch [data-baseweb="select"]>div { min-height:34px; border-color:rgba(224,255,241,.2); border-radius:7px; background:rgba(3,18,14,.82); box-shadow:none; }
+        .st-key-top_xi_pitch [data-baseweb="select"] span { font-size:.62rem; }
+        .fantasy-lineup-card { --accent:#19e6b0; min-height:82px; display:grid; grid-template-columns:43px minmax(0,1fr); gap:.42rem; align-items:center; margin:.22rem 0 .06rem; padding:.44rem; overflow:hidden; border:1px solid color-mix(in srgb,var(--accent) 52%,transparent); border-radius:12px; background:linear-gradient(145deg,rgba(4,19,15,.96),rgba(7,35,25,.86)); box-shadow:0 12px 26px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.06); backdrop-filter:blur(7px); }
+        .fantasy-lineup-card.role-p { --accent:#ffb020; }
+        .fantasy-lineup-card.role-d { --accent:#19e6b0; }
+        .fantasy-lineup-card.role-c { --accent:#62d8ff; }
+        .fantasy-lineup-card.role-a { --accent:#f4538a; }
+        .fantasy-lineup-shirt { position:relative; width:40px; height:48px; display:grid; place-items:center; clip-path:polygon(18% 0,36% 8%,64% 8%,82% 0,100% 24%,85% 38%,80% 100%,20% 100%,15% 38%,0 24%); color:#07100d; background:linear-gradient(145deg,#fff,var(--accent) 52%,color-mix(in srgb,var(--accent) 74%,#000)); filter:drop-shadow(0 5px 6px rgba(0,0,0,.32)); }
+        .fantasy-lineup-shirt i { font-style:normal; font-size:.69rem; font-weight:950; }
+        .fantasy-lineup-shirt span { position:absolute; bottom:4px; color:rgba(7,16,13,.78); font-size:.47rem; font-weight:950; }
+        .fantasy-lineup-copy { min-width:0; display:flex; flex-direction:column; gap:.02rem; }
+        .fantasy-lineup-copy>small { color:var(--accent); font-size:.52rem; font-weight:950; letter-spacing:.07em; }
+        .fantasy-lineup-copy>strong { overflow:hidden; color:#f7fffb; font-size:.72rem; line-height:1.08; text-overflow:ellipsis; white-space:nowrap; }
+        .fantasy-lineup-copy>div { display:flex; flex-wrap:wrap; gap:.2rem; margin-top:.18rem; }
+        .fantasy-lineup-copy>div span { padding:.09rem .22rem; border-radius:4px; color:#c9ddd5; background:rgba(255,255,255,.07); font-size:.48rem; font-weight:800; }
+        .fantasy-lineup-card.empty { display:flex; flex-direction:column; justify-content:center; gap:.12rem; border-style:dashed; opacity:.7; text-align:center; }
+        .fantasy-lineup-card.empty span { color:var(--accent); font-size:.58rem; font-weight:950; }
+        .fantasy-lineup-card.empty strong { color:#c7d6d0; font-size:.59rem; letter-spacing:.05em; }
+        .fantasy-pitch-footer { display:flex; justify-content:space-between; align-items:center; margin-top:.55rem; padding:.42rem .65rem; border:1px solid rgba(255,255,255,.1); border-radius:8px; color:#a8c6ba; background:rgba(2,20,14,.76); font-size:.58rem; font-weight:900; letter-spacing:.07em; }
+        .fantasy-pitch-footer strong { color:#f4fbf7; }
+        .fantasy-swap-hero { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin:1.25rem 0 .35rem; padding:1rem 1.05rem; border:1px solid rgba(174,112,255,.42); border-radius:14px; background:radial-gradient(circle at 88% 0,rgba(174,112,255,.2),transparent 34%),linear-gradient(120deg,rgba(98,216,255,.08),rgba(8,10,11,.92)); }
+        .fantasy-swap-hero>div { display:flex; flex-direction:column; gap:.14rem; }
+        .fantasy-swap-hero span { color:#c9a7ff; font-size:.65rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-swap-hero strong { color:#f4fbf7; font-size:1.12rem; }
+        .fantasy-swap-hero small { color:#95a39e; }
+        .fantasy-swap-hero>b { min-width:55px; height:55px; display:grid; place-items:center; border-radius:16px; color:#0b0711; background:linear-gradient(145deg,#d6bdff,#9b65ee); font-size:1.2rem; box-shadow:0 0 28px rgba(174,112,255,.24); }
+        .fantasy-swap-card { margin:.7rem 0; padding:.8rem; border:1px solid rgba(244,251,247,.12); border-radius:13px; background:linear-gradient(145deg,rgba(244,251,247,.045),rgba(8,10,11,.78)); box-shadow:0 14px 34px rgba(0,0,0,.16); }
+        .fantasy-swap-card>header { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.65rem; }
+        .fantasy-swap-card>header span { color:#899791; font-size:.6rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-swap-card>header b { padding:.25rem .45rem; border-radius:6px; color:#c9a7ff; background:rgba(174,112,255,.12); font-size:.62rem; }
+        .fantasy-swap-flow { display:grid; grid-template-columns:1fr auto 1fr; gap:.7rem; align-items:center; }
+        .fantasy-swap-flow>section { display:flex; flex-direction:column; gap:.35rem; }
+        .fantasy-swap-flow>section>small { color:#899791; font-size:.56rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-swap-player { display:grid; grid-template-columns:31px 1fr; gap:.45rem; align-items:center; padding:.42rem .5rem; border-radius:8px; background:rgba(255,255,255,.035); }
+        .fantasy-swap-player>span { width:29px; height:29px; display:grid; place-items:center; border-radius:8px; color:#f4fbf7; background:rgba(244,83,138,.18); font-weight:950; }
+        .fantasy-swap-player.in>span { color:#07100d; background:#19e6b0; }
+        .fantasy-swap-player>div { min-width:0; display:flex; flex-direction:column; }
+        .fantasy-swap-player strong { overflow:hidden; color:#f4fbf7; font-size:.8rem; text-overflow:ellipsis; white-space:nowrap; }
+        .fantasy-swap-player small { color:#899791; font-size:.62rem; }
+        .fantasy-swap-arrow { display:flex; flex-direction:column; align-items:center; gap:.15rem; color:#c9a7ff; }
+        .fantasy-swap-arrow strong { font-size:1.5rem; }
+        .fantasy-swap-arrow span { padding:.15rem .3rem; border-radius:5px; color:#d8c4f8; background:rgba(174,112,255,.12); font-size:.55rem; font-weight:900; }
+        .fantasy-swap-deltas { display:flex; flex-wrap:wrap; gap:.35rem; margin:.65rem 0 .45rem; }
+        .fantasy-swap-deltas span { padding:.22rem .4rem; border:1px solid rgba(25,230,176,.22); border-radius:999px; color:#bceee0; background:rgba(25,230,176,.07); font-size:.62rem; font-weight:850; }
+        .fantasy-swap-card>p { margin:.2rem 0 0; color:#a8b5b0; font-size:.76rem; line-height:1.45; }
+        .fantasy-auction-hero { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin:.25rem 0 .65rem; padding:1rem 1.05rem; overflow:hidden; border:1px solid rgba(255,176,32,.38); border-radius:14px; background:radial-gradient(circle at 90% 0,rgba(255,176,32,.2),transparent 35%),linear-gradient(120deg,rgba(244,83,138,.08),rgba(8,10,11,.92)); }
+        .fantasy-auction-hero>div { display:flex; flex-direction:column; gap:.12rem; }
+        .fantasy-auction-hero span { color:#ffbe45; font-size:.64rem; font-weight:950; letter-spacing:.11em; }
+        .fantasy-auction-hero strong { color:#f4fbf7; font-size:1.16rem; }
+        .fantasy-auction-hero small { color:#95a39e; }
+        .fantasy-auction-hero aside { min-width:120px; display:flex; flex-direction:column; align-items:flex-end; }
+        .fantasy-auction-hero aside small { font-size:.5rem; font-weight:900; letter-spacing:.08em; }
+        .fantasy-auction-hero aside b { color:#ffbe45; font-size:1.75rem; line-height:1; }
+        .fantasy-manager-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:.48rem; margin-bottom:.55rem; }
+        .fantasy-manager-card { display:grid; grid-template-columns:1fr auto; gap:.05rem .4rem; align-items:center; padding:.62rem .7rem; border:1px solid rgba(244,251,247,.1); border-radius:10px; background:linear-gradient(140deg,rgba(244,251,247,.04),rgba(8,10,11,.58)); }
+        .fantasy-manager-card.owner { border-color:rgba(25,230,176,.36); background:linear-gradient(140deg,rgba(25,230,176,.1),rgba(8,10,11,.58)); }
+        .fantasy-manager-card>span { grid-column:1/3; color:#899791; font-size:.48rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-manager-card.owner>span { color:#19e6b0; }
+        .fantasy-manager-card>strong { overflow:hidden; color:#f4fbf7; font-size:.76rem; text-overflow:ellipsis; white-space:nowrap; }
+        .fantasy-manager-card>small { grid-column:1; color:#899791; font-size:.58rem; }
+        .fantasy-manager-card>b { grid-column:2; grid-row:2/4; color:#ffbe45; font-size:1.05rem; }
         @media (max-width:720px) {
             .fantasy-league-hero { grid-template-columns:1fr auto; }
             .fantasy-mode-stack { grid-column:1/3; justify-content:flex-start; }
@@ -1644,6 +2037,18 @@ def render_fantasy_styles() -> None:
             .st-key-top_xi_pitch:before { inset:.75rem .45rem; }
             .st-key-top_xi_pitch [data-baseweb="select"] span { font-size:.58rem; }
             .st-key-top_xi_pitch [data-baseweb="select"]>div { min-height:38px; padding-left:.25rem; padding-right:.15rem; }
+            .fantasy-lineup-card { min-height:68px; grid-template-columns:31px minmax(0,1fr); gap:.25rem; padding:.3rem; border-radius:9px; }
+            .fantasy-lineup-shirt { width:30px; height:38px; }
+            .fantasy-lineup-shirt i { font-size:.55rem; }
+            .fantasy-lineup-copy>strong { font-size:.58rem; }
+            .fantasy-lineup-copy>small,.fantasy-lineup-copy>div span { font-size:.43rem; }
+            .fantasy-pitch-footer { font-size:.48rem; }
+            .fantasy-swap-flow { grid-template-columns:1fr; }
+            .fantasy-swap-arrow { flex-direction:row; justify-content:center; }
+            .fantasy-swap-arrow strong { transform:rotate(90deg); }
+            .fantasy-auction-hero { align-items:flex-start; }
+            .fantasy-auction-hero aside { min-width:75px; }
+            .fantasy-manager-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-role-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-insights { grid-template-columns:1fr; }
             .fantasy-empty { padding:1.25rem .8rem; }
