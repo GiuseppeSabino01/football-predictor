@@ -100,6 +100,9 @@ def create_league(
         "purchases": [],
         "watchlist": [],
         "analysis": "",
+        "preferred_xi": [],
+        "preferred_xi_customized": False,
+        "sasa_analysis": "",
         "created_at": now,
         "updated_at": now,
     }
@@ -167,6 +170,7 @@ def update_league_settings(
         for purchase in league.get("purchases", []):
             if purchase.get("quote") is not None:
                 purchase["price"] = _number(purchase.get("quote"))
+    league["sasa_analysis"] = ""
 
 
 def delete_league(workspace: dict[str, Any], league_id: str) -> None:
@@ -227,16 +231,239 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
     league.setdefault("purchases", []).append(purchase)
     league["watchlist"] = [item for item in league.get("watchlist", []) if item != player_id]
     league["analysis"] = ""
+    league["sasa_analysis"] = ""
     league["updated_at"] = utc_now()
     return purchase
+
+
+def add_purchases_batch(
+    league: dict[str, Any],
+    players: list[dict[str, Any]],
+    prices: dict[str, float] | None = None,
+) -> list[dict[str, Any]]:
+    """Add a selection atomically, so an invalid player never leaves a partial roster."""
+    if not players:
+        raise ValueError("Seleziona almeno un giocatore.")
+    draft = deepcopy(league)
+    purchases = []
+    for player in players:
+        player_id = str(player.get("id", ""))
+        price = (prices or {}).get(player_id, _number(player.get("quote")))
+        purchases.append(add_purchase(draft, player, price))
+    league.clear()
+    league.update(draft)
+    return purchases
+
+
+def role_balance_recommendation(
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    role: str,
+    *,
+    limit: int = 5,
+) -> dict[str, Any] | None:
+    """Suggest complementary profiles once at least half of a role is filled."""
+    role = str(role).upper()
+    if role not in ROLE_LABELS:
+        return None
+    summary = roster_summary(league)
+    target = int(league.get("roster_slots", DEFAULT_ROSTER_SLOTS).get(role, 0))
+    owned = [row for row in league.get("purchases", []) if row.get("role") == role]
+    trigger = (target + 1) // 2
+    if target <= 0 or len(owned) < trigger or len(owned) >= target:
+        return None
+
+    purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
+    available = [
+        player
+        for player in catalog
+        if str(player.get("role", "")).upper() == role
+        and str(player.get("id")) not in purchased_ids
+        and _number(player.get("quote")) <= summary["remaining_budget"]
+    ]
+    if not available:
+        return {
+            "role": role,
+            "count": len(owned),
+            "target": target,
+            "focus": "availability",
+            "title": "Nessun profilo disponibile",
+            "reason": "Non risultano giocatori acquistabili con il budget rimasto.",
+            "candidates": [],
+        }
+
+    starter_average = _average(owned, "starter_probability")
+    goal_average = _average(owned, "expected_goals")
+    assist_average = _average(owned, "expected_assists")
+    reliability_average = _average(owned, "reliability")
+    fantasy_average = _average(owned, "expected_fantasy_average")
+    pool_goal_median = _median(_number(player.get("expected_goals")) for player in available)
+    pool_assist_median = _median(_number(player.get("expected_assists")) for player in available)
+    pool_fantasy_median = _median(
+        _number(player.get("expected_fantasy_average")) for player in available
+    )
+
+    if role == "P":
+        if starter_average < 72:
+            focus = "starter"
+            title = "Serve un portiere titolare"
+            reason = "La porta non ha ancora una base abbastanza stabile: privilegia presenze e affidabilita."
+        else:
+            focus = "reliability"
+            title = "Completa con affidabilita"
+            reason = "Hai gia titolarita: aggiungi un portiere con fantamedia e affidabilita migliori."
+    elif role == "D" and league.get("modifier_enabled") and reliability_average < 76:
+        focus = "reliability"
+        title = "Rinforza il modificatore"
+        reason = "I difensori scelti non garantiscono ancora abbastanza affidabilita per il modificatore."
+    else:
+        goal_floor = {"D": 1.2, "C": 3.0, "A": 8.0}.get(role, 0.0)
+        goal_benchmark = max(goal_floor, pool_goal_median * 0.8)
+        if goal_average < goal_benchmark:
+            focus = "goals"
+            title = "Aggiungi gol alla rosa"
+            prefix = "Hai costruito una buona base di titolari, ma" if starter_average >= 72 else "Al reparto"
+            reason = f"{prefix} manca produzione offensiva: cerca giocatori con piu gol attesi."
+        elif assist_average < pool_assist_median * 0.75:
+            focus = "assists"
+            title = "Serve creativita"
+            reason = "Il reparto ha finalizzazione, ma pochi assist attesi: completa con un creatore di gioco."
+        elif starter_average < 72:
+            focus = "starter"
+            title = "Metti in sicurezza la titolarita"
+            reason = "Il potenziale e buono, ma servono giocatori con maggiore continuita di impiego."
+        elif fantasy_average < pool_fantasy_median * 0.9:
+            focus = "fantasy_average"
+            title = "Alza la fantamedia"
+            reason = "Il reparto e equilibrato: il prossimo acquisto deve aumentare la qualita media."
+        else:
+            focus = "value"
+            title = "Cerca valore senza doppioni"
+            reason = "La struttura e equilibrata: privilegia il miglior rapporto tra costo, bonus e titolarita."
+
+    ranked = sorted(
+        available,
+        key=lambda player: _recommendation_score(player, focus),
+        reverse=True,
+    )[: max(int(limit), 1)]
+    return {
+        "role": role,
+        "count": len(owned),
+        "target": target,
+        "focus": focus,
+        "title": title,
+        "reason": reason,
+        "candidates": ranked,
+    }
+
+
+def _recommendation_score(player: dict[str, Any], focus: str) -> float:
+    goals = _number(player.get("expected_goals"))
+    assists = _number(player.get("expected_assists"))
+    starter = _number(player.get("starter_probability"))
+    reliability = _number(player.get("reliability"))
+    fantasy_average = _number(player.get("expected_fantasy_average"))
+    fantasy_score = _number(player.get("fantasy_score"))
+    value = _number(player.get("value"))
+    risk = _number(player.get("risk"))
+    quote = _number(player.get("quote"))
+    weights = {
+        "goals": goals * 12 + assists * 2.5,
+        "assists": assists * 11 + goals * 3,
+        "starter": starter * 0.55 + reliability * 0.2,
+        "reliability": reliability * 0.45 + starter * 0.25 - risk * 0.12,
+        "fantasy_average": fantasy_average * 12 + fantasy_score * 0.45,
+        "value": value * 0.35 + fantasy_score * 0.5 - quote * 0.08,
+    }
+    return (
+        weights.get(focus, 0.0)
+        + fantasy_average * 4
+        + starter * 0.08
+        + reliability * 0.05
+        - risk * 0.04
+    )
+
+
+def _average(players: list[dict[str, Any]], field: str) -> float:
+    return sum(_number(player.get(field)) for player in players) / max(len(players), 1)
+
+
+def _median(values) -> float:
+    ordered = sorted(float(value) for value in values)
+    if not ordered:
+        return 0.0
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
 
 
 def remove_purchase(league: dict[str, Any], player_id: str) -> None:
     league["purchases"] = [row for row in league.get("purchases", []) if row.get("player_id") != player_id]
     league["analysis"] = ""
+    league["sasa_analysis"] = ""
+    league["preferred_xi"] = [
+        item for item in league.get("preferred_xi", []) if item != player_id
+    ]
     if league.get("captain_player_id") == player_id:
         league["captain_player_id"] = None
     league["updated_at"] = utc_now()
+
+
+def selected_top_xi(league: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the saved XI, or the 11 most expensive purchases by default."""
+    purchases = league.get("purchases", [])
+    by_id = {str(row.get("player_id")): row for row in purchases}
+    if league.get("preferred_xi_customized"):
+        selected_ids = [
+            str(player_id)
+            for player_id in league.get("preferred_xi", [])
+            if str(player_id) in by_id
+        ][:11]
+        return [by_id[player_id] for player_id in selected_ids]
+    return sorted(
+        purchases,
+        key=lambda row: (
+            _number(row.get("price")),
+            _number(row.get("fantasy_score")),
+            str(row.get("name", "")),
+        ),
+        reverse=True,
+    )[:11]
+
+
+def set_preferred_xi(league: dict[str, Any], player_ids: list[str]) -> None:
+    clean_ids = list(dict.fromkeys(str(player_id) for player_id in player_ids))
+    expected_size = min(11, len(league.get("purchases", [])))
+    if len(clean_ids) != expected_size:
+        raise ValueError(f"Seleziona esattamente {expected_size} giocatori per la Top 11.")
+    purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
+    if any(player_id not in purchased_ids for player_id in clean_ids):
+        raise ValueError("La Top 11 puo contenere solo giocatori della tua rosa.")
+    league["preferred_xi"] = clean_ids
+    league["preferred_xi_customized"] = True
+    league["sasa_analysis"] = ""
+    league["updated_at"] = utc_now()
+
+
+def reset_preferred_xi(league: dict[str, Any]) -> None:
+    league["preferred_xi"] = []
+    league["preferred_xi_customized"] = False
+    league["sasa_analysis"] = ""
+    league["updated_at"] = utc_now()
+
+
+def top_xi_summary(league: dict[str, Any]) -> dict[str, Any]:
+    players = selected_top_xi(league)
+    return {
+        "players": players,
+        "player_ids": [str(row.get("player_id")) for row in players],
+        "count": len(players),
+        "expected_goals_average": _known_average(players, "expected_goals"),
+        "expected_assists_average": _known_average(players, "expected_assists"),
+        "expected_fantasy_average": _known_average(players, "expected_fantasy_average"),
+        "cost": sum(_number(row.get("price")) for row in players),
+    }
 
 
 def set_captain(league: dict[str, Any], player_id: str | None) -> None:
@@ -249,6 +476,7 @@ def set_captain(league: dict[str, Any], player_id: str | None) -> None:
     else:
         league["captain_player_id"] = player_id
     league["analysis"] = ""
+    league["sasa_analysis"] = ""
     league["updated_at"] = utc_now()
 
 
@@ -348,6 +576,9 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("purchases", [])
     league.setdefault("watchlist", [])
     league.setdefault("analysis", "")
+    league.setdefault("preferred_xi", [])
+    league.setdefault("preferred_xi_customized", False)
+    league.setdefault("sasa_analysis", "")
     league.setdefault("updated_at", utc_now())
 
 
@@ -365,3 +596,12 @@ def _optional_number(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _known_average(players: list[dict[str, Any]], field: str) -> float | None:
+    values = [
+        number
+        for player in players
+        if (number := _optional_number(player.get(field))) is not None
+    ]
+    return sum(values) / len(values) if values else None
