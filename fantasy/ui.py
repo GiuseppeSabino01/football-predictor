@@ -73,7 +73,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v12 · Fasce a riga colorata")
+    st.caption("Fantacalcio · Build 2026.08.18 v13 · Indicatori scouting")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -797,6 +797,30 @@ def _tier_option_label(tier: dict[str, Any]) -> str:
     return f"{marker} {str(tier.get('name') or 'Fascia')}"
 
 
+def _auction_metric_renderer(color: str, suffix: str = "") -> JsCode:
+    safe_suffix = json.dumps(suffix)
+    return JsCode(
+        f"""function(params) {{
+            const raw = Number(params.value);
+            if (!Number.isFinite(raw)) return '—';
+            const value = Math.max(0, Math.min(100, raw));
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:flex-end;padding:0 2px;';
+            const track = document.createElement('span');
+            track.style.cssText = 'position:absolute;left:2px;right:2px;bottom:4px;height:4px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;';
+            const bar = document.createElement('i');
+            bar.style.cssText = 'display:block;height:100%;width:' + value + '%;border-radius:999px;background:{color};box-shadow:0 0 8px {color};';
+            const label = document.createElement('b');
+            label.style.cssText = 'position:relative;color:inherit;font-size:11px;font-weight:800;';
+            label.textContent = Math.round(value) + {safe_suffix};
+            track.appendChild(bar);
+            wrapper.appendChild(track);
+            wrapper.appendChild(label);
+            return wrapper;
+        }}"""
+    )
+
+
 def _render_auction_catalog_editor(
     frame: pd.DataFrame,
     catalog: list[dict[str, Any]],
@@ -834,6 +858,14 @@ def _render_auction_catalog_editor(
         str(player_id): auction_player_tier(league, str(player_id))
         for player_id in indexed["_id"]
     }
+    catalog_by_id = {str(player.get("id")): player for player in catalog}
+
+    def player_metric(player_id: Any, field: str) -> float:
+        player = catalog_by_id.get(str(player_id), {})
+        value = _number_or_none(player.get(field), 0.0) or 0.0
+        if 0 < value <= 1:
+            value *= 100
+        return round(max(0.0, min(100.0, value)), 1)
 
     display = pd.DataFrame(
         {
@@ -873,12 +905,22 @@ def _render_auction_catalog_editor(
             "Spesa iniziale": indexed["Spesa iniziale"],
             "Spesa aggiornata": indexed["Spesa aggiornata"],
             "Max strategico": indexed["Spesa strategica"],
-            "Confronti": indexed["Comparabili"],
             "FM attesa": indexed["FM attesa"],
             "Gol attesi": indexed["Gol attesi"],
             "Assist attesi": indexed["Assist attesi"],
+            "Bonus": [player_metric(player_id, "bonus") for player_id in indexed["_id"]],
             "Titolarita": indexed["Titolarita %"],
-            "Score": indexed["Indice"],
+            "Affidabilita": [
+                player_metric(player_id, "reliability") for player_id in indexed["_id"]
+            ],
+            "Rischio infortuni": [
+                player_metric(player_id, "risk") for player_id in indexed["_id"]
+            ],
+            "Potenziale": [
+                player_metric(player_id, "potential") for player_id in indexed["_id"]
+            ],
+            "Valore": [player_metric(player_id, "value") for player_id in indexed["_id"]],
+            "Indice": indexed["Indice"],
             "Fascia": indexed["Fascia"],
         }
     )
@@ -973,12 +1015,47 @@ def _render_auction_catalog_editor(
             {"field": "Spesa iniziale", "width": 112, "type": "numericColumn"},
             {"field": "Spesa aggiornata", "width": 125, "type": "numericColumn"},
             {"field": "Max strategico", "width": 118, "type": "numericColumn"},
-            {"field": "Confronti", "width": 94, "type": "numericColumn"},
             {"field": "FM attesa", "width": 94, "type": "numericColumn"},
             {"field": "Gol attesi", "width": 92, "type": "numericColumn"},
             {"field": "Assist attesi", "width": 100, "type": "numericColumn"},
-            {"field": "Titolarita", "width": 92, "type": "numericColumn"},
-            {"field": "Score", "width": 80, "type": "numericColumn"},
+            {
+                "field": "Bonus",
+                "headerName": "Propensione bonus",
+                "width": 132,
+                "cellRenderer": _auction_metric_renderer("#ffb020"),
+            },
+            {
+                "field": "Titolarita",
+                "headerName": "Titolarità",
+                "width": 105,
+                "cellRenderer": _auction_metric_renderer("#19e6b0", "%"),
+            },
+            {
+                "field": "Affidabilita",
+                "headerName": "Affidabilità",
+                "width": 112,
+                "cellRenderer": _auction_metric_renderer("#62d8ff"),
+            },
+            {
+                "field": "Rischio infortuni",
+                "width": 125,
+                "cellRenderer": _auction_metric_renderer("#f4538a"),
+            },
+            {
+                "field": "Potenziale",
+                "width": 105,
+                "cellRenderer": _auction_metric_renderer("#b895ff"),
+            },
+            {
+                "field": "Valore",
+                "width": 90,
+                "cellRenderer": _auction_metric_renderer("#7de39d"),
+            },
+            {
+                "field": "Indice",
+                "width": 90,
+                "cellRenderer": _auction_metric_renderer("#19e6b0"),
+            },
             {"field": "Fascia", "width": 90},
         ],
         "getRowId": JsCode("function(params) { return params.data._player_id; }"),
@@ -1040,7 +1117,7 @@ def _render_auction_catalog_editor(
     if not isinstance(edited, pd.DataFrame):
         edited = pd.DataFrame(edited)
     changes: list[dict[str, Any]] = []
-    by_id = {str(player.get("id")): player for player in catalog}
+    by_id = catalog_by_id
     for _, edited_row in edited.iterrows():
         clean_id = str(edited_row.get("_player_id") or "")
         if clean_id not in assignments:
