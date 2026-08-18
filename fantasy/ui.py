@@ -93,7 +93,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v20 · Official News Alerts")
+    st.caption("Fantacalcio · Build 2026.08.18 v21 · Pinned Player Names")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -997,7 +997,6 @@ def _render_auction_catalog_editor(
             "Potenziale": [
                 player_metric(player_id, "potential") for player_id in indexed["_id"]
             ],
-            "Valore": [player_metric(player_id, "value") for player_id in indexed["_id"]],
             "Indice": indexed["Indice"],
             "Fascia": indexed["Fascia"],
         }
@@ -1084,7 +1083,15 @@ def _render_auction_catalog_editor(
                 "minWidth": 180,
             },
             {"field": "Ruolo", "width": 78},
-            {"field": "Giocatore", "minWidth": 190, "flex": 1},
+            {
+                "field": "Giocatore",
+                "headerName": "Giocatore",
+                "width": 180,
+                "minWidth": 150,
+                "pinned": "left",
+                "lockPinned": True,
+                "suppressMovable": True,
+            },
             {"field": "Squadra", "width": 86},
             {"field": "Q", "width": 65, "type": "numericColumn"},
             {"field": "Spesa iniziale", "width": 112, "type": "numericColumn"},
@@ -1127,12 +1134,6 @@ def _render_auction_catalog_editor(
                 "valueFormatter": _auction_metric_formatter(),
             },
             {
-                "field": "Valore",
-                "width": 90,
-                "cellStyle": _auction_metric_style("#7de39d"),
-                "valueFormatter": _auction_metric_formatter(),
-            },
-            {
                 "field": "Indice",
                 "width": 90,
                 "cellStyle": _auction_metric_style("#19e6b0"),
@@ -1172,6 +1173,15 @@ def _render_auction_catalog_editor(
             ".ag-header": {
                 "background": "#1a1f22 !important",
                 "border-bottom": "1px solid rgba(244,251,247,.13) !important",
+            },
+            ".ag-pinned-left-header": {
+                "border-right": "2px solid rgba(25,230,176,.32) !important",
+                "box-shadow": "8px 0 18px rgba(0,0,0,.24) !important",
+            },
+            ".ag-pinned-left-cols-container": {
+                "border-right": "2px solid rgba(25,230,176,.32) !important",
+                "box-shadow": "8px 0 18px rgba(0,0,0,.24) !important",
+                "z-index": "2 !important",
             },
             ".ag-row": {
                 "background": "#080b0a",
