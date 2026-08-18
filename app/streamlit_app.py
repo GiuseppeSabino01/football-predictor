@@ -21,6 +21,7 @@ import streamlit.components.v1 as components
 
 from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
 from config.settings import load_settings
+from fantasy.ui import render_fantasy_page
 from features.market_features import fair_odd, recommendation, value_score
 from features.team_strength import canonical_team_name
 from nlp.gemini_client import GeminiClient
@@ -31,9 +32,9 @@ from schemas import MatchPrediction, MarketPick
 
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
-SESSION_SCHEMA_VERSION = "gigi-v9"
+SESSION_SCHEMA_VERSION = "fantasy-v1"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
-VIEW_OPTIONS = ["Home", "Road To New York", "GiGi", "Predict manuale", "Config"]
+VIEW_OPTIONS = ["Home", "Road To New York", "Fantacalcio", "GiGi", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
 
 
@@ -89,6 +90,8 @@ def main() -> None:
         render_config()
     elif page == "Road To New York":
         render_road_to_new_york()
+    elif page == "Fantacalcio":
+        render_fantasy_page(settings())
     elif page == "GiGi":
         render_jarvis_page()
     elif page == "Predict manuale":
@@ -1297,16 +1300,24 @@ def render_login_header() -> None:
 
 
 def render_app_header(page: str) -> None:
+    if page == "Fantacalcio":
+        title = "Fantacalcio Command Center"
+        subtitle = "Prepara l'asta, gestisci piu squadre e trasforma ogni credito in un vantaggio."
+        chip = "FANTA LAB"
+    else:
+        title = "Football Betting Predictor"
+        subtitle = "Probabilita, value e segnali partita in un cockpit personale."
+        chip = "MODEL READY"
     st.markdown(
         f"""
         <div class="app-hero">
             <div class="app-hero-inner">
                 <div>
                     <p class="app-kicker">{escape(page)}</p>
-                    <h1 class="app-title">Football Betting Predictor</h1>
-                    <p class="app-subtitle">Probabilita, value e segnali partita in un cockpit personale.</p>
+                    <h1 class="app-title">{escape(title)}</h1>
+                    <p class="app-subtitle">{escape(subtitle)}</p>
                 </div>
-                <div class="hero-chip">MODEL READY</div>
+                <div class="hero-chip">{escape(chip)}</div>
             </div>
         </div>
         """,

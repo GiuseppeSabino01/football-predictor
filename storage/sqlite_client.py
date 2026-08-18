@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 from schemas import Match, MatchPrediction, NewsArticle, NewsSignal
@@ -155,6 +156,36 @@ class SQLiteStorage:
         except json.JSONDecodeError:
             return None
         return payload if isinstance(payload, dict) else None
+
+    def load_json_state(self, state_key: str) -> dict | None:
+        """Load generic app state from the existing JSON cache table."""
+        return self.load_llm_prediction(state_key)
+
+    def upsert_json_state(self, state_key: str, label: str, payload: dict) -> bool:
+        now = datetime.now().astimezone().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                insert into llm_prediction_cache (
+                    cache_key, match_id, match_label, match_date, model, generated_at, payload_json
+                )
+                values (?, ?, ?, ?, ?, ?, ?)
+                on conflict(cache_key) do update set
+                    match_label=excluded.match_label,
+                    generated_at=excluded.generated_at,
+                    payload_json=excluded.payload_json
+                """,
+                (
+                    state_key,
+                    "app-state",
+                    label,
+                    now[:10],
+                    "app-state-v1",
+                    now,
+                    json.dumps(payload),
+                ),
+            )
+        return True
 
     def upsert_llm_prediction(self, cache_key: str, prediction: MatchPrediction, model: str) -> None:
         payload = llm_payload(prediction, model)
