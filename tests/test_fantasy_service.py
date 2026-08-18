@@ -4,12 +4,17 @@ from fantasy.catalog import make_player
 from fantasy.service import (
     GAME_MODE_LIST,
     add_purchase,
+    add_purchases_batch,
     create_league,
     new_workspace,
     remove_purchase,
+    reset_preferred_xi,
+    role_balance_recommendation,
     roster_summary,
     set_captain,
+    set_preferred_xi,
     suggest_lineup,
+    top_xi_summary,
     update_league_settings,
 )
 
@@ -111,3 +116,99 @@ def test_captain_is_cleared_when_player_is_removed() -> None:
     remove_purchase(league, player["id"])
 
     assert league["captain_player_id"] is None
+
+
+def test_batch_purchase_is_atomic() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Batch",
+        initial_budget=20,
+        roster_slots={"P": 0, "D": 0, "C": 2, "A": 0},
+    )
+    players = [
+        make_player(name="C1", team="Roma", role="C", quote=12),
+        make_player(name="C2", team="Milan", role="C", quote=12),
+    ]
+
+    with pytest.raises(ValueError, match="Crediti insufficienti"):
+        add_purchases_batch(league, players)
+
+    assert league["purchases"] == []
+
+
+def test_role_advice_starts_at_half_slots_and_recommends_goals() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Consigli",
+        initial_budget=250,
+        roster_slots={"P": 0, "D": 0, "C": 7, "A": 0},
+    )
+    owned = [
+        make_player(
+            name=f"Titolare {index}",
+            team="Roma",
+            role="C",
+            quote=5,
+            expected_goals=1,
+            expected_assists=2,
+            starter_probability=90,
+        )
+        for index in range(4)
+    ]
+    candidates = [
+        make_player(
+            name=f"Bomber {index}",
+            team="Milan",
+            role="C",
+            quote=10,
+            expected_goals=8 - index,
+            expected_assists=3,
+            starter_probability=80,
+        )
+        for index in range(6)
+    ]
+    add_purchases_batch(league, owned)
+
+    advice = role_balance_recommendation(league, [*owned, *candidates], "C")
+
+    assert advice is not None
+    assert advice["focus"] == "goals"
+    assert len(advice["candidates"]) == 5
+    assert advice["candidates"][0]["name"] == "Bomber 0"
+
+
+def test_top_xi_defaults_to_most_expensive_and_can_be_customized() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Top 11",
+        initial_budget=500,
+        roster_slots={"P": 0, "D": 0, "C": 12, "A": 0},
+    )
+    players = []
+    for index in range(12):
+        player = make_player(
+            name=f"Player {index}",
+            team="Roma",
+            role="C",
+            quote=index + 1,
+            expected_goals=index,
+            expected_assists=index / 2,
+        )
+        player["expected_fantasy_average"] = 6 + index / 10
+        players.append(player)
+        add_purchase(league, player, index + 1)
+
+    automatic = top_xi_summary(league)
+    assert automatic["count"] == 11
+    assert "Player 0" not in {row["name"] for row in automatic["players"]}
+    assert automatic["expected_fantasy_average"] == pytest.approx(6.6)
+
+    custom_ids = [player["id"] for player in players[:11]]
+    set_preferred_xi(league, custom_ids)
+    assert top_xi_summary(league)["player_ids"] == custom_ids
+
+    reset_preferred_xi(league)
+    assert top_xi_summary(league)["player_ids"] == automatic["player_ids"]
