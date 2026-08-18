@@ -71,7 +71,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v9 · Player Board dimmed")
+    st.caption("Fantacalcio · Build 2026.08.18 v10 · Fasce asta predefinite")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -833,11 +833,6 @@ def _render_auction_catalog_editor(
         for player_id in indexed["_id"]
     }
 
-    def player_tier_marker(player_id: str) -> str:
-        tier = player_tiers.get(str(player_id))
-        color = str(tier.get("color") or "gray") if tier else "gray"
-        return AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[1] if tier else "▫️"
-
     display = pd.DataFrame(
         {
             "Scheda": False,
@@ -845,10 +840,6 @@ def _render_auction_catalog_editor(
                 "✓"
                 if assignments[str(player_id)] and assignments[str(player_id)].get("is_user")
                 else ""
-                for player_id in indexed["_id"]
-            ],
-            "Stato": [
-                "● OCCUPATO" if assignments[str(player_id)] else "🟢 LIBERO"
                 for player_id in indexed["_id"]
             ],
             "★": ["★" if str(player_id) in watchlist else "" for player_id in indexed["_id"]],
@@ -870,11 +861,7 @@ def _render_auction_catalog_editor(
             "Ruolo": indexed["Ruolo"].map(
                 {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
             ).fillna(indexed["Ruolo"]),
-            "Giocatore": [
-                f"{player_tier_marker(str(player_id))} "
-                f"{indexed.iloc[position]['Giocatore']}"
-                for position, player_id in enumerate(indexed["_id"])
-            ],
+            "Giocatore": indexed["Giocatore"],
             "Squadra": indexed["Squadra"],
             "Q": indexed["Quotazione"],
             "Spesa iniziale": indexed["Spesa iniziale"],
@@ -923,10 +910,6 @@ def _render_auction_catalog_editor(
             "In rosa": st.column_config.TextColumn(
                 width="small",
                 help="La spunta compare solo per i giocatori della tua squadra.",
-            ),
-            "Stato": st.column_config.TextColumn(
-                width="medium",
-                help="I giocatori occupati restano visibili, ma la riga viene spenta.",
             ),
             "★": st.column_config.TextColumn(width="small"),
             "Partecipante": st.column_config.SelectboxColumn(
