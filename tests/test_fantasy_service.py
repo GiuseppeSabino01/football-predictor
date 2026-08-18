@@ -14,6 +14,7 @@ from fantasy.service import (
     set_captain,
     set_preferred_xi,
     suggest_lineup,
+    top_xi_formation,
     top_xi_summary,
     update_league_settings,
 )
@@ -205,6 +206,9 @@ def test_top_xi_defaults_to_most_expensive_and_can_be_customized() -> None:
     assert automatic["count"] == 11
     assert "Player 0" not in {row["name"] for row in automatic["players"]}
     assert automatic["expected_fantasy_average"] == pytest.approx(6.6)
+    assert automatic["expected_goals_total"] == pytest.approx(66)
+    assert automatic["expected_assists_total"] == pytest.approx(33)
+    assert automatic["expected_fantasy_average_sum"] == pytest.approx(72.6)
 
     custom_ids = [player["id"] for player in players[:11]]
     set_preferred_xi(league, custom_ids)
@@ -212,3 +216,38 @@ def test_top_xi_defaults_to_most_expensive_and_can_be_customized() -> None:
 
     reset_preferred_xi(league)
     assert top_xi_summary(league)["player_ids"] == automatic["player_ids"]
+
+
+def test_top_xi_uses_most_expensive_players_compatible_with_formation() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Campo",
+        initial_budget=1000,
+        roster_slots={"P": 2, "D": 5, "C": 5, "A": 4},
+    )
+    for role, count in {"P": 2, "D": 5, "C": 5, "A": 4}.items():
+        for index in range(count):
+            player = make_player(
+                name=f"{role}{index}",
+                team="Roma",
+                role=role,
+                quote=index + 1,
+                expected_goals=1,
+                expected_assists=0.5,
+            )
+            player["expected_fantasy_average"] = 6
+            add_purchase(league, player, index + 1)
+    league["preferred_formation"] = "4-3-3"
+
+    summary = top_xi_summary(league)
+    role_counts = {
+        role: sum(1 for row in summary["players"] if row["role"] == role)
+        for role in ("P", "D", "C", "A")
+    }
+
+    assert top_xi_formation(league) == "4-3-3"
+    assert role_counts == {"P": 1, "D": 4, "C": 3, "A": 3}
+    assert summary["expected_goals_total"] == 11
+    assert summary["expected_assists_total"] == 5.5
+    assert summary["expected_fantasy_average_sum"] == 66
