@@ -129,6 +129,7 @@ def create_league(
         "preferred_formation": None,
         "sasa_analysis": "",
         "sasa_analysis_version": 0,
+        "read_alert_ids": [],
         "created_at": now,
         "updated_at": now,
     }
@@ -1282,6 +1283,7 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("preferred_formation", None)
     league.setdefault("sasa_analysis", "")
     league.setdefault("sasa_analysis_version", 0)
+    league.setdefault("read_alert_ids", [])
     league.setdefault("updated_at", utc_now())
 
 
