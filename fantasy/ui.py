@@ -5,6 +5,7 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
+from st_aggrid import AgGrid, JsCode
 
 from config.settings import Settings
 from fantasy.catalog import catalog_dataframe, make_player, merge_catalog
@@ -71,7 +72,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v10 · Fasce asta predefinite")
+    st.caption("Fantacalcio · Build 2026.08.18 v11 · Righe assegnate evidenziate")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -835,6 +836,10 @@ def _render_auction_catalog_editor(
 
     display = pd.DataFrame(
         {
+            "_player_id": indexed["_id"].astype(str),
+            "_assigned": [
+                bool(assignments[str(player_id)]) for player_id in indexed["_id"]
+            ],
             "Scheda": False,
             "In rosa": [
                 "✓"
@@ -878,90 +883,141 @@ def _render_auction_catalog_editor(
     )
     first_id = str(indexed.iloc[0]["_id"])
     last_id = str(indexed.iloc[-1]["_id"])
-    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}"
-    assigned_positions = {
-        position
-        for position, player_id in enumerate(indexed["_id"])
-        if assignments[str(player_id)]
-    }
-
-    def dim_assigned_row(row: pd.Series) -> list[str]:
-        if int(row.name) not in assigned_positions:
-            return [""] * len(row)
-        return [
-            "color:#59635f;background-color:#090d0c;opacity:0.42;"
-        ] * len(row)
-
-    editor_source = display.style.apply(dim_assigned_row, axis=1)
-    edited = st.data_editor(
-        editor_source,
-        hide_index=True,
-        use_container_width=True,
-        height=min(620, 88 + max(len(display), 1) * 38),
-        num_rows="fixed",
-        key=editor_key,
-        disabled=[
-            column
-            for column in display.columns
-            if column not in {"Scheda", "Partecipante", "Prezzo asta", "Fascia personale"}
+    editor_version = int(st.session_state.get(version_key, 0))
+    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}_{editor_version}"
+    grid_options = {
+        "defaultColDef": {
+            "sortable": True,
+            "resizable": True,
+            "filter": False,
+            "editable": False,
+            "suppressHeaderMenuButton": True,
+        },
+        "columnDefs": [
+            {"field": "_player_id", "hide": True},
+            {"field": "_assigned", "hide": True},
+            {
+                "field": "Scheda",
+                "headerName": "Apri",
+                "editable": True,
+                "cellRenderer": "agCheckboxCellRenderer",
+                "cellEditor": "agCheckboxCellEditor",
+                "width": 72,
+                "pinned": "left",
+            },
+            {"field": "In rosa", "width": 82, "pinned": "left"},
+            {"field": "★", "width": 55},
+            {
+                "field": "Partecipante",
+                "editable": True,
+                "cellEditor": "agSelectCellEditor",
+                "cellEditorParams": {"values": [unassigned, *manager_names]},
+                "minWidth": 190,
+            },
+            {
+                "field": "Prezzo asta",
+                "headerName": "Prezzo",
+                "editable": True,
+                "cellDataType": "number",
+                "valueParser": JsCode(
+                    """function(params) {
+                        const value = Number(params.newValue);
+                        return Number.isFinite(value) && value >= 0 ? value : params.oldValue;
+                    }"""
+                ),
+                "width": 88,
+            },
+            {
+                "field": "Fascia personale",
+                "editable": True,
+                "cellEditor": "agSelectCellEditor",
+                "cellEditorParams": {"values": [no_tier, *tier_id_by_label]},
+                "minWidth": 180,
+            },
+            {"field": "Ruolo", "width": 78},
+            {"field": "Giocatore", "minWidth": 190, "flex": 1},
+            {"field": "Squadra", "width": 86},
+            {"field": "Q", "width": 65, "type": "numericColumn"},
+            {"field": "Spesa iniziale", "width": 112, "type": "numericColumn"},
+            {"field": "Spesa aggiornata", "width": 125, "type": "numericColumn"},
+            {"field": "Max strategico", "width": 118, "type": "numericColumn"},
+            {"field": "Confronti", "width": 94, "type": "numericColumn"},
+            {"field": "FM attesa", "width": 94, "type": "numericColumn"},
+            {"field": "Gol attesi", "width": 92, "type": "numericColumn"},
+            {"field": "Assist attesi", "width": 100, "type": "numericColumn"},
+            {"field": "Titolarita", "width": 92, "type": "numericColumn"},
+            {"field": "Score", "width": 80, "type": "numericColumn"},
+            {"field": "Fascia", "width": 90},
         ],
-        column_config={
-            "Scheda": st.column_config.CheckboxColumn("Apri", width="small"),
-            "In rosa": st.column_config.TextColumn(
-                width="small",
-                help="La spunta compare solo per i giocatori della tua squadra.",
-            ),
-            "★": st.column_config.TextColumn(width="small"),
-            "Partecipante": st.column_config.SelectboxColumn(
-                "Partecipante",
-                options=[unassigned, *manager_names],
-                required=True,
-                width="medium",
-                help="Seleziona Non assegnato per rimuovere il giocatore da tutte le rose.",
-            ),
-            "Prezzo asta": st.column_config.NumberColumn(
-                "Prezzo",
-                min_value=0,
-                step=1,
-                format="%.0f",
-                width="small",
-                help="Prezzo reale dell'aggiudicazione, modificabile direttamente.",
-            ),
-            "Fascia personale": st.column_config.SelectboxColumn(
-                "Fascia personale",
-                options=[no_tier, *tier_id_by_label],
-                required=True,
-                width="medium",
-                help="Classificazione e colore validi solo in questo fantacalcio.",
-            ),
-            "Ruolo": st.column_config.TextColumn(width="small"),
-            "Giocatore": st.column_config.TextColumn(width="large"),
-            "Squadra": st.column_config.TextColumn(width="small"),
-            "Q": st.column_config.NumberColumn(format="%.0f", width="small"),
-            "Spesa iniziale": st.column_config.NumberColumn(format="%.0f", width="small"),
-            "Spesa aggiornata": st.column_config.NumberColumn(format="%.0f", width="small"),
-            "Max strategico": st.column_config.NumberColumn(format="%.0f", width="small"),
-            "Confronti": st.column_config.NumberColumn(format="%d", width="small"),
-            "FM attesa": st.column_config.NumberColumn(format="%.2f", width="small"),
-            "Gol attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
-            "Assist attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
-            "Titolarita": st.column_config.ProgressColumn(
-                min_value=0, max_value=100, format="%.0f%%", width="medium"
-            ),
-            "Score": st.column_config.ProgressColumn(
-                min_value=0, max_value=100, format="%.0f", width="medium"
-            ),
-            "Fascia": st.column_config.TextColumn(width="small"),
+        "getRowId": JsCode("function(params) { return params.data._player_id; }"),
+        "rowClassRules": {
+            "fantasy-player-assigned": "data._assigned === true",
+        },
+        "singleClickEdit": True,
+        "stopEditingWhenCellsLoseFocus": True,
+        "suppressRowClickSelection": True,
+        "rowHeight": 38,
+        "headerHeight": 42,
+        "animateRows": False,
+    }
+    grid_response = AgGrid(
+        display,
+        gridOptions=grid_options,
+        height=min(620, 88 + max(len(display), 1) * 38),
+        key=editor_key,
+        data_return_mode="AS_INPUT",
+        update_on=[("cellValueChanged", 250)],
+        allow_unsafe_jscode=True,
+        enable_enterprise_modules=False,
+        theme="streamlit",
+        show_toolbar=False,
+        show_search=False,
+        show_download_button=False,
+        server_sync_strategy="client_wins",
+        custom_css={
+            ".ag-root-wrapper": {
+                "border": "1px solid rgba(25,230,176,.22) !important",
+                "border-radius": "10px !important",
+                "overflow": "hidden !important",
+            },
+            ".ag-header": {
+                "background": "#1a1f22 !important",
+                "border-bottom": "1px solid rgba(244,251,247,.13) !important",
+            },
+            ".ag-row": {
+                "background": "#080b0a",
+                "color": "#edf7f2",
+                "border-bottom": "1px solid rgba(244,251,247,.08)",
+            },
+            ".ag-row-hover": {
+                "background": "#10201b !important",
+            },
+            ".fantasy-player-assigned": {
+                "background": "#111514 !important",
+                "color": "#5b6661 !important",
+                "opacity": "0.48 !important",
+                "border-left": "5px solid #78827e !important",
+                "filter": "grayscale(1) !important",
+            },
+            ".fantasy-player-assigned .ag-cell": {
+                "background": "transparent !important",
+                "color": "#5b6661 !important",
+            },
         },
     )
+    edited = grid_response.data
+    if not isinstance(edited, pd.DataFrame):
+        edited = pd.DataFrame(edited)
     changes: list[dict[str, Any]] = []
     by_id = {str(player.get("id")): player for player in catalog}
-    for position, player_id in enumerate(indexed["_id"]):
-        clean_id = str(player_id)
+    for _, edited_row in edited.iterrows():
+        clean_id = str(edited_row.get("_player_id") or "")
+        if clean_id not in assignments:
+            continue
         current = assignments[clean_id]
         current_name = current["manager_name"] if current else unassigned
-        edited_name = str(edited.iloc[position]["Partecipante"] or unassigned)
-        raw_price = edited.iloc[position]["Prezzo asta"]
+        edited_name = str(edited_row.get("Partecipante") or unassigned)
+        raw_price = edited_row.get("Prezzo asta")
         edited_price = float(raw_price) if pd.notna(raw_price) else 0.0
         current_price = (
             float(current["purchase"].get("price") or 0) if current else 0.0
@@ -971,9 +1027,7 @@ def _render_auction_catalog_editor(
             tier_label_by_id.get(str(current_tier.get("id")), no_tier)
             if current_tier else no_tier
         )
-        edited_tier_label = str(
-            edited.iloc[position]["Fascia personale"] or no_tier
-        )
+        edited_tier_label = str(edited_row.get("Fascia personale") or no_tier)
         owner_changed = edited_name != current_name
         price_changed = current is not None and abs(edited_price - current_price) > 0.001
         tier_changed = edited_tier_label != current_tier_label
@@ -996,9 +1050,9 @@ def _render_auction_catalog_editor(
         changes.append(change)
 
     selected_ids = [
-        str(indexed.iloc[position]["_id"])
-        for position, selected in enumerate(edited["Scheda"])
-        if bool(selected)
+        str(row.get("_player_id"))
+        for _, row in edited.iterrows()
+        if bool(row.get("Scheda"))
     ]
     action_column, hint_column = st.columns([1.1, 2.2])
     if action_column.button(
