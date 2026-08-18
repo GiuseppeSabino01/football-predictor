@@ -215,6 +215,7 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
         "predicted_quote": _optional_number(player.get("predicted_quote")),
         "expected_goals": _optional_number(player.get("expected_goals")),
         "expected_assists": _optional_number(player.get("expected_assists")),
+        "expected_fantasy_average": _optional_number(player.get("expected_fantasy_average")),
         "starter_probability": _optional_number(player.get("starter_probability")),
         "fantasy_score": player_score(player),
         "reliability": _optional_number(player.get("reliability")),

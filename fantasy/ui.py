@@ -95,6 +95,7 @@ def _sync_official_catalog(
         result.get("players", []),
         authoritative=bool(result.get("remote_ok")),
     )
+    purchases_repaired = _refresh_purchased_player_data(workspace, merged)
     meta = {
         "checked_at": result.get("checked_at"),
         "source": result.get("source", "Fantacalcio.it"),
@@ -103,12 +104,54 @@ def _sync_official_catalog(
         "message": result.get("message", ""),
         "player_count": len(merged),
     }
-    if catalog_fingerprint(previous) != catalog_fingerprint(merged) or workspace.get("catalog_meta") != meta:
+    if (
+        catalog_fingerprint(previous) != catalog_fingerprint(merged)
+        or workspace.get("catalog_meta") != meta
+        or purchases_repaired
+    ):
         workspace["catalog"] = merged
         workspace["catalog_meta"] = meta
         touch_workspace(workspace)
         _save_workspace(workspace, storage)
     return workspace
+
+
+def _refresh_purchased_player_data(
+    workspace: dict[str, Any], catalog: list[dict[str, Any]]
+) -> bool:
+    by_id = {str(player.get("id")): player for player in catalog}
+    changed = False
+    fields = (
+        "name",
+        "team",
+        "role",
+        "quote",
+        "fvm",
+        "expected_goals",
+        "expected_assists",
+        "expected_fantasy_average",
+        "starter_probability",
+        "fantasy_score",
+        "reliability",
+        "risk",
+        "tier",
+        "profile",
+    )
+    for league in workspace.get("leagues", []):
+        league_changed = False
+        for purchase in league.get("purchases", []):
+            player = by_id.get(str(purchase.get("player_id")))
+            if not player:
+                continue
+            for field in fields:
+                value = player.get(field)
+                if value is not None and purchase.get(field) != value:
+                    purchase[field] = value
+                    changed = league_changed = True
+        if league_changed:
+            league["analysis"] = ""
+            league["updated_at"] = utc_now()
+    return changed
 
 
 def _render_empty_workspace(workspace: dict[str, Any], storage: FantasyWorkspaceStorage) -> None:
@@ -385,33 +428,230 @@ def _render_preparation(
     if sort_label in frame.columns:
         frame = frame.sort_values(sort_label, ascending=False, na_position="last")
 
-    visible_ids = frame["_id"].tolist()
-    _render_watchlist_control(catalog, visible_ids, league, workspace, storage)
-    display = frame.drop(columns=["_id"])
-    st.dataframe(
-        display,
-        hide_index=True,
-        use_container_width=True,
-        height=min(620, 92 + max(len(display), 1) * 35),
-        column_config={
-            "Quotazione": st.column_config.NumberColumn(format="%.0f"),
-            "FVM / 1000": st.column_config.NumberColumn(format="%.0f"),
-            "Quotazione prevista": st.column_config.NumberColumn(format="%.0f"),
-            "Indice": st.column_config.NumberColumn(format="%.1f"),
-            "Titolarita %": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f%%"),
-            "Affidabilita": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f%%"),
-            "Rischio": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f%%"),
-        },
+    st.markdown(
+        '<div class="fantasy-table-heading"><div><strong>Player board</strong>'
+        '<span>Confronta i profili e clicca una riga per aprire la scheda completa</span></div>'
+        f'<b>{len(frame)}</b></div>',
+        unsafe_allow_html=True,
     )
+    selected_id = _render_catalog_table(frame, key=f"catalog_board_{league['id']}")
+    if selected_id:
+        st.session_state[f"fantasy_selected_player_{league['id']}"] = selected_id
+
+    selected_id = st.session_state.get(f"fantasy_selected_player_{league['id']}")
+    selected_player = next((player for player in catalog if player.get("id") == selected_id), None)
+    if selected_player:
+        _render_player_detail(selected_player, league, workspace, storage)
+    else:
+        st.info("Seleziona un giocatore dalla tabella per vedere tutte le statistiche e le proiezioni.")
 
     watched_players = [player for player in catalog if player.get("id") in watchlist]
     if watched_players:
-        st.markdown("#### La tua watchlist")
-        st.dataframe(
-            catalog_dataframe(watched_players).drop(columns=["_id"]),
-            hide_index=True,
-            use_container_width=True,
+        with st.expander(f"Watchlist · {len(watched_players)} giocatori"):
+            watch_frame = catalog_dataframe(watched_players)
+            _render_catalog_table(watch_frame, key=f"watchlist_board_{league['id']}", height=260)
+
+
+def _render_catalog_table(frame: pd.DataFrame, *, key: str, height: int = 560) -> str | None:
+    if frame.empty:
+        st.warning("Nessun giocatore corrisponde ai filtri selezionati.")
+        return None
+    indexed = frame.reset_index(drop=True)
+    compact_columns = [
+        "Ruolo",
+        "Giocatore",
+        "Squadra",
+        "Quotazione",
+        "FM attesa",
+        "Gol attesi",
+        "Assist attesi",
+        "Titolarita %",
+        "Indice",
+        "Fascia",
+    ]
+    display = indexed[compact_columns].copy()
+    display["Ruolo"] = display["Ruolo"].map(
+        {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
+    ).fillna(display["Ruolo"])
+    event = st.dataframe(
+        display,
+        hide_index=True,
+        use_container_width=True,
+        height=min(height, 88 + max(len(display), 1) * 38),
+        row_height=38,
+        on_select="rerun",
+        selection_mode="single-row",
+        key=key,
+        column_config={
+            "Ruolo": st.column_config.TextColumn(width="small"),
+            "Giocatore": st.column_config.TextColumn(width="large"),
+            "Squadra": st.column_config.TextColumn(width="small"),
+            "Quotazione": st.column_config.NumberColumn("Q", format="%.0f", width="small"),
+            "FM attesa": st.column_config.NumberColumn(format="%.2f", width="small"),
+            "Gol attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
+            "Assist attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
+            "Titolarita %": st.column_config.ProgressColumn(
+                "Titolarita", min_value=0, max_value=100, format="%.0f%%", width="medium"
+            ),
+            "Indice": st.column_config.ProgressColumn(
+                "Score", min_value=0, max_value=100, format="%.0f", width="medium"
+            ),
+            "Fascia": st.column_config.TextColumn(width="small"),
+        },
+    )
+    rows = _selected_dataframe_rows(event)
+    if not rows:
+        return None
+    position = rows[0]
+    return str(indexed.iloc[position]["_id"]) if 0 <= position < len(indexed) else None
+
+
+def _selected_dataframe_rows(event: Any) -> list[int]:
+    try:
+        return list(event.selection.rows)
+    except AttributeError:
+        if isinstance(event, dict):
+            return list(event.get("selection", {}).get("rows", []))
+    return []
+
+
+def _render_player_detail(
+    player: dict[str, Any],
+    league: dict[str, Any],
+    workspace: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+) -> None:
+    role = str(player.get("role", ""))
+    role_names = {"P": "Portiere", "D": "Difensore", "C": "Centrocampista", "A": "Attaccante"}
+    st.markdown(
+        f"""
+        <section class="fantasy-player-hero role-{role.lower()}">
+            <div class="fantasy-player-role">{escape(role)}</div>
+            <div class="fantasy-player-title">
+                <span>{escape(role_names.get(role, 'Calciatore'))} · {escape(str(player.get('team') or 'Svincolato'))}</span>
+                <h3>{escape(str(player.get('name') or ''))}</h3>
+                <p>{escape(str(player.get('status') or 'Stato non disponibile'))} · {escape(str(player.get('profile') or 'Profilo in analisi'))}</p>
+            </div>
+            <div class="fantasy-player-score"><small>FANTA SCORE</small><strong>{_format_stat(player.get('fantasy_score'), 0)}</strong><span>{escape(str(player.get('tier') or '—'))}</span></div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    quote, fvm, expected_fm, starter = st.columns(4)
+    quote.metric("Quotazione", _format_stat(player.get("quote"), 0))
+    fvm.metric("FVM / 1000", _format_stat(player.get("fvm"), 0))
+    expected_fm.metric("Fantamedia attesa", _format_stat(player.get("expected_fantasy_average"), 2))
+    starter.metric("Titolarita", _format_stat(player.get("starter_probability"), 0, "%"))
+
+    watchlist = set(league.get("watchlist", []))
+    is_watched = player.get("id") in watchlist
+    if st.button(
+        "Rimuovi dalla watchlist" if is_watched else "+ Aggiungi alla watchlist",
+        key=f"detail_watch_{league['id']}_{player.get('id')}",
+        type="secondary",
+    ):
+        toggle_watchlist(league, str(player.get("id")))
+        touch_workspace(workspace)
+        _save_workspace(workspace, storage)
+        st.rerun()
+
+    projection_tab, season_tab, advanced_tab, profile_tab = st.tabs(
+        ["Proiezione 26/27", "Stagione 25/26", "Dati avanzati", "Profilo & listone"]
+    )
+    with projection_tab:
+        _render_stat_grid([
+            ("Presenze attese", player.get("expected_appearances"), 0),
+            ("Gol attesi", player.get("expected_goals"), 1),
+            ("Assist attesi", player.get("expected_assists"), 1),
+            ("Fantamedia attesa", player.get("expected_fantasy_average"), 2),
+            ("Affidabilita", player.get("reliability"), 0),
+            ("Bonus", player.get("bonus"), 0),
+            ("Potenziale", player.get("potential"), 0),
+            ("Rischio", player.get("risk"), 0),
+            ("Valore", player.get("value"), 0),
+            ("Fanta Score", player.get("fantasy_score"), 0),
+        ])
+    with season_tab:
+        _render_stat_grid([
+            ("Presenze", player.get("appearances_previous"), 0),
+            ("Media voto", player.get("average_rating_previous"), 2),
+            ("Fantamedia", player.get("fantasy_average_previous"), 2),
+            ("Gol", player.get("goals_previous"), 0),
+            ("Assist", player.get("assists_previous"), 0),
+            ("Rigori segnati", player.get("penalties_scored"), 0),
+            ("Rigori tirati", player.get("penalties_taken"), 0),
+            ("Ammonizioni", player.get("yellow_cards"), 0),
+            ("Espulsioni", player.get("red_cards"), 0),
+            ("Gol subiti", player.get("goals_conceded"), 0),
+            ("Rigori parati", player.get("penalties_saved"), 0),
+        ])
+    with advanced_tab:
+        goals_minus_xg = player.get("goals_minus_xg")
+        if goals_minus_xg is None and player.get("xg_previous") is not None:
+            goals_minus_xg = _number_or_none(player.get("goals_previous"), 0) - _number_or_none(player.get("xg_previous"), 0)
+        assists_minus_xa = player.get("assists_minus_xa")
+        if assists_minus_xa is None and player.get("xa_previous") is not None:
+            assists_minus_xa = _number_or_none(player.get("assists_previous"), 0) - _number_or_none(player.get("xa_previous"), 0)
+        _render_stat_grid([
+            ("xG", player.get("xg_previous"), 2),
+            ("xA", player.get("xa_previous"), 2),
+            ("Gol - xG", goals_minus_xg, 2),
+            ("Assist - xA", assists_minus_xa, 2),
+            ("Goal prevented", player.get("goals_prevented"), 2),
+        ])
+        st.caption(
+            "xG, xA e Goal prevented provengono dall'analisi [FotMob](https://www.fotmob.com/leagues/55/overview/serie-a). I tracking fisici "
+            "(km percorsi, sprint e velocita) non sono pubblicati in modo completo e uniforme per tutti i giocatori."
         )
+    with profile_tab:
+        penalty_labels = {1: "Prima scelta", 2: "Seconda scelta"}
+        _render_stat_grid([
+            ("Ruolo Classic", player.get("role"), None),
+            ("Ruolo Mantra", player.get("mantra_role"), None),
+            ("Quotazione iniziale", player.get("initial_quote"), 0),
+            ("Quotazione attuale", player.get("quote"), 0),
+            ("FVM / 1000", player.get("fvm"), 0),
+            ("Rigorista", penalty_labels.get(_int_or_none(player.get("penalty_taker")), "No"), None),
+            ("Piazzati", penalty_labels.get(_int_or_none(player.get("set_pieces")), "No"), None),
+            ("Stato 26/27", player.get("status"), None),
+            ("Qualita dati", player.get("data_quality"), None),
+            ("Fascia", player.get("tier"), None),
+            ("Profilo", player.get("profile"), None),
+            ("Fonte", player.get("source"), None),
+        ])
+
+
+def _render_stat_grid(items: list[tuple[str, Any, int | None]]) -> None:
+    cards = []
+    for label, value, decimals in items:
+        display = (
+            escape(str("—" if value is None or value == "" else value))
+            if decimals is None else _format_stat(value, decimals)
+        )
+        cards.append(
+            f'<div class="fantasy-stat-card"><span>{escape(label)}</span><strong>{display}</strong></div>'
+        )
+    st.markdown(f'<div class="fantasy-stat-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+
+def _format_stat(value: Any, decimals: int, suffix: str = "") -> str:
+    number = _number_or_none(value)
+    return "—" if number is None else f"{number:.{decimals}f}{suffix}"
+
+
+def _number_or_none(value: Any, default: float | None = None) -> float | None:
+    if value is None or value == "":
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _int_or_none(value: Any) -> int | None:
+    number = _number_or_none(value)
+    return int(number) if number is not None else None
 
 
 def _render_manual_player_form(
@@ -602,6 +842,7 @@ def _render_roster_table(
             "Giocatore": row.get("name"),
             "Squadra": row.get("team"),
             price_label: row.get("price"),
+            "FM attesa": row.get("expected_fantasy_average"),
             "Gol attesi": row.get("expected_goals"),
             "Assist attesi": row.get("expected_assists"),
         }
@@ -773,6 +1014,7 @@ def _fantasy_analysis_prompt(league: dict[str, Any], summary: dict[str, Any]) ->
                     f"costo {row.get('price', 0)}",
                     f"gol attesi {row.get('expected_goals')}",
                     f"assist attesi {row.get('expected_assists')}",
+                    f"fantamedia attesa {row.get('expected_fantasy_average')}",
                     f"titolarita {row.get('starter_probability')}",
                 ]
             )
@@ -844,6 +1086,29 @@ def render_fantasy_styles() -> None:
         .fantasy-source-card strong,.fantasy-source-card b { color:#f4fbf7; }
         .fantasy-source-card b { font-size:1.35rem; }
         .fantasy-source-card small { color:#95a39e; }
+        .fantasy-table-heading { display:flex; justify-content:space-between; align-items:center; margin:1rem 0 .45rem; padding:.75rem .9rem; border:1px solid rgba(244,251,247,.1); border-radius:10px 10px 4px 4px; background:linear-gradient(110deg,rgba(25,230,176,.09),rgba(255,176,32,.035)); }
+        .fantasy-table-heading>div { display:flex; flex-direction:column; gap:.15rem; }
+        .fantasy-table-heading strong { color:#f4fbf7; font-size:1rem; }
+        .fantasy-table-heading span { color:#899791; font-size:.78rem; }
+        .fantasy-table-heading b { min-width:42px; text-align:center; color:#07100d; background:#19e6b0; border-radius:999px; padding:.32rem .55rem; }
+        div[data-testid="stDataFrame"] { overflow:hidden; border:1px solid rgba(25,230,176,.2); border-radius:4px 4px 12px 12px; box-shadow:0 14px 36px rgba(0,0,0,.18); }
+        .fantasy-player-hero { --role:#19e6b0; display:grid; grid-template-columns:auto 1fr auto; gap:.9rem; align-items:center; margin:1.15rem 0 .75rem; padding:1rem; border:1px solid color-mix(in srgb,var(--role) 42%,transparent); border-radius:13px; background:radial-gradient(circle at 88% 12%,color-mix(in srgb,var(--role) 18%,transparent),transparent 32%),linear-gradient(125deg,rgba(244,251,247,.055),rgba(8,10,11,.92)); }
+        .fantasy-player-hero.role-p { --role:#ffb020; }
+        .fantasy-player-hero.role-d { --role:#19e6b0; }
+        .fantasy-player-hero.role-c { --role:#62d8ff; }
+        .fantasy-player-hero.role-a { --role:#f4538a; }
+        .fantasy-player-role { width:52px; height:52px; display:grid; place-items:center; border-radius:15px; color:#07100d; background:var(--role); font-size:1.25rem; font-weight:950; box-shadow:0 0 30px color-mix(in srgb,var(--role) 28%,transparent); }
+        .fantasy-player-title span { color:var(--role); font-size:.7rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+        .fantasy-player-title h3 { margin:.12rem 0; color:#f4fbf7; font-size:1.45rem; }
+        .fantasy-player-title p { margin:0; color:#94a19c; font-size:.8rem; }
+        .fantasy-player-score { min-width:88px; display:flex; flex-direction:column; align-items:flex-end; }
+        .fantasy-player-score small { color:#899791; font-size:.58rem; font-weight:900; letter-spacing:.08em; }
+        .fantasy-player-score strong { color:var(--role); font-size:1.75rem; line-height:1; }
+        .fantasy-player-score span { color:#f4fbf7; font-size:.72rem; }
+        .fantasy-stat-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.55rem; margin:.7rem 0 1rem; }
+        .fantasy-stat-card { min-height:72px; display:flex; flex-direction:column; justify-content:center; gap:.25rem; padding:.65rem .75rem; border:1px solid rgba(244,251,247,.1); border-radius:9px; background:linear-gradient(140deg,rgba(244,251,247,.045),rgba(8,10,11,.35)); }
+        .fantasy-stat-card span { color:#899791; font-size:.72rem; }
+        .fantasy-stat-card strong { color:#f4fbf7; font-size:1.05rem; overflow-wrap:anywhere; }
         .fantasy-role-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.55rem; margin:.8rem 0 1.15rem; }
         .fantasy-role-card { display:grid; grid-template-columns:auto 1fr; gap:.1rem .6rem; align-items:center; padding:.7rem; border:1px solid rgba(244,251,247,.12); border-radius:9px; background:rgba(244,251,247,.035); }
         .fantasy-role-card>span { grid-row:1/3; width:35px; height:35px; display:grid; place-items:center; border-radius:50%; color:#08100e; background:#19e6b0; font-weight:950; }
@@ -865,6 +1130,11 @@ def render_fantasy_styles() -> None:
             .fantasy-mode-stack { grid-column:1/3; justify-content:flex-start; }
             .fantasy-source-card { grid-template-columns:1fr; }
             .fantasy-source-card>div:last-child { text-align:left; }
+            .fantasy-player-hero { grid-template-columns:auto 1fr; }
+            .fantasy-player-score { grid-column:1/3; flex-direction:row; align-items:center; gap:.5rem; }
+            .fantasy-player-score strong { font-size:1.35rem; }
+            .fantasy-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .fantasy-table-heading span { display:none; }
             .fantasy-role-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .fantasy-insights { grid-template-columns:1fr; }
             .fantasy-empty { padding:1.25rem .8rem; }

@@ -24,6 +24,7 @@ CATALOG_COLUMNS = [
     "expected_goals",
     "assists_previous",
     "expected_assists",
+    "expected_fantasy_average",
     "starter_probability",
 ]
 
@@ -40,6 +41,7 @@ COLUMN_ALIASES = {
     "expected_goals": {"gol attesi", "gol attesi 26 27", "gol previsti", "expected goals"},
     "assists_previous": {"assist 25 26", "assist 2025 26", "assist scorso anno"},
     "expected_assists": {"assist attesi", "assist attesi 26 27", "assist previsti", "expected assists"},
+    "expected_fantasy_average": {"fm attesa", "fantamedia attesa", "fantamedia prevista"},
     "starter_probability": {"titolarita", "titolarita prevista", "probabilita titolare", "starter probability"},
 }
 
@@ -152,6 +154,7 @@ def catalog_dataframe(players: list[dict[str, Any]]) -> pd.DataFrame:
                 "Gol attesi": player.get("expected_goals"),
                 "Assist 25/26": player.get("assists_previous"),
                 "Assist attesi": player.get("expected_assists"),
+                "FM attesa": player.get("expected_fantasy_average"),
                 "Titolarita %": player.get("starter_probability"),
                 "Affidabilita": player.get("reliability"),
                 "Rischio": player.get("risk"),

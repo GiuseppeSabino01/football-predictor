@@ -13,6 +13,7 @@ def test_normalizes_italian_catalog_columns() -> None:
                 "Qt. A": 35,
                 "Gol attesi 26/27": 20,
                 "Assist attesi": 5,
+                "FM attesa": 7.42,
                 "Titolarita": 92,
             }
         ]
@@ -25,6 +26,7 @@ def test_normalizes_italian_catalog_columns() -> None:
     assert players[0]["role"] == "A"
     assert players[0]["quote"] == 35
     assert players[0]["expected_goals"] == 20
+    assert players[0]["expected_fantasy_average"] == 7.42
     assert players[0]["starter_probability"] == 92
 
 
