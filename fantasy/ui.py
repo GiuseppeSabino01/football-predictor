@@ -7,7 +7,9 @@ from typing import Any
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
 import streamlit as st
+from bs4 import BeautifulSoup
 from st_aggrid import AgGrid, JsCode
 
 from fantasy.analytics import (
@@ -20,6 +22,14 @@ from fantasy.analytics import (
 )
 from config.settings import Settings
 from fantasy.catalog import catalog_dataframe, make_player, merge_catalog
+from fantasy.decision_center import (
+    FIXTURE_SOURCE_URL,
+    best_rotation_pairs,
+    build_roster_alerts,
+    fixture_outlook,
+    recommend_lineup,
+    simulate_purchase,
+)
 from fantasy.official_catalog import (
     OFFICIAL_CATALOG_URL,
     catalog_fingerprint,
@@ -83,7 +93,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v17 · Player Intelligence Lab")
+    st.caption("Fantacalcio · Build 2026.08.18 v18 · Decision Center")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -99,15 +109,48 @@ def render_fantasy_page(settings: Settings) -> None:
     summary = roster_summary(league)
     _render_league_hero(league, summary)
     list_mode = league.get("game_mode") == GAME_MODE_LIST
-    preparation_tab, squad_tab = st.tabs([
+    preparation_tab, squad_tab, decision_tab = st.tabs([
         "Studia il listone" if list_mode else "Preparati all'asta",
         "La mia squadra",
+        "Decision Center",
     ])
     with preparation_tab:
         _render_preparation(workspace, league, storage)
     with squad_tab:
         _render_my_squad(workspace, league, storage, settings)
+    with decision_tab:
+        _render_decision_center(workspace, league, storage)
     _render_sync_status(storage)
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_fantasy_news() -> list[dict[str, str]]:
+    try:
+        response = requests.get(
+            "https://www.fantacalcio.it/news",
+            timeout=8,
+            headers={"User-Agent": "Mozilla/5.0 fantasy-decision-center/1.0"},
+        )
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+    except Exception:
+        return []
+    news: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for link in soup.select("a[href]"):
+        title = " ".join(link.get_text(" ", strip=True).split())
+        href = str(link.get("href") or "").strip()
+        if len(title) < 18 or "/news/" not in href:
+            continue
+        if href.startswith("/"):
+            href = f"https://www.fantacalcio.it{href}"
+        if not href.startswith("http") or href in seen:
+            continue
+        seen.add(href)
+        news.append({"title": title[:180], "url": href, "source": "Fantacalcio.it"})
+        if len(news) >= 40:
+            break
+    return news
 
 
 def _load_workspace(storage: FantasyWorkspaceStorage) -> dict[str, Any]:
@@ -585,6 +628,8 @@ def _render_preparation(
         _render_player_detail(selected_player, league, workspace, storage)
     else:
         st.info("Seleziona un giocatore dalla tabella per vedere tutte le statistiche e le proiezioni.")
+
+    _render_what_if_simulator(league, catalog)
 
     watched_players = [player for player in catalog if player.get("id") in watchlist]
     if watched_players:
@@ -2446,6 +2491,357 @@ def _render_roster_table(
         st.rerun()
 
 
+def _render_what_if_simulator(
+    league: dict[str, Any], catalog: list[dict[str, Any]]
+) -> None:
+    list_mode = league.get("game_mode") == GAME_MODE_LIST
+    unavailable_ids = (
+        {str(row.get("player_id")) for row in league.get("purchases", [])}
+        if list_mode else auction_taken_player_ids(league)
+    )
+    available = sorted(
+        (player for player in catalog if str(player.get("id")) not in unavailable_ids),
+        key=lambda player: (
+            _number_or_none(player.get("fantasy_score"), 0),
+            _number_or_none(player.get("quote"), 0),
+        ),
+        reverse=True,
+    )
+    with st.expander("E se lo compro? · Simulatore senza rischi"):
+        st.caption(
+            "Prova un acquisto prima di salvarlo: budget, completezza e bonus attesi "
+            "vengono ricalcolati, ma la rosa non cambia."
+        )
+        if not available:
+            st.info("Non risultano giocatori disponibili da simulare.")
+            return
+        by_id = {str(player.get("id")): player for player in available}
+        selector_column, price_column = st.columns([2.15, 0.85])
+        selected_id = selector_column.selectbox(
+            "Giocatore da simulare",
+            list(by_id),
+            format_func=lambda player_id: (
+                f"{by_id[player_id].get('role')} · {by_id[player_id].get('name')} · "
+                f"{by_id[player_id].get('team')}"
+            ),
+            key=f"what_if_player_{league['id']}",
+        )
+        player = by_id[selected_id]
+        if list_mode:
+            suggested_price = float(_number_or_none(player.get("quote"), 0) or 0)
+        else:
+            price_board = auction_price_board(league, catalog)
+            suggested_price = float(
+                price_board.get(selected_id, {}).get("strategic")
+                or price_board.get(selected_id, {}).get("updated")
+                or player.get("quote")
+                or 1
+            )
+        price = price_column.number_input(
+            "Costo ipotizzato",
+            min_value=0.0,
+            max_value=float(max(int(league.get("initial_budget") or 1), 1)),
+            value=min(suggested_price, float(max(int(league.get("initial_budget") or 1), 1))),
+            step=1.0,
+            disabled=list_mode,
+            key=f"what_if_price_{league['id']}_{selected_id}",
+        )
+        simulation = simulate_purchase(league, player, float(price))
+        before, after = simulation["before"], simulation["after"]
+        budget, size, goals, assists, fantasy_average = st.columns(5)
+        budget.metric(
+            "Crediti dopo",
+            f"{after['remaining_budget']:.0f}",
+            f"-{simulation['price']:.0f}",
+            delta_color="inverse",
+        )
+        size.metric("Rosa", f"{after['roster_size']}", f"+{after['roster_size'] - before['roster_size']}")
+        goals.metric("Gol attesi rosa", f"{after['goals']:.1f}", f"+{after['goals'] - before['goals']:.1f}")
+        assists.metric("Assist attesi rosa", f"{after['assists']:.1f}", f"+{after['assists'] - before['assists']:.1f}")
+        fantasy_average.metric(
+            "Somma FM attese",
+            f"{after['fantasy_average_sum']:.2f}",
+            f"+{after['fantasy_average_sum'] - before['fantasy_average_sum']:.2f}",
+        )
+        tone = "ok" if simulation["valid"] and "positivo" in simulation["verdict"].lower() else "warn"
+        details = (
+            f"Valore stimato {simulation['value_score']:.2f} punti indice per credito."
+            if simulation["valid"] else " · ".join(simulation["errors"])
+        )
+        st.markdown(
+            f'<div class="fantasy-sim-verdict {tone}"><span>VERDETTO</span>'
+            f'<strong>{escape(str(simulation["verdict"]))}</strong><small>{escape(details)}</small></div>',
+            unsafe_allow_html=True,
+        )
+
+
+def _render_decision_center(
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+) -> None:
+    catalog = workspace.get("catalog", [])
+    news_items = _cached_fantasy_news()
+    alerts = build_roster_alerts(league, catalog, news_items)
+    read_ids = {str(alert_id) for alert_id in league.get("read_alert_ids", [])}
+    unread_count = sum(str(alert.get("id")) not in read_ids for alert in alerts)
+    st.markdown(
+        f'<section class="fantasy-decision-hero"><div><span>SaSa · MATCH INTELLIGENCE</span>'
+        f'<strong>Decision Center</strong><small>Formazione, calendario, simulazioni e segnali della tua rosa in un unico posto.</small>'
+        f'</div><aside><small>DA LEGGERE</small><b>{unread_count}</b></aside></section>',
+        unsafe_allow_html=True,
+    )
+    if not league.get("purchases"):
+        st.info("Aggiungi almeno un giocatore alla rosa per attivare il Decision Center.")
+        return
+    lineup_tab, calendar_tab, alert_tab = st.tabs(
+        ["Assistente di giornata", "Calendario strategico", f"Avvisi · {unread_count}"]
+    )
+    with lineup_tab:
+        _render_matchday_assistant(workspace, league, storage, catalog)
+    with calendar_tab:
+        _render_strategic_calendar(league, catalog)
+    with alert_tab:
+        _render_alert_center(workspace, league, storage, alerts, read_ids)
+
+
+def _render_matchday_assistant(
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    catalog: list[dict[str, Any]],
+) -> None:
+    matchday = st.select_slider(
+        "Giornata da preparare",
+        options=list(range(1, 6)),
+        value=1,
+        format_func=lambda value: f"{value}ª giornata",
+        key=f"decision_matchday_{league['id']}",
+    )
+    recommendation = recommend_lineup(league, catalog, matchday=int(matchday))
+    players = recommendation.get("players", [])
+    if not players:
+        st.info("La rosa non contiene ancora giocatori sufficienti per una proposta.")
+        return
+    goals_total = sum(float(_number_or_none(player.get("expected_goals"), 0) or 0) for player in players)
+    assists_total = sum(float(_number_or_none(player.get("expected_assists"), 0) or 0) for player in players)
+    fantasy_average_sum = sum(
+        float(_number_or_none(player.get("expected_fantasy_average"), 0) or 0)
+        for player in players
+    )
+    captain = recommendation.get("captain")
+    formation_label = recommendation.get("formation") or "In costruzione"
+    formation_metric, captain_metric, goals_metric, fm_metric = st.columns(4)
+    formation_metric.metric("Modulo consigliato", formation_label)
+    captain_metric.metric("Uomo bonus", str((captain or {}).get("name") or "—"))
+    goals_metric.metric("Gol + assist attesi", f"{goals_total + assists_total:.1f}")
+    fm_metric.metric("Somma FM attese", f"{fantasy_average_sum:.2f}")
+    if not recommendation.get("complete"):
+        st.warning(
+            "La rosa non consente ancora un undici regolamentare: SaSa mostra i migliori "
+            "giocatori disponibili e si aggiornera automaticamente."
+        )
+    st.markdown(
+        f'<div class="fantasy-matchday-label"><span>XI CONSIGLIATO</span>'
+        f'<strong>{escape(str(formation_label))} · Giornata {int(matchday)}</strong></div>',
+        unsafe_allow_html=True,
+    )
+    role_labels = {"A": "Attacco", "C": "Centrocampo", "D": "Difesa", "P": "Porta"}
+    role_rows = []
+    captain_id = str((captain or {}).get("player_id") or "")
+    for role in ("A", "C", "D", "P"):
+        cards = []
+        for player in (row for row in players if row.get("role") == role):
+            fixture = player.get("decision_fixture") or {}
+            difficulty = _number_or_none(fixture.get("difficulty"))
+            tone = _fixture_tone(difficulty)
+            venue = "vs" if fixture.get("venue") == "C" else "@"
+            opponent = fixture.get("opponent") or "calendario n/d"
+            crown = "<i>★ BONUS</i>" if str(player.get("player_id")) == captain_id else ""
+            cards.append(
+                f'<div class="fantasy-decision-player role-{role.lower()} {tone}">'
+                f'<span>{escape(role)} · {float(_number_or_none(player.get("decision_score"), 0) or 0):.0f}</span>'
+                f'<strong>{escape(str(player.get("name") or ""))}</strong>'
+                f'<small>{escape(str(player.get("team") or ""))} {venue} {escape(str(opponent))}'
+                f'{" · D " + f"{difficulty:.1f}" if difficulty is not None else ""}</small>{crown}</div>'
+            )
+        if cards:
+            role_rows.append(
+                f'<div class="fantasy-decision-line"><b>{role_labels[role]}</b>'
+                f'<div>{"".join(cards)}</div></div>'
+            )
+    st.markdown(
+        f'<section class="fantasy-decision-pitch">{"".join(role_rows)}</section>',
+        unsafe_allow_html=True,
+    )
+    bench = recommendation.get("bench", [])[:5]
+    bench_column, reason_column = st.columns([1, 1.25])
+    with bench_column:
+        st.markdown("##### Prime alternative")
+        if bench:
+            for index, player in enumerate(bench, start=1):
+                fixture = player.get("decision_fixture") or {}
+                st.caption(
+                    f"{index}. {player.get('name')} · {player.get('role')} · "
+                    f"{fixture.get('venue', '–')} {fixture.get('opponent', 'calendario n/d')}"
+                )
+        else:
+            st.caption("Nessuna alternativa disponibile.")
+    with reason_column:
+        st.markdown("##### Perche questa formazione")
+        favorable = sorted(
+            (
+                player for player in players
+                if (player.get("decision_fixture") or {}).get("difficulty") is not None
+            ),
+            key=lambda player: float((player.get("decision_fixture") or {}).get("difficulty") or 5),
+        )[:3]
+        st.caption(
+            "SaSa combina fantamedia attesa, titolarita, bonus, affidabilita, rischio "
+            "infortuni e difficolta dell'avversario."
+        )
+        if favorable:
+            st.caption(
+                "Calendario favorevole: "
+                + " · ".join(str(player.get("name")) for player in favorable)
+            )
+    if recommendation.get("complete") and recommendation.get("formation"):
+        if st.button(
+            "Usa questo undici come Top 11",
+            type="primary",
+            use_container_width=True,
+            key=f"use_decision_xi_{league['id']}_{matchday}",
+        ):
+            try:
+                set_preferred_xi(
+                    league,
+                    [str(player.get("player_id")) for player in players],
+                    formation=str(recommendation["formation"]),
+                )
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.rerun()
+
+
+def _fixture_tone(difficulty: float | None) -> str:
+    if difficulty is None:
+        return "neutral"
+    if difficulty <= 2.3:
+        return "easy"
+    if difficulty <= 3.6:
+        return "medium"
+    return "hard"
+
+
+def _render_strategic_calendar(
+    league: dict[str, Any], catalog: list[dict[str, Any]]
+) -> None:
+    start_matchday = st.selectbox(
+        "Parti dalla giornata",
+        list(range(1, 6)),
+        format_func=lambda value: f"{value}ª giornata",
+        key=f"calendar_start_{league['id']}",
+    )
+    st.caption(
+        "Verde = partita favorevole · ambra = equilibrata · rosso = impegnativa. "
+        "La difficolta e calcolata sulla forza del listone e sul fattore casa/trasferta."
+    )
+    grouped: dict[str, list[str]] = {}
+    for player in league.get("purchases", []):
+        grouped.setdefault(str(player.get("team") or ""), []).append(str(player.get("name") or ""))
+    rows = []
+    for team, names in sorted(grouped.items()):
+        outlook = fixture_outlook(team, catalog, start_matchday=int(start_matchday), limit=5)
+        chips = []
+        for fixture in outlook:
+            difficulty = float(fixture.get("difficulty") or 3)
+            tone = _fixture_tone(difficulty)
+            venue = "vs" if fixture.get("venue") == "C" else "@"
+            chips.append(
+                f'<span class="{tone}"><small>G{fixture.get("matchday")}</small>'
+                f'<strong>{venue} {escape(str(fixture.get("opponent") or ""))}</strong>'
+                f'<b>{difficulty:.1f}</b></span>'
+            )
+        rows.append(
+            f'<div class="fantasy-calendar-row"><div><strong>{escape(team)}</strong>'
+            f'<small>{escape(" · ".join(names))}</small></div><section>{"".join(chips) or "<em>Calendario non disponibile</em>"}</section></div>'
+        )
+    st.markdown(
+        f'<div class="fantasy-calendar-board">{"".join(rows)}</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Fonte: [calendario ufficiale Lega Serie A · prime cinque giornate]({FIXTURE_SOURCE_URL})."
+    )
+    rotations = best_rotation_pairs(
+        league, catalog, start_matchday=int(start_matchday), limit=5
+    )
+    if rotations:
+        st.markdown("##### Rotazioni intelligenti")
+        rotation_columns = st.columns(min(3, len(rotations)))
+        for index, pair in enumerate(rotations[:3]):
+            with rotation_columns[index % len(rotation_columns)]:
+                st.markdown(
+                    f'<div class="fantasy-rotation-card"><span>{escape(str(pair["role"]))} · COPPIA</span>'
+                    f'<strong>{escape(str(pair["first"].get("name")))} + {escape(str(pair["second"].get("name")))}</strong>'
+                    f'<small>Difficolta media della scelta migliore: {pair["average_difficulty"]:.2f}/5</small></div>',
+                    unsafe_allow_html=True,
+                )
+
+
+def _render_alert_center(
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    alerts: list[dict[str, Any]],
+    read_ids: set[str],
+) -> None:
+    unread = [alert for alert in alerts if str(alert.get("id")) not in read_ids]
+    filter_column, action_column = st.columns([1.6, 0.8])
+    only_unread = filter_column.toggle(
+        "Mostra solo da leggere",
+        value=True,
+        key=f"only_unread_alerts_{league['id']}",
+    )
+    if action_column.button(
+        "Segna tutto come letto",
+        use_container_width=True,
+        disabled=not unread,
+        key=f"read_all_alerts_{league['id']}",
+    ):
+        league["read_alert_ids"] = [str(alert.get("id")) for alert in alerts]
+        league["updated_at"] = utc_now()
+        touch_workspace(workspace)
+        _save_workspace(workspace, storage)
+        st.rerun()
+    visible = unread if only_unread else alerts
+    if not visible:
+        st.success("Nessun nuovo segnale critico per la tua rosa o watchlist.")
+        return
+    for alert in visible:
+        alert_id = str(alert.get("id"))
+        unread_class = " unread" if alert_id not in read_ids else ""
+        severity = str(alert.get("severity") or "low")
+        url = str(alert.get("url") or "")
+        source_html = escape(str(alert.get("source") or "Analisi rosa"))
+        if url.startswith("http"):
+            source_html = f'<a href="{escape(url, quote=True)}" target="_blank">{source_html} ↗</a>'
+        st.markdown(
+            f'<article class="fantasy-alert-card {severity}{unread_class}"><span></span><div>'
+            f'<small>{"NUOVO · " if unread_class else ""}{source_html}</small>'
+            f'<strong>{escape(str(alert.get("title") or ""))}</strong>'
+            f'<p>{escape(str(alert.get("message") or ""))}</p></div></article>',
+            unsafe_allow_html=True,
+        )
+    st.caption(
+        "Gli avvisi incrociano rosa e watchlist con titolarita, rischio fisico, stato del "
+        "listone e notizie pubbliche pertinenti. Aggiornamento notizie ogni 15 minuti."
+    )
+
+
 def _render_my_squad(
     workspace: dict[str, Any],
     league: dict[str, Any],
@@ -3118,6 +3514,64 @@ def render_fantasy_styles() -> None:
         .fantasy-custom-tier>span { grid-row:1/3; font-size:1.05rem; filter:drop-shadow(0 0 8px var(--tier-color)); }
         .fantasy-custom-tier>strong { color:#f4fbf7; font-size:.76rem; }
         .fantasy-custom-tier>small { color:#899791; font-size:.58rem; }
+        .fantasy-sim-verdict { display:flex; flex-direction:column; gap:.15rem; margin:.65rem 0 .2rem; padding:.8rem .9rem; border:1px solid rgba(255,176,32,.35); border-left:4px solid #ffb020; border-radius:10px; background:linear-gradient(110deg,rgba(255,176,32,.1),rgba(8,10,11,.62)); }
+        .fantasy-sim-verdict.ok { border-color:rgba(25,230,176,.35); border-left-color:#19e6b0; background:linear-gradient(110deg,rgba(25,230,176,.1),rgba(8,10,11,.62)); }
+        .fantasy-sim-verdict span { color:#8f9d98; font-size:.55rem; font-weight:950; letter-spacing:.11em; }
+        .fantasy-sim-verdict strong { color:#f4fbf7; font-size:1rem; }
+        .fantasy-sim-verdict small { color:#9eaca7; }
+        .fantasy-decision-hero { position:relative; overflow:hidden; display:grid; grid-template-columns:1fr auto; gap:1rem; align-items:center; margin:.25rem 0 1rem; padding:1.15rem 1.2rem; border:1px solid rgba(98,216,255,.34); border-radius:16px; background:radial-gradient(circle at 88% -20%,rgba(98,216,255,.27),transparent 38%),radial-gradient(circle at 8% 120%,rgba(25,230,176,.18),transparent 32%),linear-gradient(125deg,#0d1716,#0b1013 58%,#15101b); box-shadow:0 18px 48px rgba(0,0,0,.22); }
+        .fantasy-decision-hero>div { display:flex; flex-direction:column; gap:.16rem; }
+        .fantasy-decision-hero span { color:#62d8ff; font-size:.62rem; font-weight:950; letter-spacing:.12em; }
+        .fantasy-decision-hero strong { color:#f7fffb; font-size:1.5rem; }
+        .fantasy-decision-hero small { color:#9eaca7; }
+        .fantasy-decision-hero aside { min-width:72px; height:72px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid rgba(98,216,255,.45); border-radius:20px; background:rgba(98,216,255,.09); box-shadow:inset 0 0 24px rgba(98,216,255,.08); }
+        .fantasy-decision-hero aside small { color:#8ca39f; font-size:.48rem; font-weight:950; letter-spacing:.08em; }
+        .fantasy-decision-hero aside b { color:#62d8ff; font-size:1.55rem; line-height:1; }
+        .fantasy-matchday-label { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:.8rem 0 .4rem; padding:.55rem .75rem; border-radius:9px; background:linear-gradient(90deg,rgba(25,230,176,.12),rgba(98,216,255,.05)); }
+        .fantasy-matchday-label span { color:#19e6b0; font-size:.58rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-matchday-label strong { color:#f4fbf7; }
+        .fantasy-decision-pitch { position:relative; overflow:hidden; display:flex; flex-direction:column; gap:.65rem; padding:1rem; border:1px solid rgba(104,255,190,.42); border-radius:18px; background:radial-gradient(circle at 50% 50%,transparent 0 58px,rgba(237,255,246,.18) 59px 61px,transparent 62px),linear-gradient(to bottom,transparent 49.7%,rgba(237,255,246,.2) 49.8% 50.2%,transparent 50.3%),repeating-linear-gradient(90deg,rgba(7,69,49,.94) 0 12.5%,rgba(10,91,62,.94) 12.5% 25%); box-shadow:inset 0 0 80px rgba(0,0,0,.36),0 20px 48px rgba(0,0,0,.22); }
+        .fantasy-decision-line { display:grid; grid-template-columns:92px 1fr; gap:.7rem; align-items:center; }
+        .fantasy-decision-line>b { color:rgba(237,255,246,.68); font-size:.62rem; text-transform:uppercase; letter-spacing:.08em; }
+        .fantasy-decision-line>div { display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:.45rem; }
+        .fantasy-decision-player { --accent:#19e6b0; position:relative; display:flex; flex-direction:column; min-width:0; padding:.58rem .62rem; border:1px solid color-mix(in srgb,var(--accent) 42%,transparent); border-radius:11px; background:linear-gradient(145deg,rgba(3,20,15,.94),rgba(6,35,24,.86)); box-shadow:0 10px 20px rgba(0,0,0,.22); }
+        .fantasy-decision-player.role-a { --accent:#f4538a; }
+        .fantasy-decision-player.role-c { --accent:#62d8ff; }
+        .fantasy-decision-player.role-p { --accent:#ffb020; }
+        .fantasy-decision-player>span { color:var(--accent); font-size:.5rem; font-weight:950; letter-spacing:.08em; }
+        .fantasy-decision-player>strong { overflow:hidden; color:#f7fffb; font-size:.8rem; text-overflow:ellipsis; white-space:nowrap; }
+        .fantasy-decision-player>small { color:#9fb1aa; font-size:.58rem; }
+        .fantasy-decision-player>i { position:absolute; top:.45rem; right:.45rem; color:#ffdf72; font-size:.44rem; font-style:normal; font-weight:950; }
+        .fantasy-decision-player.easy { box-shadow:0 0 0 1px rgba(25,230,176,.16),0 10px 22px rgba(0,0,0,.24); }
+        .fantasy-decision-player.medium { box-shadow:inset 3px 0 #ffb020,0 10px 22px rgba(0,0,0,.24); }
+        .fantasy-decision-player.hard { box-shadow:inset 3px 0 #f4538a,0 10px 22px rgba(0,0,0,.24); }
+        .fantasy-calendar-board { display:flex; flex-direction:column; gap:.45rem; margin:.7rem 0; }
+        .fantasy-calendar-row { display:grid; grid-template-columns:minmax(150px,.72fr) 2fr; gap:.65rem; align-items:center; padding:.62rem; border:1px solid rgba(244,251,247,.1); border-radius:11px; background:linear-gradient(120deg,rgba(244,251,247,.045),rgba(8,10,11,.5)); }
+        .fantasy-calendar-row>div { min-width:0; display:flex; flex-direction:column; }
+        .fantasy-calendar-row>div strong { color:#f4fbf7; }
+        .fantasy-calendar-row>div small { overflow:hidden; color:#899791; font-size:.6rem; text-overflow:ellipsis; white-space:nowrap; }
+        .fantasy-calendar-row>section { display:grid; grid-template-columns:repeat(5,minmax(88px,1fr)); gap:.35rem; }
+        .fantasy-calendar-row>section>span { display:grid; grid-template-columns:auto 1fr auto; gap:.3rem; align-items:center; padding:.4rem .45rem; border:1px solid rgba(244,251,247,.1); border-radius:7px; background:rgba(244,251,247,.035); }
+        .fantasy-calendar-row>section>span.easy { border-color:rgba(25,230,176,.32); background:rgba(25,230,176,.08); }
+        .fantasy-calendar-row>section>span.medium { border-color:rgba(255,176,32,.32); background:rgba(255,176,32,.08); }
+        .fantasy-calendar-row>section>span.hard { border-color:rgba(244,83,138,.32); background:rgba(244,83,138,.08); }
+        .fantasy-calendar-row span small { color:#899791; font-size:.48rem; }
+        .fantasy-calendar-row span strong { overflow:hidden; color:#f4fbf7; font-size:.58rem; text-overflow:ellipsis; white-space:nowrap; }
+        .fantasy-calendar-row span b { color:#c8d6d1; font-size:.62rem; }
+        .fantasy-rotation-card { min-height:86px; display:flex; flex-direction:column; gap:.2rem; padding:.72rem; border:1px solid rgba(98,216,255,.25); border-radius:10px; background:linear-gradient(145deg,rgba(98,216,255,.08),rgba(8,10,11,.54)); }
+        .fantasy-rotation-card span { color:#62d8ff; font-size:.52rem; font-weight:950; letter-spacing:.09em; }
+        .fantasy-rotation-card strong { color:#f4fbf7; }
+        .fantasy-rotation-card small { color:#94a29d; }
+        .fantasy-alert-card { position:relative; display:grid; grid-template-columns:5px 1fr; gap:.75rem; margin:.5rem 0; padding:.72rem .8rem .72rem .45rem; border:1px solid rgba(244,251,247,.1); border-radius:11px; background:linear-gradient(115deg,rgba(244,251,247,.045),rgba(8,10,11,.6)); }
+        .fantasy-alert-card>span { width:5px; height:100%; border-radius:999px; background:#62d8ff; }
+        .fantasy-alert-card.high>span { background:#f4538a; box-shadow:0 0 18px rgba(244,83,138,.45); }
+        .fantasy-alert-card.medium>span { background:#ffb020; }
+        .fantasy-alert-card.news>span { background:#62d8ff; }
+        .fantasy-alert-card.unread { border-color:rgba(98,216,255,.26); background:linear-gradient(115deg,rgba(98,216,255,.08),rgba(8,10,11,.64)); }
+        .fantasy-alert-card>div { display:flex; flex-direction:column; gap:.12rem; }
+        .fantasy-alert-card small,.fantasy-alert-card small a { color:#62d8ff; font-size:.52rem; font-weight:900; letter-spacing:.07em; text-decoration:none; }
+        .fantasy-alert-card strong { color:#f4fbf7; }
+        .fantasy-alert-card p { margin:0; color:#9eaca7; font-size:.76rem; }
         @media (max-width:720px) {
             .fantasy-league-hero { grid-template-columns:1fr auto; }
             .fantasy-mode-stack { grid-column:1/3; justify-content:flex-start; }
@@ -3156,6 +3610,20 @@ def render_fantasy_styles() -> None:
             .fantasy-empty { padding:1.25rem .8rem; }
             .fantasy-line { grid-template-columns:28px 1fr; }
             .fantasy-line>div { font-size:.78rem; padding:.48rem; overflow-wrap:anywhere; }
+            .fantasy-decision-hero { padding:.9rem; }
+            .fantasy-decision-hero strong { font-size:1.2rem; }
+            .fantasy-decision-hero small { font-size:.68rem; }
+            .fantasy-decision-hero aside { min-width:58px; height:58px; }
+            .fantasy-decision-line { grid-template-columns:1fr; gap:.25rem; }
+            .fantasy-decision-line>b { text-align:center; }
+            .fantasy-decision-line>div { grid-template-columns:repeat(3,minmax(0,1fr)); gap:.28rem; }
+            .fantasy-decision-player { padding:.42rem; border-radius:8px; }
+            .fantasy-decision-player>strong { font-size:.63rem; }
+            .fantasy-decision-player>small { font-size:.48rem; }
+            .fantasy-decision-player>i { display:none; }
+            .fantasy-calendar-row { grid-template-columns:1fr; }
+            .fantasy-calendar-row>section { display:flex; overflow-x:auto; padding-bottom:.2rem; }
+            .fantasy-calendar-row>section>span { min-width:104px; }
         }
         </style>
         """,
