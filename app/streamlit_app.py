@@ -53,7 +53,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.18 · Player Board v4.1 · reload fix")
+    st.caption("Build 2026.08.18 · Player Board v5 · Top 11 pitch")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
