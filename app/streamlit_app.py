@@ -53,7 +53,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.18 · Fantasy v6 · WOW XI + Swap Lab + Asta Live")
+    st.caption("Build 2026.08.18 · Fantasy v7 · Auction Grid editabile")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
