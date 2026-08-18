@@ -72,35 +72,51 @@ def test_what_if_simulation_never_mutates_the_roster():
 
 def test_alerts_are_personalized_to_roster_and_watchlist():
     league, catalog = complete_league()
-    league["purchases"][0]["risk"] = 70
-    league["purchases"][1]["starter_probability"] = 30
+    league["purchases"][0]["name"] = "Albarracin"
+    catalog[0]["name"] = "Albarracin"
     alerts = build_roster_alerts(
         league,
         catalog,
         [
             {
-                "title": "Player 1 si ferma: problema muscolare",
+                "title": "Albarracin si ferma: problema muscolare",
                 "summary": "Il calciatore sara valutato nei prossimi giorni.",
-                "url": "https://example.com/1",
-                "source": "Test News",
+                "url": "https://www.fantacalcio.it/news/serie-a/albarracin-stop.html",
+                "source": "Fantacalcio.it",
+                "verified": True,
             },
-            {"title": "Player 3 cambia gerarchia", "url": "https://example.com/3"},
         ],
     )
     titles = " ".join(str(alert["title"]) for alert in alerts)
-    assert "Rischio fisico" in titles
-    assert "Titolarita da monitorare" in titles
-    risk_alert = next(alert for alert in alerts if alert["title"].startswith("Rischio fisico"))
-    assert risk_alert["has_news"] is True
-    assert risk_alert["evidence_title"] == "Player 1 si ferma: problema muscolare"
-    assert risk_alert["source"] == "Test News"
-    assert "problema muscolare" in risk_alert["evidence_title"]
+    assert "Disponibilita: Albarracin" in titles
+    assert "Titolarita da monitorare" not in titles
+    alert = alerts[0]
+    assert alert["has_news"] is True
+    assert alert["evidence_title"] == "Albarracin si ferma: problema muscolare"
+    assert alert["source"] == "Fantacalcio.it"
+    assert "problema muscolare" in alert["evidence_title"]
 
 
-def test_physical_risk_without_news_explains_that_it_is_statistical():
+def test_statistical_risk_without_news_does_not_create_an_alert():
     league, catalog = complete_league()
     league["purchases"][0]["risk"] = 65
+    league["purchases"][0]["starter_probability"] = 20
     alerts = build_roster_alerts(league, catalog, [])
-    risk_alert = next(alert for alert in alerts if alert["title"].startswith("Rischio fisico"))
-    assert risk_alert["has_news"] is False
-    assert "Non risulta una notizia recente verificata" in risk_alert["message"]
+    assert alerts == []
+
+
+def test_unverified_news_is_ignored():
+    league, catalog = complete_league()
+    alerts = build_roster_alerts(
+        league,
+        catalog,
+        [
+            {
+                "title": "Player 1 si ferma",
+                "url": "https://example.com/player-1",
+                "source": "Fonte sconosciuta",
+                "verified": False,
+            }
+        ],
+    )
+    assert alerts == []
