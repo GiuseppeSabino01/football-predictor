@@ -17,6 +17,7 @@ from fantasy.service import (
     delete_league,
     list_trade_analysis,
     new_workspace,
+    normalize_workspace,
     record_auction_purchase,
     remove_purchase,
     reset_preferred_xi,
@@ -367,11 +368,77 @@ def test_custom_auction_tiers_are_isolated_and_do_not_drive_market_prices() -> N
     )
 
     assert auction_player_tier(first, player["id"])["name"] == "Top difensori"
-    assert second["auction_tiers"] == []
+    assert [tier["name"] for tier in second["auction_tiers"]] == [
+        "Top",
+        "Semi-top",
+        "Terza fascia",
+        "Quarta fascia",
+        "Quinta fascia",
+        "Scommesse",
+        "Titolari",
+    ]
     assert second["auction_player_tiers"] == {}
 
     delete_auction_tier(first, tier["id"])
     assert auction_player_tier(first, player["id"]) is None
+
+
+def test_auction_default_tiers_have_independent_ids_per_league() -> None:
+    workspace = new_workspace()
+    first = create_league(
+        workspace,
+        "Prima asta",
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+    )
+    second = create_league(
+        workspace,
+        "Seconda asta",
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+    )
+
+    expected_names = [
+        "Top",
+        "Semi-top",
+        "Terza fascia",
+        "Quarta fascia",
+        "Quinta fascia",
+        "Scommesse",
+        "Titolari",
+    ]
+    assert [tier["name"] for tier in first["auction_tiers"]] == expected_names
+    assert [tier["name"] for tier in second["auction_tiers"]] == expected_names
+    assert {tier["id"] for tier in first["auction_tiers"]}.isdisjoint(
+        tier["id"] for tier in second["auction_tiers"]
+    )
+
+
+def test_existing_auction_without_tiers_receives_defaults_once() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Asta esistente",
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+    )
+    league.pop("auction_tiers_initialized")
+    league["auction_tiers"] = []
+
+    normalized = normalize_workspace(workspace)
+    normalized_league = normalized["leagues"][0]
+
+    assert [tier["name"] for tier in normalized_league["auction_tiers"]] == [
+        "Top",
+        "Semi-top",
+        "Terza fascia",
+        "Quarta fascia",
+        "Quinta fascia",
+        "Scommesse",
+        "Titolari",
+    ]
+    normalized_league["auction_tiers"] = []
+    assert normalize_workspace(normalized)["leagues"][0]["auction_tiers"] == []
 
 
 def test_strategic_auction_price_stops_one_above_richest_opponent() -> None:
