@@ -68,11 +68,12 @@ def fetch_official_catalog(timeout: int = 18) -> dict:
         html = response.text
         players = _download_excel_catalog(session, html, headers, timeout)
         method = "Excel ufficiale"
-        if len(players) < MINIMUM_VALID_PLAYERS:
+        if not _valid_role_distribution(players):
             players = parse_official_html(html, load_seed_catalog())
             method = "Pagina ufficiale"
-        if len(players) < MINIMUM_VALID_PLAYERS:
-            raise ValueError(f"Listone incompleto: trovati solo {len(players)} giocatori")
+        if not _valid_role_distribution(players):
+            counts = _role_counts(players)
+            raise ValueError(f"Listone incompleto o ruoli non validi: {counts}")
         return {
             "players": players,
             "checked_at": checked_at,
@@ -139,7 +140,7 @@ def parse_official_html(html: str, seed_players: list[dict] | None = None) -> li
             if len(numbers) < 3:
                 continue
             seed_match = _unique_seed_match(seed_by_name, name)
-            role = _detect_role(row) or (str(seed_match.get("role")) if seed_match else "")
+            role = str(seed_match.get("role")) if seed_match else _detect_role(row)
             if role not in {"P", "D", "C", "A"}:
                 continue
             player_id = str(seed_match.get("id")) if seed_match else make_player_id(name, team, role)
@@ -191,6 +192,7 @@ def catalog_fingerprint(players: list[dict]) -> tuple:
             (
                 str(player.get("id", "")),
                 str(player.get("team", "")),
+                str(player.get("role", "")),
                 _number(player.get("quote")),
                 _number(player.get("fvm")),
             )
@@ -233,7 +235,11 @@ def _merge_preserving_analysis(base: list[dict], current: list[dict]) -> list[di
             by_id[str(copied.get("id"))] = copied
             by_name.setdefault(_normalize_name(copied.get("name")), []).append(copied)
         else:
+            stable_id = target.get("id")
+            stable_role = target.get("role")
             target.update(deepcopy(player))
+            target["id"] = stable_id
+            target["role"] = stable_role
     return base
 
 
@@ -258,7 +264,7 @@ def _merge_official(base: list[dict], official: list[dict]) -> list[dict]:
             by_id[str(copied.get("id"))] = copied
             by_name.setdefault(_normalize_name(copied.get("name")), []).append(copied)
             continue
-        for field in ("name", "team", "role", "initial_quote", "quote", "fvm", "source"):
+        for field in ("name", "team", "initial_quote", "quote", "fvm", "source"):
             if update.get(field) not in (None, ""):
                 target[field] = update[field]
     return base
@@ -274,10 +280,13 @@ def _authoritative_official_catalog(analysis: list[dict], official: list[dict]) 
         if enriched is None:
             enriched = _unique_seed_match(by_name, str(update.get("name", "")))
         stable_id = str(enriched.get("id")) if enriched else ""
+        stable_role = str(enriched.get("role")) if enriched else ""
         player = deepcopy(enriched) if enriched else {}
         player.update(deepcopy(update))
         if stable_id:
             player["id"] = stable_id
+        if stable_role:
+            player["role"] = stable_role
         player.setdefault(
             "id",
             make_player_id(
@@ -294,21 +303,47 @@ def _authoritative_official_catalog(analysis: list[dict], official: list[dict]) 
 
 
 def _detect_role(row) -> str:
-    tokens: list[str] = [row.get_text(" ", strip=True)]
+    for cell in row.find_all(["td", "th"]):
+        exact = cell.get_text(" ", strip=True).upper()
+        if exact in {"P", "D", "C", "A"}:
+            return exact
+
+    tokens: list[str] = []
     for tag in row.find_all(True):
-        tokens.extend(str(value) for value in tag.attrs.values())
+        for value in tag.attrs.values():
+            if isinstance(value, list):
+                tokens.extend(str(item) for item in value)
+            else:
+                tokens.append(str(value))
         tokens.append(str(tag.get("title", "")))
         tokens.append(str(tag.get("alt", "")))
     raw = " ".join(tokens).lower()
-    for role, words in {
-        "P": ("portiere", "role-p", "ruolo-p", "position-p"),
-        "D": ("difensore", "role-d", "ruolo-d", "position-d"),
-        "C": ("centrocampista", "role-c", "ruolo-c", "position-c"),
-        "A": ("attaccante", "role-a", "ruolo-a", "position-a"),
+    for role, word in {
+        "P": "portiere",
+        "D": "difensore",
+        "C": "centrocampista",
+        "A": "attaccante",
     }.items():
-        if any(word in raw for word in words):
+        if re.search(rf"\b{word}\b", raw):
             return role
+    explicit = re.search(r"(?:role|ruolo|position)[-_](p|d|c|a)(?:$|[_\s-])", raw)
+    if explicit:
+        return explicit.group(1).upper()
     return ""
+
+
+def _role_counts(players: list[dict]) -> dict[str, int]:
+    return {
+        role: sum(str(player.get("role", "")).upper() == role for player in players)
+        for role in ("P", "D", "C", "A")
+    }
+
+
+def _valid_role_distribution(players: list[dict]) -> bool:
+    if len(players) < MINIMUM_VALID_PLAYERS:
+        return False
+    counts = _role_counts(players)
+    return counts["P"] >= 20 and counts["D"] >= 80 and counts["C"] >= 80 and counts["A"] >= 40
 
 
 def _players_by_name(players: list[dict]) -> dict[str, list[dict]]:
