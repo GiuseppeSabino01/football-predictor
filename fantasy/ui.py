@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 from html import escape
 from typing import Any
@@ -27,7 +28,9 @@ from fantasy.decision_center import (
     best_rotation_pairs,
     build_roster_alerts,
     fixture_outlook,
+    matchday_date,
     recommend_lineup,
+    season_next_matchday,
     simulate_purchase,
 )
 from fantasy.official_catalog import (
@@ -93,7 +96,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.18 v21 · Pinned Player Names")
+    st.caption("Fantacalcio · Build 2026.08.18 v22 · 38 Giornate")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -135,7 +138,7 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
         soup = BeautifulSoup(response.text, "html.parser")
     except Exception:
         return []
-    news: list[dict[str, str]] = []
+    news: list[dict[str, Any]] = []
     seen: set[str] = set()
     for link in soup.select("a[href]"):
         title = " ".join(link.get_text(" ", strip=True).split())
@@ -166,6 +169,53 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
         )
         if len(news) >= 40:
             break
+    detail_keywords = (
+        "probabili formazioni", "infortun", "indispon", "squal", "convocat",
+        "stop", "recuper", "panchina", "ballottaggio",
+    )
+    detailed = [
+        item for item in news
+        if any(keyword in str(item.get("title") or "").casefold() for keyword in detail_keywords)
+    ][:12]
+
+    def load_article(item: dict[str, Any]) -> tuple[str, str, str]:
+        url = str(item.get("url") or "")
+        try:
+            detail_response = requests.get(
+                url,
+                timeout=6,
+                headers={"User-Agent": "Mozilla/5.0 fantasy-decision-center/1.0"},
+            )
+            detail_response.raise_for_status()
+            detail_soup = BeautifulSoup(detail_response.text, "html.parser")
+        except Exception:
+            return url, "", ""
+        article = detail_soup.select_one("article") or detail_soup.select_one("main")
+        paragraphs = (article or detail_soup).select("p, li")
+        body = " ".join(
+            " ".join(paragraph.get_text(" ", strip=True).split())
+            for paragraph in paragraphs
+        )
+        published = ""
+        published_meta = detail_soup.select_one(
+            'meta[property="article:published_time"], meta[name="date"]'
+        )
+        if published_meta:
+            published = str(published_meta.get("content") or "")
+        return url, body[:18000], published
+
+    if detailed:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(load_article, item) for item in detailed]
+            details = {url: (body, published) for url, body, published in (
+                future.result() for future in as_completed(futures)
+            )}
+        for item in news:
+            body, published = details.get(str(item.get("url") or ""), ("", ""))
+            if body:
+                item["body"] = body
+            if published:
+                item["published_at"] = published
     return news
 
 
@@ -2624,7 +2674,7 @@ def _render_decision_center(
         ["Assistente di giornata", "Calendario strategico", f"Avvisi · {unread_count}"]
     )
     with lineup_tab:
-        _render_matchday_assistant(workspace, league, storage, catalog)
+        _render_matchday_assistant(workspace, league, storage, catalog, news_items)
     with calendar_tab:
         _render_strategic_calendar(league, catalog)
     with alert_tab:
@@ -2636,15 +2686,26 @@ def _render_matchday_assistant(
     league: dict[str, Any],
     storage: FantasyWorkspaceStorage,
     catalog: list[dict[str, Any]],
+    news_items: list[dict[str, Any]],
 ) -> None:
+    upcoming_matchday = season_next_matchday()
     matchday = st.select_slider(
         "Giornata da preparare",
-        options=list(range(1, 6)),
-        value=1,
-        format_func=lambda value: f"{value}ª giornata",
-        key=f"decision_matchday_{league['id']}",
+        options=list(range(1, 39)),
+        value=upcoming_matchday,
+        format_func=lambda value: (
+            f"{value}ª giornata · {matchday_date(value).strftime('%d/%m/%Y')}"
+            if matchday_date(value) else f"{value}ª giornata"
+        ),
+        key=f"decision_matchday_v22_{league['id']}",
     )
-    recommendation = recommend_lineup(league, catalog, matchday=int(matchday))
+    recommendation = recommend_lineup(
+        league,
+        catalog,
+        matchday=int(matchday),
+        news_items=news_items,
+        next_matchday_number=upcoming_matchday,
+    )
     players = recommendation.get("players", [])
     if not players:
         st.info("La rosa non contiene ancora giocatori sufficienti per una proposta.")
@@ -2684,12 +2745,24 @@ def _render_matchday_assistant(
             venue = "vs" if fixture.get("venue") == "C" else "@"
             opponent = fixture.get("opponent") or "calendario n/d"
             crown = "<i>★ BONUS</i>" if str(player.get("player_id")) == captain_id else ""
+            appearance_probability = int(
+                _number_or_none(player.get("appearance_probability"), 0) or 0
+            )
+            availability_status = str(player.get("availability_status") or "model")
+            availability_html = ""
+            if int(matchday) == upcoming_matchday or player.get("availability_unavailable"):
+                availability_html = (
+                    f'<em class="availability {escape(availability_status)}">'
+                    f'{escape(str(player.get("availability_label") or "Stima impiego"))} · '
+                    f'{appearance_probability}%</em>'
+                )
             cards.append(
                 f'<div class="fantasy-decision-player role-{role.lower()} {tone}">'
                 f'<span>{escape(role)} · {float(_number_or_none(player.get("decision_score"), 0) or 0):.0f}</span>'
                 f'<strong>{escape(str(player.get("name") or ""))}</strong>'
                 f'<small>{escape(str(player.get("team") or ""))} {venue} {escape(str(opponent))}'
-                f'{" · D " + f"{difficulty:.1f}" if difficulty is not None else ""}</small>{crown}</div>'
+                f'{" · D " + f"{difficulty:.1f}" if difficulty is not None else ""}</small>'
+                f'{availability_html}{crown}</div>'
             )
         if cards:
             role_rows.append(
@@ -2700,6 +2773,76 @@ def _render_matchday_assistant(
         f'<section class="fantasy-decision-pitch">{"".join(role_rows)}</section>',
         unsafe_allow_html=True,
     )
+    unavailable_players = [
+        player for player in recommendation.get("all_players", [])
+        if player.get("availability_unavailable")
+    ]
+    if unavailable_players:
+        st.markdown("##### Indisponibili per questa giornata")
+        for player in unavailable_players:
+            unavailable_until = player.get("unavailable_until_matchday")
+            duration = (
+                f"fino alla G{int(unavailable_until)}"
+                if unavailable_until else "rientro non ancora comunicato"
+            )
+            source = str(player.get("availability_source") or "Fonte pubblicata")
+            url = str(player.get("availability_url") or "")
+            source_markdown = f"[{source}]({url})" if url.startswith("http") else source
+            st.warning(
+                f"**{player.get('name')}** · {player.get('availability_label')} · "
+                f"{duration} · {source_markdown}"
+            )
+    if int(matchday) == upcoming_matchday:
+        st.markdown("##### Probabilità di impiego · tutta la rosa")
+        st.caption(
+            "Disponibile solo per la prossima giornata. SaSa combina titolarità, "
+            "possibilità di subentro e notizie/probabili formazioni pubblicate."
+        )
+        availability_cards = []
+        role_order = {"P": 0, "D": 1, "C": 2, "A": 3}
+        all_players = sorted(
+            recommendation.get("all_players", []),
+            key=lambda player: (
+                role_order.get(str(player.get("role") or ""), 9),
+                -float(_number_or_none(player.get("appearance_probability"), 0) or 0),
+                str(player.get("name") or ""),
+            ),
+        )
+        for player in all_players:
+            probability = int(_number_or_none(player.get("appearance_probability"), 0) or 0)
+            if player.get("availability_unavailable"):
+                tone = "out"
+            elif probability >= 80:
+                tone = "ready"
+            elif probability >= 55:
+                tone = "watch"
+            else:
+                tone = "low"
+            source = escape(str(player.get("availability_source") or "Modello SaSa"))
+            url = str(player.get("availability_url") or "")
+            if player.get("availability_has_news") and url.startswith("http"):
+                source = (
+                    f'<a href="{escape(url, quote=True)}" target="_blank">{source} ↗</a>'
+                )
+            reason = escape(str(player.get("availability_reason") or ""))
+            availability_cards.append(
+                f'<article class="fantasy-appearance-card {tone}">'
+                f'<header><span>{escape(str(player.get("role") or ""))} · '
+                f'{escape(str(player.get("team") or ""))}</span><b>{probability}%</b></header>'
+                f'<strong>{escape(str(player.get("name") or ""))}</strong>'
+                f'<div><i style="width:{probability}%"></i></div>'
+                f'<small>{escape(str(player.get("availability_label") or "Stima impiego"))} · '
+                f'{source}</small><p>{reason}</p></article>'
+            )
+        st.markdown(
+            f'<section class="fantasy-appearance-grid">{"".join(availability_cards)}</section>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info(
+            f"Le probabilità individuali sono mostrate solo sulla prossima giornata "
+            f"(G{upcoming_matchday}), perché oltre quel turno non sarebbero attendibili."
+        )
     bench = recommendation.get("bench", [])[:5]
     bench_column, reason_column = st.columns([1, 1.25])
     with bench_column:
@@ -2707,9 +2850,15 @@ def _render_matchday_assistant(
         if bench:
             for index, player in enumerate(bench, start=1):
                 fixture = player.get("decision_fixture") or {}
+                probability_text = ""
+                if int(matchday) == upcoming_matchday:
+                    probability_text = (
+                        f" · {int(_number_or_none(player.get('appearance_probability'), 0) or 0)}% impiego"
+                    )
                 st.caption(
                     f"{index}. {player.get('name')} · {player.get('role')} · "
                     f"{fixture.get('venue', '–')} {fixture.get('opponent', 'calendario n/d')}"
+                    f"{probability_text}"
                 )
         else:
             st.caption("Nessuna alternativa disponibile.")
@@ -2723,8 +2872,8 @@ def _render_matchday_assistant(
             key=lambda player: float((player.get("decision_fixture") or {}).get("difficulty") or 5),
         )[:3]
         st.caption(
-            "SaSa combina fantamedia attesa, titolarita, bonus, affidabilita, rischio "
-            "infortuni e difficolta dell'avversario."
+            "SaSa combina fantamedia attesa, titolarita, bonus, affidabilita, "
+            "difficolta dell'avversario e segnali pubblicati sulla disponibilita."
         )
         if favorable:
             st.caption(
@@ -2765,11 +2914,16 @@ def _fixture_tone(difficulty: float | None) -> str:
 def _render_strategic_calendar(
     league: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> None:
+    upcoming_matchday = season_next_matchday()
     start_matchday = st.selectbox(
         "Parti dalla giornata",
-        list(range(1, 6)),
-        format_func=lambda value: f"{value}ª giornata",
-        key=f"calendar_start_{league['id']}",
+        list(range(1, 39)),
+        index=upcoming_matchday - 1,
+        format_func=lambda value: (
+            f"{value}ª giornata · {matchday_date(value).strftime('%d/%m/%Y')}"
+            if matchday_date(value) else f"{value}ª giornata"
+        ),
+        key=f"calendar_start_v22_{league['id']}",
     )
     st.caption(
         "Verde = partita favorevole · ambra = equilibrata · rosso = impegnativa. "
@@ -2800,7 +2954,8 @@ def _render_strategic_calendar(
         unsafe_allow_html=True,
     )
     st.caption(
-        f"Fonte: [calendario ufficiale Lega Serie A · prime cinque giornate]({FIXTURE_SOURCE_URL})."
+        f"Fonte: [calendario ufficiale Lega Serie A · 38 giornate]({FIXTURE_SOURCE_URL}). "
+        "La vista mostra la giornata selezionata e le quattro successive."
     )
     rotations = best_rotation_pairs(
         league, catalog, start_matchday=int(start_matchday), limit=5
@@ -3579,10 +3734,26 @@ def render_fantasy_styles() -> None:
         .fantasy-decision-player>span { color:var(--accent); font-size:.5rem; font-weight:950; letter-spacing:.08em; }
         .fantasy-decision-player>strong { overflow:hidden; color:#f7fffb; font-size:.8rem; text-overflow:ellipsis; white-space:nowrap; }
         .fantasy-decision-player>small { color:#9fb1aa; font-size:.58rem; }
+        .fantasy-decision-player>em.availability { width:fit-content; margin-top:.3rem; padding:.13rem .32rem; border:1px solid rgba(98,216,255,.25); border-radius:999px; color:#9fe8ff; background:rgba(98,216,255,.08); font-size:.46rem; font-style:normal; font-weight:900; letter-spacing:.04em; }
+        .fantasy-decision-player>em.availability.bench { border-color:rgba(255,176,32,.35); color:#ffcf72; background:rgba(255,176,32,.09); }
+        .fantasy-decision-player>em.availability.injured,.fantasy-decision-player>em.availability.suspended { border-color:rgba(244,83,138,.38); color:#ff8db4; background:rgba(244,83,138,.1); }
         .fantasy-decision-player>i { position:absolute; top:.45rem; right:.45rem; color:#ffdf72; font-size:.44rem; font-style:normal; font-weight:950; }
         .fantasy-decision-player.easy { box-shadow:0 0 0 1px rgba(25,230,176,.16),0 10px 22px rgba(0,0,0,.24); }
         .fantasy-decision-player.medium { box-shadow:inset 3px 0 #ffb020,0 10px 22px rgba(0,0,0,.24); }
         .fantasy-decision-player.hard { box-shadow:inset 3px 0 #f4538a,0 10px 22px rgba(0,0,0,.24); }
+        .fantasy-appearance-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.5rem; margin:.55rem 0 1rem; }
+        .fantasy-appearance-card { --signal:#62d8ff; display:flex; flex-direction:column; gap:.18rem; min-width:0; padding:.65rem .7rem; border:1px solid color-mix(in srgb,var(--signal) 28%,transparent); border-radius:11px; background:linear-gradient(145deg,color-mix(in srgb,var(--signal) 7%,transparent),rgba(8,10,11,.7)); }
+        .fantasy-appearance-card.ready { --signal:#19e6b0; }
+        .fantasy-appearance-card.watch { --signal:#ffb020; }
+        .fantasy-appearance-card.low,.fantasy-appearance-card.out { --signal:#f4538a; }
+        .fantasy-appearance-card header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; }
+        .fantasy-appearance-card header span { color:var(--signal); font-size:.5rem; font-weight:950; letter-spacing:.08em; }
+        .fantasy-appearance-card header b { color:var(--signal); font-size:1rem; }
+        .fantasy-appearance-card>strong { overflow:hidden; color:#f7fffb; font-size:.82rem; text-overflow:ellipsis; white-space:nowrap; }
+        .fantasy-appearance-card>div { height:5px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.08); }
+        .fantasy-appearance-card>div>i { display:block; height:100%; border-radius:inherit; background:var(--signal); box-shadow:0 0 14px color-mix(in srgb,var(--signal) 62%,transparent); }
+        .fantasy-appearance-card>small,.fantasy-appearance-card>small a { color:#97aaa3; font-size:.52rem; text-decoration:none; }
+        .fantasy-appearance-card>p { display:-webkit-box; overflow:hidden; margin:.12rem 0 0; color:#788680; font-size:.55rem; line-height:1.35; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
         .fantasy-calendar-board { display:flex; flex-direction:column; gap:.45rem; margin:.7rem 0; }
         .fantasy-calendar-row { display:grid; grid-template-columns:minmax(150px,.72fr) 2fr; gap:.65rem; align-items:center; padding:.62rem; border:1px solid rgba(244,251,247,.1); border-radius:11px; background:linear-gradient(120deg,rgba(244,251,247,.045),rgba(8,10,11,.5)); }
         .fantasy-calendar-row>div { min-width:0; display:flex; flex-direction:column; }
@@ -3666,6 +3837,8 @@ def render_fantasy_styles() -> None:
             .fantasy-decision-player>strong { font-size:.63rem; }
             .fantasy-decision-player>small { font-size:.48rem; }
             .fantasy-decision-player>i { display:none; }
+            .fantasy-appearance-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.38rem; }
+            .fantasy-appearance-card { padding:.5rem; }
             .fantasy-calendar-row { grid-template-columns:1fr; }
             .fantasy-calendar-row>section { display:flex; overflow-x:auto; padding-bottom:.2rem; }
             .fantasy-calendar-row>section>span { min-width:104px; }
