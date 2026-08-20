@@ -3985,6 +3985,7 @@ def _save_workspace(workspace: dict[str, Any], storage: FantasyWorkspaceStorage)
     st.session_state[WORKSPACE_SESSION_KEY] = workspace
     st.session_state["fantasy_remote_save_attempted"] = storage.remote_available
     st.session_state["fantasy_remote_synced"] = storage.save(workspace)
+    st.session_state["fantasy_remote_error"] = storage.last_remote_error
 
 
 def _render_sync_status(storage: FantasyWorkspaceStorage) -> None:
@@ -3994,7 +3995,12 @@ def _render_sync_status(storage: FantasyWorkspaceStorage) -> None:
         if synced:
             st.caption("● Dati sincronizzati su Supabase")
         elif attempted:
-            detail = f" Motivo: {storage.last_remote_error}" if storage.last_remote_error else ""
+            remote_error = str(
+                st.session_state.get("fantasy_remote_error")
+                or storage.last_remote_error
+                or ""
+            )
+            detail = f" Motivo: {remote_error}" if remote_error else ""
             st.warning(
                 "Salvataggio cloud non riuscito: i dati potrebbero andare persi al riavvio."
                 + detail
