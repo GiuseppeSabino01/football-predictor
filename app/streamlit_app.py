@@ -23,6 +23,7 @@ import streamlit.components.v1 as components
 from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
 from config.settings import load_settings
 import fantasy.service as fantasy_service
+import fantasy.storage as fantasy_storage
 import fantasy.ui as fantasy_ui
 from features.market_features import fair_odd, recommendation, value_score
 from features.team_strength import canonical_team_name
@@ -53,7 +54,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.20 · Fantasy v24 · Salvataggio cloud")
+    st.caption("Build 2026.08.20 · Fantasy v24.1 · Hotfix salvataggio")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
@@ -95,6 +96,7 @@ def main() -> None:
         render_road_to_new_york()
     elif page == "Fantacalcio":
         importlib.reload(fantasy_service)
+        importlib.reload(fantasy_storage)
         importlib.reload(fantasy_ui)
         fantasy_ui.render_fantasy_page(settings())
     elif page == "GiGi":
