@@ -1,8 +1,13 @@
+from datetime import date
+
 from fantasy.decision_center import (
+    OFFICIAL_FIXTURES_2026_27,
     build_roster_alerts,
     fixture_outlook,
     fixtures_for_team,
+    player_availability,
     recommend_lineup,
+    season_next_matchday,
     simulate_purchase,
 )
 
@@ -41,12 +46,27 @@ def complete_league():
 
 
 def test_fixture_alias_and_difficulty_are_available():
-    fixtures = fixtures_for_team("INT", start_matchday=1, limit=5)
-    assert len(fixtures) == 5
+    fixtures = fixtures_for_team("INT", start_matchday=1, limit=38)
+    assert len(fixtures) == 38
     assert fixtures[0]["opponent"] == "MONZA"
     assert fixtures[0]["venue"] == "C"
+    assert fixtures[-1]["opponent"] == "SASSUOLO"
     outlook = fixture_outlook("INT", [player(1, "A", "INT"), player(2, "A", "MON")])
     assert 1 <= outlook[0]["difficulty"] <= 5
+
+
+def test_official_calendar_contains_38_complete_matchdays():
+    assert len(OFFICIAL_FIXTURES_2026_27) == 38
+    for fixtures in OFFICIAL_FIXTURES_2026_27:
+        teams = [team for fixture in fixtures for team in fixture]
+        assert len(fixtures) == 10
+        assert len(set(teams)) == 20
+
+
+def test_next_matchday_uses_the_official_season_dates():
+    assert season_next_matchday(date(2026, 8, 18)) == 1
+    assert season_next_matchday(date(2027, 4, 12)) == 32
+    assert season_next_matchday(date(2027, 6, 1)) == 38
 
 
 def test_matchday_assistant_builds_a_valid_eleven():
@@ -56,6 +76,63 @@ def test_matchday_assistant_builds_a_valid_eleven():
     assert result["formation"] in {"4-3-3", "4-4-2", "3-4-3", "3-5-2", "5-3-2"}
     assert len(result["players"]) == 11
     assert result["captain"] in result["players"]
+
+
+def test_published_injury_excludes_player_until_announced_round():
+    league, catalog = complete_league()
+    injured = league["purchases"][1]
+    injured["name"] = "Albarracin"
+    catalog[1]["name"] = "Albarracin"
+    news = [
+        {
+            "title": "Albarracin infortunato: stop fino alla 4a giornata",
+            "summary": "Il difensore non sara disponibile.",
+            "url": "https://www.fantacalcio.it/news/albarracin-stop.html",
+            "source": "Fantacalcio.it",
+            "verified": True,
+            "status": "injured",
+            "unavailable_until_matchday": 4,
+        }
+    ]
+    result = recommend_lineup(
+        league,
+        catalog,
+        matchday=3,
+        news_items=news,
+        next_matchday_number=3,
+    )
+    selected_ids = {row["player_id"] for row in result["players"]}
+    assert injured["player_id"] not in selected_ids
+    signal = next(
+        row for row in result["all_players"] if row["player_id"] == injured["player_id"]
+    )
+    assert signal["availability_unavailable"] is True
+    assert signal["appearance_probability"] <= 8
+    assert signal["unavailable_until_matchday"] == 4
+
+
+def test_probable_bench_changes_only_the_immediately_next_round():
+    candidate = player(50, "C", "ROM", starter=90)
+    candidate["name"] = "Perrone"
+    news = [
+        {
+            "title": "Probabili formazioni: Perrone verso la panchina",
+            "body": "Perrone verso la panchina nella prossima giornata.",
+            "url": "https://www.fantacalcio.it/news/probabili-perrone.html",
+            "source": "Fantacalcio.it",
+            "verified": True,
+        }
+    ]
+    next_signal = player_availability(
+        candidate, news, matchday=5, next_matchday_number=5
+    )
+    future_signal = player_availability(
+        candidate, news, matchday=6, next_matchday_number=5
+    )
+    assert next_signal["availability_status"] == "bench"
+    assert next_signal["appearance_probability"] <= 58
+    assert future_signal["availability_status"] == "model"
+    assert future_signal["appearance_probability"] > next_signal["appearance_probability"]
 
 
 def test_what_if_simulation_never_mutates_the_roster():
