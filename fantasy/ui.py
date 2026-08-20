@@ -224,7 +224,7 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
 def _load_workspace(storage: FantasyWorkspaceStorage) -> dict[str, Any]:
     if WORKSPACE_SESSION_KEY not in st.session_state:
         st.session_state[WORKSPACE_SESSION_KEY] = storage.load()
-        st.session_state["fantasy_remote_synced"] = storage.last_remote_save_ok
+        st.session_state["fantasy_remote_synced"] = getattr(storage, "last_remote_save_ok", False)
     return st.session_state[WORKSPACE_SESSION_KEY]
 
 
