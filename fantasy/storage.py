@@ -44,7 +44,7 @@ class FantasyWorkspaceStorage:
                 if loaded_legacy:
                     self.save(workspace)
                 return workspace
-            self.last_remote_error = self.remote.last_error
+            self.last_remote_error = getattr(self.remote, "last_error", "")
             if local_workspace.get("leagues"):
                 self.save(local_workspace)
         return local_workspace
@@ -54,14 +54,14 @@ class FantasyWorkspaceStorage:
         self.local.upsert_json_state(FANTASY_STATE_KEY, "Fantacalcio workspace", normalized)
         if not self.remote_available:
             self.last_remote_save_ok = False
-            self.last_remote_error = self.remote.last_error
+            self.last_remote_error = getattr(self.remote, "last_error", "")
             return False
         self.last_remote_save_ok = self.remote.upsert_json_state(
             FANTASY_STATE_KEY,
             "Fantacalcio workspace",
             _remote_workspace_payload(normalized),
         )
-        self.last_remote_error = self.remote.last_error
+        self.last_remote_error = getattr(self.remote, "last_error", "")
         return self.last_remote_save_ok
 
 
