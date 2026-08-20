@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from hashlib import sha1
 import re
 from typing import Any, Iterable
@@ -9,43 +10,79 @@ from fantasy.service import FORMATIONS, ROLE_LABELS, roster_summary
 
 FIXTURE_SOURCE_URL = (
     "https://www.legaseriea.it/serie-a/news/"
-    "date-orari-e-programmazione-tv-delle-prime-cinque-giornate"
+    "calendario-della-serie-a-enilive-2026-27"
 )
 
 
-# Le prime cinque giornate sono pubblicate dalla Lega Serie A. Tenere i dati qui rende
-# il Decision Center utilizzabile anche quando il sito sorgente non risponde.
-OFFICIAL_FIXTURES_2026_27: tuple[tuple[tuple[str, str], ...], ...] = (
-    (
-        ("INTER", "MONZA"), ("UDINESE", "COMO"), ("GENOA", "NAPOLI"),
-        ("PARMA", "CAGLIARI"), ("FROSINONE", "JUVENTUS"), ("VENEZIA", "LECCE"),
-        ("ATALANTA", "SASSUOLO"), ("TORINO", "MILAN"), ("BOLOGNA", "LAZIO"),
-        ("ROMA", "FIORENTINA"),
-    ),
-    (
-        ("MILAN", "VENEZIA"), ("FIORENTINA", "FROSINONE"), ("MONZA", "UDINESE"),
-        ("SASSUOLO", "TORINO"), ("JUVENTUS", "PARMA"), ("NAPOLI", "COMO"),
-        ("CAGLIARI", "INTER"), ("LAZIO", "GENOA"), ("LECCE", "ROMA"),
-        ("ATALANTA", "BOLOGNA"),
-    ),
-    (
-        ("GENOA", "COMO"), ("INTER", "NAPOLI"), ("FIORENTINA", "TORINO"),
-        ("ROMA", "ATALANTA"), ("JUVENTUS", "MILAN"), ("FROSINONE", "VENEZIA"),
-        ("PARMA", "MONZA"), ("BOLOGNA", "SASSUOLO"), ("CAGLIARI", "LECCE"),
-        ("UDINESE", "LAZIO"),
-    ),
-    (
-        ("VENEZIA", "FIORENTINA"), ("GENOA", "FROSINONE"),
-        ("ATALANTA", "CAGLIARI"), ("LAZIO", "MILAN"), ("SASSUOLO", "JUVENTUS"),
-        ("LECCE", "MONZA"), ("INTER", "UDINESE"), ("COMO", "PARMA"),
-        ("NAPOLI", "BOLOGNA"), ("TORINO", "ROMA"),
-    ),
-    (
-        ("MONZA", "SASSUOLO"), ("BOLOGNA", "TORINO"), ("UDINESE", "CAGLIARI"),
-        ("ROMA", "INTER"), ("VENEZIA", "LAZIO"), ("FIORENTINA", "NAPOLI"),
-        ("FROSINONE", "COMO"), ("PARMA", "GENOA"), ("ATALANTA", "JUVENTUS"),
-        ("MILAN", "LECCE"),
-    ),
+def _parse_fixture_calendar(raw: str) -> tuple[tuple[tuple[str, str], ...], ...]:
+    rounds: list[tuple[tuple[str, str], ...]] = []
+    for line in raw.strip().splitlines():
+        matches = []
+        for match in line.split(";"):
+            home, away = match.strip().split("-")
+            matches.append((home, away))
+        rounds.append(tuple(matches))
+    return tuple(rounds)
+
+
+# Calendario ufficiale Lega Serie A 2026/27. Il fallback locale mantiene disponibili
+# tutte le 38 giornate anche se la pagina della Lega non risponde al caricamento.
+OFFICIAL_FIXTURES_2026_27 = _parse_fixture_calendar(
+    """
+ATALANTA-SASSUOLO;BOLOGNA-LAZIO;FROSINONE-JUVENTUS;GENOA-NAPOLI;INTER-MONZA;PARMA-CAGLIARI;ROMA-FIORENTINA;TORINO-MILAN;UDINESE-COMO;VENEZIA-LECCE
+ATALANTA-BOLOGNA;CAGLIARI-INTER;FIORENTINA-FROSINONE;JUVENTUS-PARMA;LAZIO-GENOA;LECCE-ROMA;MILAN-VENEZIA;MONZA-UDINESE;NAPOLI-COMO;SASSUOLO-TORINO
+BOLOGNA-SASSUOLO;CAGLIARI-LECCE;FIORENTINA-TORINO;FROSINONE-VENEZIA;GENOA-COMO;INTER-NAPOLI;JUVENTUS-MILAN;PARMA-MONZA;ROMA-ATALANTA;UDINESE-LAZIO
+ATALANTA-CAGLIARI;COMO-PARMA;GENOA-FROSINONE;INTER-UDINESE;LAZIO-MILAN;LECCE-MONZA;NAPOLI-BOLOGNA;SASSUOLO-JUVENTUS;TORINO-ROMA;VENEZIA-FIORENTINA
+BOLOGNA-TORINO;FIORENTINA-NAPOLI;FROSINONE-COMO;JUVENTUS-ATALANTA;MILAN-LECCE;MONZA-SASSUOLO;PARMA-GENOA;ROMA-INTER;UDINESE-CAGLIARI;VENEZIA-LAZIO
+ATALANTA-VENEZIA;CAGLIARI-JUVENTUS;COMO-ROMA;GENOA-FIORENTINA;INTER-PARMA;LAZIO-MONZA;LECCE-BOLOGNA;NAPOLI-FROSINONE;SASSUOLO-MILAN;TORINO-UDINESE
+BOLOGNA-INTER;FIORENTINA-COMO;FROSINONE-SASSUOLO;JUVENTUS-LAZIO;MILAN-ATALANTA;MONZA-CAGLIARI;PARMA-TORINO;ROMA-GENOA;UDINESE-LECCE;VENEZIA-NAPOLI
+ATALANTA-FROSINONE;CAGLIARI-BOLOGNA;COMO-SASSUOLO;GENOA-VENEZIA;INTER-FIORENTINA;LAZIO-PARMA;LECCE-JUVENTUS;NAPOLI-ROMA;TORINO-MONZA;UDINESE-MILAN
+FIORENTINA-ATALANTA;FROSINONE-LECCE;GENOA-JUVENTUS;MILAN-BOLOGNA;MONZA-NAPOLI;PARMA-UDINESE;ROMA-CAGLIARI;SASSUOLO-LAZIO;TORINO-COMO;VENEZIA-INTER
+ATALANTA-PARMA;BOLOGNA-MONZA;COMO-VENEZIA;FROSINONE-TORINO;JUVENTUS-NAPOLI;LAZIO-CAGLIARI;LECCE-GENOA;MILAN-INTER;SASSUOLO-FIORENTINA;UDINESE-ROMA
+CAGLIARI-FROSINONE;FIORENTINA-JUVENTUS;GENOA-MILAN;INTER-COMO;MONZA-ATALANTA;NAPOLI-LAZIO;PARMA-BOLOGNA;ROMA-SASSUOLO;TORINO-LECCE;VENEZIA-UDINESE
+ATALANTA-INTER;BOLOGNA-UDINESE;COMO-CAGLIARI;JUVENTUS-VENEZIA;LAZIO-LECCE;MILAN-FROSINONE;MONZA-FIORENTINA;NAPOLI-TORINO;PARMA-ROMA;SASSUOLO-GENOA
+CAGLIARI-MILAN;COMO-JUVENTUS;FROSINONE-PARMA;INTER-GENOA;LECCE-ATALANTA;ROMA-MONZA;SASSUOLO-NAPOLI;TORINO-LAZIO;UDINESE-FIORENTINA;VENEZIA-BOLOGNA
+BOLOGNA-ROMA;FIORENTINA-CAGLIARI;FROSINONE-INTER;GENOA-TORINO;JUVENTUS-UDINESE;LAZIO-ATALANTA;MILAN-PARMA;MONZA-COMO;NAPOLI-LECCE;VENEZIA-SASSUOLO
+ATALANTA-GENOA;CAGLIARI-VENEZIA;COMO-BOLOGNA;INTER-TORINO;JUVENTUS-MONZA;LAZIO-ROMA;LECCE-SASSUOLO;NAPOLI-MILAN;PARMA-FIORENTINA;UDINESE-FROSINONE
+ATALANTA-NAPOLI;FIORENTINA-BOLOGNA;FROSINONE-LAZIO;GENOA-UDINESE;LECCE-INTER;MILAN-COMO;ROMA-JUVENTUS;SASSUOLO-PARMA;TORINO-CAGLIARI;VENEZIA-MONZA
+BOLOGNA-JUVENTUS;CAGLIARI-GENOA;COMO-LECCE;FIORENTINA-LAZIO;INTER-SASSUOLO;MONZA-MILAN;PARMA-NAPOLI;ROMA-FROSINONE;TORINO-VENEZIA;UDINESE-ATALANTA
+ATALANTA-COMO;FROSINONE-BOLOGNA;GENOA-MONZA;JUVENTUS-TORINO;LAZIO-INTER;LECCE-PARMA;MILAN-FIORENTINA;NAPOLI-CAGLIARI;SASSUOLO-UDINESE;VENEZIA-ROMA
+BOLOGNA-GENOA;CAGLIARI-SASSUOLO;COMO-LAZIO;FIORENTINA-LECCE;INTER-JUVENTUS;MONZA-FROSINONE;PARMA-VENEZIA;ROMA-MILAN;TORINO-ATALANTA;UDINESE-NAPOLI
+ATALANTA-ROMA;CAGLIARI-COMO;JUVENTUS-GENOA;LAZIO-BOLOGNA;LECCE-UDINESE;MILAN-TORINO;NAPOLI-FIORENTINA;PARMA-INTER;SASSUOLO-MONZA;VENEZIA-FROSINONE
+BOLOGNA-ATALANTA;COMO-NAPOLI;FIORENTINA-SASSUOLO;FROSINONE-MILAN;GENOA-PARMA;INTER-VENEZIA;JUVENTUS-CAGLIARI;LECCE-TORINO;MONZA-LAZIO;ROMA-UDINESE
+ATALANTA-FIORENTINA;CAGLIARI-PARMA;GENOA-LECCE;LAZIO-VENEZIA;MILAN-JUVENTUS;MONZA-ROMA;NAPOLI-INTER;SASSUOLO-COMO;TORINO-FROSINONE;UDINESE-BOLOGNA
+ATALANTA-LAZIO;BOLOGNA-MILAN;COMO-MONZA;FIORENTINA-UDINESE;INTER-CAGLIARI;JUVENTUS-SASSUOLO;LECCE-NAPOLI;PARMA-FROSINONE;ROMA-TORINO;VENEZIA-GENOA
+BOLOGNA-COMO;CAGLIARI-LAZIO;FROSINONE-FIORENTINA;GENOA-ATALANTA;INTER-MILAN;MONZA-LECCE;NAPOLI-JUVENTUS;PARMA-ROMA;TORINO-SASSUOLO;UDINESE-VENEZIA
+ATALANTA-MONZA;COMO-TORINO;FIORENTINA-INTER;JUVENTUS-BOLOGNA;LAZIO-NAPOLI;LECCE-FROSINONE;MILAN-GENOA;SASSUOLO-ROMA;UDINESE-PARMA;VENEZIA-CAGLIARI
+BOLOGNA-LECCE;CAGLIARI-UDINESE;COMO-MILAN;FROSINONE-NAPOLI;GENOA-LAZIO;INTER-ATALANTA;MONZA-JUVENTUS;PARMA-SASSUOLO;ROMA-VENEZIA;TORINO-FIORENTINA
+ATALANTA-TORINO;FIORENTINA-VENEZIA;JUVENTUS-ROMA;LAZIO-FROSINONE;LECCE-COMO;MILAN-CAGLIARI;MONZA-GENOA;NAPOLI-PARMA;SASSUOLO-BOLOGNA;UDINESE-INTER
+BOLOGNA-NAPOLI;CAGLIARI-FIORENTINA;COMO-UDINESE;FROSINONE-MONZA;GENOA-ROMA;LAZIO-JUVENTUS;MILAN-SASSUOLO;PARMA-LECCE;TORINO-INTER;VENEZIA-ATALANTA
+ATALANTA-MILAN;FIORENTINA-GENOA;INTER-FROSINONE;JUVENTUS-COMO;MONZA-BOLOGNA;NAPOLI-VENEZIA;PARMA-LAZIO;ROMA-LECCE;SASSUOLO-CAGLIARI;UDINESE-TORINO
+CAGLIARI-NAPOLI;COMO-FIORENTINA;FROSINONE-UDINESE;GENOA-INTER;LECCE-LAZIO;MILAN-MONZA;ROMA-BOLOGNA;SASSUOLO-ATALANTA;TORINO-JUVENTUS;VENEZIA-PARMA
+BOLOGNA-VENEZIA;CAGLIARI-ATALANTA;FIORENTINA-MILAN;FROSINONE-GENOA;INTER-ROMA;JUVENTUS-LECCE;LAZIO-TORINO;NAPOLI-SASSUOLO;PARMA-COMO;UDINESE-MONZA
+ATALANTA-UDINESE;BOLOGNA-CAGLIARI;COMO-FROSINONE;FIORENTINA-PARMA;MILAN-NAPOLI;MONZA-INTER;ROMA-LAZIO;SASSUOLO-LECCE;TORINO-GENOA;VENEZIA-JUVENTUS
+CAGLIARI-MONZA;FROSINONE-ROMA;GENOA-SASSUOLO;INTER-BOLOGNA;JUVENTUS-FIORENTINA;LAZIO-COMO;LECCE-MILAN;NAPOLI-UDINESE;PARMA-ATALANTA;VENEZIA-TORINO
+ATALANTA-JUVENTUS;BOLOGNA-FIORENTINA;COMO-INTER;LECCE-CAGLIARI;MILAN-LAZIO;MONZA-VENEZIA;ROMA-NAPOLI;SASSUOLO-FROSINONE;TORINO-PARMA;UDINESE-GENOA
+FIORENTINA-ROMA;FROSINONE-ATALANTA;GENOA-CAGLIARI;INTER-LECCE;LAZIO-SASSUOLO;NAPOLI-MONZA;PARMA-MILAN;TORINO-BOLOGNA;UDINESE-JUVENTUS;VENEZIA-COMO
+BOLOGNA-FROSINONE;CAGLIARI-TORINO;COMO-ATALANTA;JUVENTUS-INTER;LAZIO-UDINESE;LECCE-FIORENTINA;MILAN-ROMA;MONZA-PARMA;NAPOLI-GENOA;SASSUOLO-VENEZIA
+ATALANTA-LECCE;FIORENTINA-MONZA;FROSINONE-CAGLIARI;GENOA-BOLOGNA;INTER-LAZIO;PARMA-JUVENTUS;ROMA-COMO;TORINO-NAPOLI;UDINESE-SASSUOLO;VENEZIA-MILAN
+BOLOGNA-PARMA;CAGLIARI-ROMA;COMO-GENOA;JUVENTUS-FROSINONE;LAZIO-FIORENTINA;LECCE-VENEZIA;MILAN-UDINESE;MONZA-TORINO;NAPOLI-ATALANTA;SASSUOLO-INTER
+"""
+)
+
+
+MATCHDAY_DATES_2026_27: tuple[date, ...] = tuple(
+    datetime.strptime(value, "%Y-%m-%d").date()
+    for value in (
+        "2026-08-23", "2026-08-30", "2026-09-06", "2026-09-13", "2026-09-20",
+        "2026-10-11", "2026-10-18", "2026-10-25", "2026-10-28", "2026-11-01",
+        "2026-11-08", "2026-11-22", "2026-11-29", "2026-12-06", "2026-12-13",
+        "2026-12-20", "2027-01-03", "2027-01-06", "2027-01-10", "2027-01-17",
+        "2027-01-24", "2027-01-31", "2027-02-07", "2027-02-14", "2027-02-21",
+        "2027-02-28", "2027-03-07", "2027-03-14", "2027-03-21", "2027-04-04",
+        "2027-04-11", "2027-04-18", "2027-04-25", "2027-05-02", "2027-05-09",
+        "2027-05-16", "2027-05-23", "2027-05-30",
+    )
 )
 
 
@@ -75,6 +112,21 @@ def number(value: Any) -> float:
 def normalize_team(team: Any) -> str:
     clean = str(team or "").strip().upper()
     return TEAM_ALIASES.get(clean, clean)
+
+
+def season_next_matchday(today: date | None = None) -> int:
+    reference = today or date.today()
+    for matchday, scheduled_date in enumerate(MATCHDAY_DATES_2026_27, start=1):
+        if scheduled_date >= reference:
+            return matchday
+    return 38
+
+
+def matchday_date(matchday: int) -> date | None:
+    index = int(matchday) - 1
+    if 0 <= index < len(MATCHDAY_DATES_2026_27):
+        return MATCHDAY_DATES_2026_27[index]
+    return None
 
 
 def fixtures_for_team(team: Any, *, start_matchday: int = 1, limit: int = 5) -> list[dict[str, Any]]:
@@ -182,6 +234,8 @@ def recommend_lineup(
     catalog: list[dict[str, Any]],
     *,
     matchday: int = 1,
+    news_items: list[dict[str, Any]] | None = None,
+    next_matchday_number: int | None = None,
 ) -> dict[str, Any]:
     catalog_by_id = {str(player.get("id")): player for player in catalog}
     players = [
@@ -202,16 +256,37 @@ def recommend_lineup(
     for player in players:
         fixture = fixture_by_team.get(normalize_team(player.get("team")))
         player["decision_fixture"] = fixture
-        player["decision_score"] = weekly_player_score(
+        availability = player_availability(
+            player,
+            news_items or [],
+            matchday=int(matchday),
+            next_matchday_number=next_matchday_number,
+        )
+        player.update(availability)
+        base_score = weekly_player_score(
             player, fixture.get("difficulty") if fixture else None
         )
+        availability_adjustment = (
+            (number(availability.get("appearance_probability")) - 75) * 0.22
+        )
+        if availability.get("availability_status") == "bench":
+            availability_adjustment -= 10
+        if availability.get("availability_unavailable"):
+            availability_adjustment -= 1000
+        player["decision_score"] = round(base_score + availability_adjustment, 2)
+    available_players = [
+        player for player in players if not player.get("availability_unavailable")
+    ]
     candidates: list[dict[str, Any]] = []
     for formation, required in FORMATIONS.items():
         selected: list[dict[str, Any]] = []
         feasible = True
         for role, count in required.items():
             role_players = sorted(
-                (player for player in players if str(player.get("role")) == role),
+                (
+                    player for player in available_players
+                    if str(player.get("role")) == role
+                ),
                 key=lambda player: (number(player.get("decision_score")), number(player.get("price"))),
                 reverse=True,
             )
@@ -229,7 +304,7 @@ def recommend_lineup(
             )
     if not candidates:
         fallback = sorted(
-            players,
+            available_players,
             key=lambda player: number(player.get("decision_score")),
             reverse=True,
         )[:11]
@@ -241,6 +316,7 @@ def recommend_lineup(
             "complete": False,
             "score": sum(number(player.get("decision_score")) for player in fallback),
             "fixture_by_team": fixture_by_team,
+            "all_players": players,
         }
     best = max(candidates, key=lambda item: number(item.get("score")))
     selected_ids = {str(player.get("player_id")) for player in best["players"]}
@@ -265,6 +341,7 @@ def recommend_lineup(
         "captain": captain,
         "complete": True,
         "fixture_by_team": fixture_by_team,
+        "all_players": players,
     }
 
 
@@ -383,7 +460,11 @@ def _related_news(
     ranked: list[tuple[int, dict[str, Any]]] = []
     for item in news_items:
         searchable = " ".join(
-            [str(item.get("title") or ""), str(item.get("summary") or "")]
+            [
+                str(item.get("title") or ""),
+                str(item.get("summary") or ""),
+                str(item.get("body") or ""),
+            ]
         )
         news_tokens = _name_tokens(searchable)
         name_matches = len(player_tokens & news_tokens)
@@ -399,6 +480,202 @@ def _is_published_news(item: dict[str, Any]) -> bool:
     source = str(item.get("source") or "").strip()
     url = str(item.get("url") or "").strip()
     return bool(title and source and url.startswith("http") and item.get("verified") is True)
+
+
+def _clamp(value: Any, minimum: float = 0, maximum: float = 100) -> float:
+    return max(minimum, min(maximum, number(value)))
+
+
+def _news_text(item: dict[str, Any]) -> str:
+    return " ".join(
+        str(item.get(field) or "") for field in ("title", "summary", "body")
+    ).strip()
+
+
+def _player_news_context(player: dict[str, Any], item: dict[str, Any]) -> str:
+    text = _news_text(item)
+    folded = text.casefold()
+    tokens = sorted(_name_tokens(player.get("name")), key=len, reverse=True)
+    positions = [folded.find(token) for token in tokens if folded.find(token) >= 0]
+    if not positions:
+        return ""
+    position = min(positions)
+    return folded[max(position - 180, 0): position + 260]
+
+
+def _explicit_unavailable_until(text: str) -> int | None:
+    patterns = (
+        r"(?:fuori|out|indisponibil\w*|stop|salter\w*)[^.]{0,90}?fino[^.]{0,40}?(\d{1,2})\s*(?:ª|a|°)?\s*giornata",
+        r"fino[^.]{0,45}?(?:alla|al)?\s*(\d{1,2})\s*(?:ª|a|°)?\s*giornata",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return max(1, min(38, int(match.group(1))))
+    return None
+
+
+def _explicit_return_matchday(text: str) -> int | None:
+    match = re.search(
+        r"(?:rientr\w*|torner\w*|ritorn\w*)[^.]{0,70}?(?:alla|per la|in)\s*"
+        r"(\d{1,2})\s*(?:ª|a|°)?\s*giornata",
+        text,
+    )
+    if not match:
+        return None
+    return max(1, min(38, int(match.group(1))))
+
+
+def player_availability(
+    player: dict[str, Any],
+    news_items: list[dict[str, Any]] | None,
+    *,
+    matchday: int,
+    next_matchday_number: int | None = None,
+) -> dict[str, Any]:
+    """Estimate appearance chance, using published evidence for short-term changes.
+
+    The catalog probability remains the baseline. Injury, suspension and probable-lineup
+    signals are accepted only from published, verified links; bench/starter signals are
+    deliberately restricted to the immediately upcoming round.
+    """
+    starter_probability = _clamp(player.get("starter_probability"))
+    base_probability = _clamp(starter_probability + (100 - starter_probability) * 0.35)
+    probability = base_probability
+    upcoming = int(next_matchday_number or season_next_matchday())
+    result: dict[str, Any] = {
+        "appearance_probability": round(probability),
+        "availability_status": "model",
+        "availability_label": "Stima impiego",
+        "availability_reason": "Stima di base da titolarita e possibilita di subentro.",
+        "availability_source": "Listone e modello SaSa",
+        "availability_url": "",
+        "availability_unavailable": False,
+        "unavailable_until_matchday": None,
+        "return_matchday": None,
+        "availability_has_news": False,
+    }
+    published = [
+        item for item in (news_items or [])
+        if _is_published_news(item) and _related_news(player, [item])
+    ]
+    injury_terms = (
+        "infortun", "lesion", "problema muscolare", "operat", "stop", "indispon",
+        "non convoc", "salta", "out", "allenamento a parte",
+    )
+    suspension_terms = ("squalificat", "squalifica")
+    recovered_terms = (
+        "recuperato", "a disposizione", "rientrato in gruppo", "torna in gruppo",
+        "regolarmente in gruppo",
+    )
+    bench_terms = (
+        "parte dalla panchina", "verso la panchina", "rischia la panchina",
+        "possibile panchina", "inizialmente in panchina", "non dovrebbe partire titolare",
+    )
+    starter_terms = (
+        "probabile titolare", "dal primo minuto", "parte titolare", "verso una maglia da titolare",
+    )
+    for item in published:
+        item_matchday = int(number(item.get("matchday"))) or None
+        if item_matchday and item_matchday != int(matchday):
+            continue
+        context = _player_news_context(player, item)
+        if not context:
+            continue
+        status = str(item.get("status") or "").strip().casefold()
+        unavailable_until = int(number(item.get("unavailable_until_matchday"))) or None
+        return_matchday = int(number(item.get("return_matchday"))) or None
+        unavailable_until = unavailable_until or _explicit_unavailable_until(context)
+        return_matchday = return_matchday or _explicit_return_matchday(context)
+        if return_matchday and unavailable_until is None:
+            unavailable_until = max(return_matchday - 1, 0)
+        source = str(item.get("source") or "Fonte pubblicata")
+        url = str(item.get("url") or "")
+        title = str(item.get("title") or "Notizia pubblicata")
+        evidence_update = {
+            "availability_source": source,
+            "availability_url": url,
+            "availability_has_news": True,
+            "availability_news_title": title,
+            "unavailable_until_matchday": unavailable_until,
+            "return_matchday": return_matchday,
+        }
+        explicit_probability = item.get("appearance_probability")
+        if explicit_probability is not None:
+            probability = _clamp(explicit_probability)
+        if status in {"recovered", "available", "starter"} or any(
+            term in context for term in recovered_terms
+        ):
+            probability = max(probability, 82)
+            result.update(
+                {
+                    **evidence_update,
+                    "availability_status": "starter" if status == "starter" else "available",
+                    "availability_label": "Disponibile",
+                    "availability_reason": title,
+                    "availability_unavailable": False,
+                }
+            )
+            break
+        is_suspended = status == "suspended" or any(term in context for term in suspension_terms)
+        is_injured = status == "injured" or any(term in context for term in injury_terms)
+        still_out = unavailable_until is None or int(matchday) <= unavailable_until
+        if is_suspended or (is_injured and still_out):
+            probability = 0 if is_suspended else min(probability, 8)
+            if unavailable_until:
+                duration = f"fino alla G{unavailable_until}"
+            else:
+                duration = "con rientro non ancora comunicato"
+            result.update(
+                {
+                    **evidence_update,
+                    "availability_status": "suspended" if is_suspended else "injured",
+                    "availability_label": "Squalificato" if is_suspended else "Indisponibile",
+                    "availability_reason": f"{title} · {duration}",
+                    "availability_unavailable": True,
+                }
+            )
+            break
+        if is_injured and not still_out:
+            probability = max(min(probability, 82), 65)
+            result.update(
+                {
+                    **evidence_update,
+                    "availability_status": "returning",
+                    "availability_label": "Rientro previsto",
+                    "availability_reason": title,
+                    "availability_unavailable": False,
+                }
+            )
+            break
+        if int(matchday) != upcoming:
+            continue
+        if status == "bench" or any(term in context for term in bench_terms):
+            probability = min(probability, _clamp(item.get("appearance_probability") or 58))
+            result.update(
+                {
+                    **evidence_update,
+                    "availability_status": "bench",
+                    "availability_label": "Possibile panchina",
+                    "availability_reason": title,
+                    "availability_unavailable": False,
+                }
+            )
+            break
+        elif status == "starter" or any(term in context for term in starter_terms):
+            probability = max(probability, _clamp(item.get("appearance_probability") or 88))
+            result.update(
+                {
+                    **evidence_update,
+                    "availability_status": "starter",
+                    "availability_label": "Probabile titolare",
+                    "availability_reason": title,
+                    "availability_unavailable": False,
+                }
+            )
+            break
+    result["appearance_probability"] = int(round(_clamp(probability)))
+    return result
 
 
 def _news_alert_kind(item: dict[str, Any]) -> tuple[str, str]:
