@@ -98,7 +98,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.20 v23 · Catalogo completo")
+    st.caption("Fantacalcio · Build 2026.08.20 v24 · Salvataggio cloud")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -1402,6 +1402,7 @@ def _render_auction_catalog_editor(
             {"field": "★", "width": 55},
             {
                 "field": "Partecipante",
+                "headerName": "Fantallenatore",
                 "editable": True,
                 "cellEditor": "agSelectCellEditor",
                 "cellEditorParams": {"values": [unassigned, *manager_names]},
@@ -2318,6 +2319,9 @@ def _render_player_detail(
         _save_workspace(workspace, storage)
         st.rerun()
 
+    if league.get("game_mode") == GAME_MODE_AUCTION:
+        _render_player_assignment_editor(player, league, workspace, storage)
+
     visual_tab, projection_tab, season_tab, advanced_tab, profile_tab = st.tabs(
         [
             "Identikit visuale",
@@ -2421,6 +2425,97 @@ def _render_player_detail(
             ("Fonte", player.get("source"), None),
         ])
 
+
+def _render_player_assignment_editor(
+    player: dict[str, Any],
+    league: dict[str, Any],
+    workspace: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+) -> None:
+    player_id = str(player.get("id") or "")
+    assignment = auction_player_assignment(league, player_id)
+    managers = auction_managers(league)
+    manager_by_id = {str(manager.get("id")): manager for manager in managers}
+    current_manager_id = str(assignment.get("manager_id")) if assignment else ""
+    current_price = (
+        float(assignment["purchase"].get("price") or 0) if assignment else 0.0
+    )
+    tiers = league.get("auction_tiers", [])
+    tier_by_id = {str(tier.get("id")): tier for tier in tiers}
+    current_tier = auction_player_tier(league, player_id)
+    current_tier_id = str(current_tier.get("id")) if current_tier else ""
+
+    with st.expander("Gestisci acquisto · fantallenatore, prezzo e fascia", expanded=False):
+        st.caption(
+            "Puoi correggere in qualsiasi momento chi ha comprato il giocatore, "
+            "il prezzo pagato e la fascia personale."
+        )
+        owner_column, price_column, tier_column = st.columns([1.25, 0.7, 1.15])
+        manager_options = ["", *manager_by_id]
+        selected_manager_id = owner_column.selectbox(
+            "Fantallenatore",
+            manager_options,
+            index=(
+                manager_options.index(current_manager_id)
+                if current_manager_id in manager_options else 0
+            ),
+            format_func=lambda value: (
+                "— Non assegnato —"
+                if not value else str(manager_by_id[value].get("name") or "")
+            ),
+            key=f"detail_owner_{league['id']}_{player_id}",
+        )
+        edited_price = price_column.number_input(
+            "Crediti pagati",
+            min_value=0.0,
+            max_value=float(max(int(league.get("initial_budget") or 0), 1)),
+            value=current_price,
+            step=1.0,
+            disabled=not selected_manager_id,
+            key=f"detail_price_{league['id']}_{player_id}",
+        )
+        tier_options = ["", *tier_by_id]
+        selected_tier_id = tier_column.selectbox(
+            "Fascia personale",
+            tier_options,
+            index=(tier_options.index(current_tier_id) if current_tier_id in tier_options else 0),
+            format_func=lambda value: (
+                "— Nessuna fascia —" if not value else _tier_option_label(tier_by_id[value])
+            ),
+            key=f"detail_tier_{league['id']}_{player_id}",
+        )
+        effective_price = float(edited_price) if selected_manager_id else 0.0
+        changed = (
+            selected_manager_id != current_manager_id
+            or abs(effective_price - current_price) > 0.001
+            or selected_tier_id != current_tier_id
+        )
+        if st.button(
+            "Salva assegnazione",
+            type="primary",
+            use_container_width=True,
+            disabled=not changed,
+            key=f"detail_assignment_save_{league['id']}_{player_id}",
+        ):
+            change: dict[str, Any] = {
+                "player": player,
+                "manager_id": selected_manager_id or None,
+                "price": effective_price,
+                "update_assignment": (
+                    selected_manager_id != current_manager_id
+                    or abs(effective_price - current_price) > 0.001
+                ),
+            }
+            if selected_tier_id != current_tier_id:
+                change["tier_id"] = selected_tier_id or None
+            try:
+                update_auction_assignments(league, [change])
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.rerun()
 
 def _render_player_visuals(player: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
     player_id = str(player.get("id") or player.get("name") or "player")
@@ -3899,14 +3994,18 @@ def _render_sync_status(storage: FantasyWorkspaceStorage) -> None:
         if synced:
             st.caption("● Dati sincronizzati su Supabase")
         elif attempted:
-            st.warning("Salvataggio Supabase non riuscito. I dati restano disponibili solo in locale.")
+            detail = f" Motivo: {storage.last_remote_error}" if storage.last_remote_error else ""
+            st.warning(
+                "Salvataggio cloud non riuscito: i dati potrebbero andare persi al riavvio."
+                + detail
+            )
         else:
             st.caption("● Supabase collegato · salvataggio al primo aggiornamento")
     else:
         st.warning(
-            "I dati sono salvati solo sul dispositivo. Configura Supabase per ritrovare le squadre anche da telefono."
+            "Persistenza cloud non configurata: su Streamlit i dati locali possono sparire dopo "
+            "un riavvio. Configura SUPABASE_URL e SUPABASE_ANON_KEY nei secrets dell'app."
         )
-
 
 def render_fantasy_styles() -> None:
     st.markdown(
