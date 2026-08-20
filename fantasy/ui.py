@@ -98,7 +98,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.20 v24 · Salvataggio cloud")
+    st.caption("Fantacalcio · Build 2026.08.20 v24.1 · Hotfix salvataggio")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -3985,7 +3985,7 @@ def _save_workspace(workspace: dict[str, Any], storage: FantasyWorkspaceStorage)
     st.session_state[WORKSPACE_SESSION_KEY] = workspace
     st.session_state["fantasy_remote_save_attempted"] = storage.remote_available
     st.session_state["fantasy_remote_synced"] = storage.save(workspace)
-    st.session_state["fantasy_remote_error"] = storage.last_remote_error
+    st.session_state["fantasy_remote_error"] = getattr(storage, "last_remote_error", "")
 
 
 def _render_sync_status(storage: FantasyWorkspaceStorage) -> None:
@@ -3997,7 +3997,7 @@ def _render_sync_status(storage: FantasyWorkspaceStorage) -> None:
         elif attempted:
             remote_error = str(
                 st.session_state.get("fantasy_remote_error")
-                or storage.last_remote_error
+                or getattr(storage, "last_remote_error", "")
                 or ""
             )
             detail = f" Motivo: {remote_error}" if remote_error else ""
