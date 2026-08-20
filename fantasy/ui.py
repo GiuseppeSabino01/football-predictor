@@ -281,6 +281,7 @@ def _refresh_purchased_player_data(
         "expected_goals",
         "expected_assists",
         "expected_fantasy_average",
+        "bonus",
         "starter_probability",
         "fantasy_score",
         "reliability",
