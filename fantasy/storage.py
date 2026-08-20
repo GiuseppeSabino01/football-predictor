@@ -45,6 +45,8 @@ class FantasyWorkspaceStorage:
                     self.save(workspace)
                 return workspace
             self.last_remote_error = self.remote.last_error
+            if local_workspace.get("leagues"):
+                self.save(local_workspace)
         return local_workspace
 
     def save(self, workspace: dict[str, Any]) -> bool:
