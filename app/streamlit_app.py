@@ -54,7 +54,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.20 · Fantasy v24.3 · Autosave")
+    st.caption("Build 2026.08.20 · Fantasy v24.4 · Bonus propensity")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
