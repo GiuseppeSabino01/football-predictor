@@ -1219,14 +1219,7 @@ def _render_list_catalog_editor(
         for _, row in edited.iterrows()
         if bool(row.get("Scheda"))
     ]
-    action_column, hint_column = st.columns([1.1, 2.2])
-    if action_column.button(
-        f"Salva modifiche ({len(changes)})",
-        type="primary",
-        use_container_width=True,
-        disabled=not changes,
-        key=f"save_list_grid_{editor_key}",
-    ):
+    if changes:
         try:
             update_list_assignments(league, changes)
         except ValueError as error:
@@ -1238,9 +1231,7 @@ def _render_list_catalog_editor(
                 st.session_state.get(version_key, 0)
             ) + 1
             st.rerun()
-    hint_column.caption(
-        "Spunta In rosa per aggiungere o rimuovere più giocatori; scegli la fascia e salva una sola volta."
-    )
+    st.caption("Modifiche salvate automaticamente.")
     return selected_ids
 
 
@@ -1601,14 +1592,7 @@ def _render_auction_catalog_editor(
         for _, row in edited.iterrows()
         if bool(row.get("Scheda"))
     ]
-    action_column, hint_column = st.columns([1.1, 2.2])
-    if action_column.button(
-        f"Salva modifiche ({len(changes)})",
-        type="primary",
-        use_container_width=True,
-        disabled=not changes,
-        key=f"save_auction_grid_{editor_key}",
-    ):
+    if changes:
         try:
             update_auction_assignments(league, changes)
         except ValueError as error:
@@ -1618,9 +1602,9 @@ def _render_auction_catalog_editor(
             _save_workspace(workspace, storage)
             st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
             st.rerun()
-    hint_column.caption(
-        "Seleziona il fantaallenatore dal menu; inserisci i crediti da tastiera. "
-        "Il prezzo resta 0 finché il giocatore è libero e le righe già assegnate vengono attenuate."
+    st.caption(
+        "Salvataggio automatico: seleziona il fantaallenatore dal menu e inserisci i crediti da tastiera. "
+        "Le righe già assegnate vengono attenuate."
     )
     return selected_ids
 
