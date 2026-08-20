@@ -197,6 +197,7 @@ def catalog_fingerprint(players: list[dict]) -> tuple:
                 str(player.get("role", "")),
                 _number(player.get("quote")),
                 _number(player.get("fvm")),
+                _number(player.get("bonus")),
             )
             for player in players
         )
