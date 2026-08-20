@@ -1402,17 +1402,19 @@ def _render_auction_catalog_editor(
             {"field": "★", "width": 55},
             {
                 "field": "Partecipante",
-                "headerName": "Fantallenatore",
+                "headerName": "Fantaallenatore",
                 "editable": True,
+                "tooltipField": "Partecipante",
                 "cellEditor": "agSelectCellEditor",
                 "cellEditorParams": {"values": [unassigned, *manager_names]},
                 "minWidth": 190,
             },
             {
                 "field": "Prezzo asta",
-                "headerName": "Prezzo",
+                "headerName": "Crediti",
                 "editable": True,
                 "cellDataType": "number",
+                "cellEditor": "agNumberCellEditor",
                 "valueParser": JsCode(
                     """function(params) {
                         const value = Number(params.newValue);
@@ -1617,7 +1619,8 @@ def _render_auction_catalog_editor(
             st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
             st.rerun()
     hint_column.caption(
-        "Prezzo resta 0 finché il giocatore è libero. Puoi aggiornare proprietario, prezzo e fascia su più righe insieme."
+        "Seleziona il fantaallenatore dal menu; inserisci i crediti da tastiera. "
+        "Il prezzo resta 0 finché il giocatore è libero e le righe già assegnate vengono attenuate."
     )
     return selected_ids
 
