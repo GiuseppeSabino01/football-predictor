@@ -98,3 +98,22 @@ def test_local_workspace_survives_a_new_storage_instance(tmp_path: Path) -> None
     restored = FantasyWorkspaceStorage(settings).load()
 
     assert [league["name"] for league in restored["leagues"]] == ["Fanta salvato"]
+
+
+def test_existing_local_workspace_is_migrated_when_cloud_is_empty(tmp_path: Path) -> None:
+    settings = _settings(tmp_path / "legacy-local.sqlite3")
+    workspace = new_workspace()
+    create_league(workspace, "Da migrare nel cloud")
+    local_storage = FantasyWorkspaceStorage(settings)
+    local_storage.local.upsert_json_state(
+        FANTASY_STATE_KEY, "Fantacalcio workspace", workspace
+    )
+
+    remote = MemoryRemote()
+    restarted_storage = FantasyWorkspaceStorage(settings)
+    restarted_storage.remote = remote
+    restored = restarted_storage.load()
+
+    assert restored["leagues"][0]["name"] == "Da migrare nel cloud"
+    assert remote.rows[FANTASY_STATE_KEY]["leagues"][0]["name"] == "Da migrare nel cloud"
+    assert restarted_storage.last_remote_save_ok is True
