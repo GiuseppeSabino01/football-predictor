@@ -526,6 +526,68 @@ def _explicit_return_matchday(text: str) -> int | None:
     return max(1, min(38, int(match.group(1))))
 
 
+def _percentage(value: Any, fallback: float) -> float:
+    if value is None or value == "":
+        return _clamp(fallback)
+    result = number(value)
+    if 0 < result <= 1:
+        result *= 100
+    return _clamp(result)
+
+
+def _base_appearance_estimate(player: dict[str, Any]) -> tuple[float, dict[str, float]]:
+    """Build an individual next-round appearance estimate from season signals.
+
+    Titolarita in the bundled analysis is intentionally coarse.  Combining it
+    with projected and previous appearances, reliability, injury risk and a
+    role-specific substitute rate avoids turning the four catalog bands into
+    four repeated appearance percentages.
+    """
+    starter = _percentage(player.get("starter_probability"), 50)
+    expected_appearances = number(player.get("expected_appearances"))
+    projected_presence = (
+        _clamp(expected_appearances / 38 * 100)
+        if expected_appearances > 0 else starter
+    )
+    previous_appearances = number(player.get("appearances_previous"))
+    previous_presence = (
+        _clamp(previous_appearances / 38 * 100)
+        if previous_appearances > 0 else projected_presence
+    )
+    reliability = _percentage(player.get("reliability"), 70)
+    injury_risk = _percentage(player.get("risk"), 25)
+    start_estimate = _clamp(
+        starter * 0.42
+        + projected_presence * 0.28
+        + previous_presence * 0.10
+        + reliability * 0.12
+        + (100 - injury_risk) * 0.08
+    )
+    role = str(player.get("role") or "").upper()
+    role_substitute_rate = {"P": 0.03, "D": 0.14, "C": 0.28, "A": 0.36}.get(role, 0.22)
+    substitute_rate = max(
+        0.02,
+        min(
+            0.50,
+            role_substitute_rate
+            + (reliability - 70) * 0.0015
+            - injury_risk * 0.0012,
+        ),
+    )
+    appearance = _clamp(
+        start_estimate + (100 - start_estimate) * substitute_rate,
+        maximum=99,
+    )
+    return appearance, {
+        "starter": round(starter, 1),
+        "projected_presence": round(projected_presence, 1),
+        "previous_presence": round(previous_presence, 1),
+        "reliability": round(reliability, 1),
+        "injury_risk": round(injury_risk, 1),
+        "substitute_rate": round(substitute_rate * 100, 1),
+    }
+
+
 def player_availability(
     player: dict[str, Any],
     news_items: list[dict[str, Any]] | None,
@@ -539,21 +601,27 @@ def player_availability(
     signals are accepted only from published, verified links; bench/starter signals are
     deliberately restricted to the immediately upcoming round.
     """
-    starter_probability = _clamp(player.get("starter_probability"))
-    base_probability = _clamp(starter_probability + (100 - starter_probability) * 0.35)
+    base_probability, model_components = _base_appearance_estimate(player)
     probability = base_probability
     upcoming = int(next_matchday_number or season_next_matchday())
     result: dict[str, Any] = {
         "appearance_probability": round(probability),
         "availability_status": "model",
         "availability_label": "Stima impiego",
-        "availability_reason": "Stima di base da titolarita e possibilita di subentro.",
+        "availability_reason": (
+            f"Titolarita {model_components['starter']:.0f}% · presenze attese "
+            f"{model_components['projected_presence']:.0f}% · affidabilita "
+            f"{model_components['reliability']:.0f}/100 · rischio "
+            f"{model_components['injury_risk']:.0f}/100 · subentro ruolo "
+            f"{model_components['substitute_rate']:.0f}%."
+        ),
         "availability_source": "Listone e modello SaSa",
         "availability_url": "",
         "availability_unavailable": False,
         "unavailable_until_matchday": None,
         "return_matchday": None,
         "availability_has_news": False,
+        "appearance_model_components": model_components,
     }
     published = [
         item for item in (news_items or [])
@@ -603,7 +671,7 @@ def player_availability(
         explicit_probability = item.get("appearance_probability")
         if explicit_probability is not None:
             probability = _clamp(explicit_probability)
-        if status in {"recovered", "available", "starter"} or any(
+        if status in {"recovered", "available"} or any(
             term in context for term in recovered_terms
         ):
             probability = max(probability, 82)
@@ -651,7 +719,10 @@ def player_availability(
         if int(matchday) != upcoming:
             continue
         if status == "bench" or any(term in context for term in bench_terms):
-            probability = min(probability, _clamp(item.get("appearance_probability") or 58))
+            bench_ceiling = item.get("appearance_probability")
+            if bench_ceiling is None:
+                bench_ceiling = max(25, probability * 0.62)
+            probability = min(probability, _clamp(bench_ceiling))
             result.update(
                 {
                     **evidence_update,
@@ -663,7 +734,10 @@ def player_availability(
             )
             break
         elif status == "starter" or any(term in context for term in starter_terms):
-            probability = max(probability, _clamp(item.get("appearance_probability") or 88))
+            starter_floor = item.get("appearance_probability")
+            if starter_floor is None:
+                starter_floor = min(98, probability + 8)
+            probability = max(probability, _clamp(starter_floor))
             result.update(
                 {
                     **evidence_update,

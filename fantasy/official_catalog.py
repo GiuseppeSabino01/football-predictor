@@ -303,6 +303,29 @@ def _authoritative_official_catalog(analysis: list[dict], official: list[dict]) 
 
 
 def _detect_role(row) -> str:
+    # The current official page exposes the Classic role as row metadata.  This
+    # is the most reliable source for newly registered players, whose Mantra
+    # title can be "Esterno", "Trequartista" or "Punta centrale" and therefore
+    # cannot be mapped by looking for the four Classic role names.
+    for attribute in ("data-filter-role-classic", "data-role-classic"):
+        explicit_role = str(row.get(attribute) or "").strip().upper()
+        if explicit_role in {"P", "D", "C", "A"}:
+            return explicit_role
+
+    for tag in row.find_all(True):
+        for attribute in ("data-filter-role-classic", "data-role-classic"):
+            explicit_role = str(tag.get(attribute) or "").strip().upper()
+            if explicit_role in {"P", "D", "C", "A"}:
+                return explicit_role
+        classes = {str(value).casefold() for value in (tag.get("class") or [])}
+        data_value = str(tag.get("data-value") or "").strip().upper()
+        if data_value in {"P", "D", "C", "A"} and (
+            "player-role-classic" in classes
+            or "role-classic" in classes
+            or "role" in classes and "role-mantra" not in classes
+        ):
+            return data_value
+
     for cell in row.find_all(["td", "th"]):
         exact = cell.get_text(" ", strip=True).upper()
         if exact in {"P", "D", "C", "A"}:

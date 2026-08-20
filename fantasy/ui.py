@@ -29,6 +29,7 @@ from fantasy.decision_center import (
     build_roster_alerts,
     fixture_outlook,
     matchday_date,
+    player_availability,
     recommend_lineup,
     season_next_matchday,
     simulate_purchase,
@@ -74,6 +75,7 @@ from fantasy.service import (
     top_xi_summary,
     touch_workspace,
     update_auction_assignments,
+    update_list_assignments,
     utc_now,
     update_league_settings,
 )
@@ -607,6 +609,8 @@ def _render_preparation(
         ]
     )
     _render_role_advisors(workspace, league, storage, advisor_catalog)
+    if list_mode:
+        _render_auction_tier_manager(workspace, league, storage)
 
     search_column, role_column, team_column, sort_column = st.columns([1.5, 0.8, 1.1, 1.1])
     search = search_column.text_input("Cerca", placeholder="Nome giocatore")
@@ -650,7 +654,7 @@ def _render_preparation(
         + (
             '<span>Assegna ogni giocatore, correggi il prezzo o scegli Non assegnato per rimuoverlo</span></div>'
             if not list_mode else
-            '<span>Spunta piu righe per aggiungerle insieme alla rosa; la prima apre la scheda completa</span></div>'
+            '<span>Gestisci direttamente rosa e fascia personale; Apri mostra la scheda completa</span></div>'
         )
         + f'<b>{len(frame)}</b></div>',
         unsafe_allow_html=True,
@@ -658,11 +662,14 @@ def _render_preparation(
     version_key = f"catalog_board_version_{league['id']}"
     board_version = int(st.session_state.get(version_key, 0))
     if list_mode:
-        selected_ids = _render_catalog_table(
+        selected_ids = _render_list_catalog_editor(
             frame,
+            catalog,
+            league,
+            workspace,
+            storage,
             key=f"catalog_board_{league['id']}_{board_version}",
-            selection_mode="multi-row",
-            purchased_ids=purchased_ids,
+            version_key=version_key,
             watchlist=watchlist,
         )
     else:
@@ -678,16 +685,6 @@ def _render_preparation(
         )
     if selected_ids:
         st.session_state[f"fantasy_selected_player_{league['id']}"] = selected_ids[0]
-    if list_mode:
-        _render_board_actions(
-            selected_ids,
-            catalog,
-            league,
-            workspace,
-            storage,
-            version_key=version_key,
-        )
-
     selected_id = st.session_state.get(f"fantasy_selected_player_{league['id']}")
     selected_player = next((player for player in catalog if player.get("id") == selected_id), None)
     if selected_player:
@@ -947,6 +944,304 @@ def _auction_metric_formatter(suffix: str = "") -> JsCode:
             return Number.isFinite(value) ? Math.round(value) + {safe_suffix} : '—';
         }}"""
     )
+
+
+def _render_list_catalog_editor(
+    frame: pd.DataFrame,
+    catalog: list[dict[str, Any]],
+    league: dict[str, Any],
+    workspace: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    *,
+    key: str,
+    version_key: str,
+    watchlist: set[str],
+) -> list[str]:
+    if frame.empty:
+        st.warning("Nessun giocatore corrisponde ai filtri selezionati.")
+        return []
+    indexed = frame.reset_index(drop=True)
+    purchased_ids = {
+        str(row.get("player_id")) for row in league.get("purchases", [])
+    }
+    custom_tiers = league.get("auction_tiers", [])
+    no_tier = "— Nessuna fascia —"
+    tier_label_by_id = {
+        str(tier.get("id")): _tier_option_label(tier) for tier in custom_tiers
+    }
+    tier_id_by_label = {
+        label: tier_id for tier_id, label in tier_label_by_id.items()
+    }
+    player_tiers = {
+        str(player_id): auction_player_tier(league, str(player_id))
+        for player_id in indexed["_id"]
+    }
+    catalog_by_id = {str(player.get("id")): player for player in catalog}
+
+    def player_metric(player_id: Any, field: str) -> float:
+        value = _number_or_none(
+            catalog_by_id.get(str(player_id), {}).get(field), 0.0
+        ) or 0.0
+        if 0 < value <= 1:
+            value *= 100
+        return round(max(0.0, min(100.0, value)), 1)
+
+    display = pd.DataFrame(
+        {
+            "_player_id": indexed["_id"].astype(str),
+            "Scheda": False,
+            "In rosa": [
+                str(player_id) in purchased_ids for player_id in indexed["_id"]
+            ],
+            "★": [
+                "★" if str(player_id) in watchlist else ""
+                for player_id in indexed["_id"]
+            ],
+            "Fascia personale": [
+                tier_label_by_id.get(
+                    str(player_tiers[str(player_id)].get("id")), no_tier
+                )
+                if player_tiers[str(player_id)] else no_tier
+                for player_id in indexed["_id"]
+            ],
+            "Ruolo": indexed["Ruolo"].map(
+                {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
+            ).fillna(indexed["Ruolo"]),
+            "Giocatore": indexed["Giocatore"],
+            "Squadra": indexed["Squadra"],
+            "Q": indexed["Quotazione"],
+            "FM attesa": indexed["FM attesa"],
+            "Gol attesi": indexed["Gol attesi"],
+            "Assist attesi": indexed["Assist attesi"],
+            "Bonus": [
+                player_metric(player_id, "bonus") for player_id in indexed["_id"]
+            ],
+            "Titolarita": indexed["Titolarita %"],
+            "Affidabilita": [
+                player_metric(player_id, "reliability")
+                for player_id in indexed["_id"]
+            ],
+            "Rischio infortuni": [
+                player_metric(player_id, "risk") for player_id in indexed["_id"]
+            ],
+            "Potenziale": [
+                player_metric(player_id, "potential")
+                for player_id in indexed["_id"]
+            ],
+            "Indice": indexed["Indice"],
+            "Fascia": indexed["Fascia"],
+        }
+    )
+    first_id = str(indexed.iloc[0]["_id"])
+    last_id = str(indexed.iloc[-1]["_id"])
+    editor_version = int(st.session_state.get(version_key, 0))
+    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}_{editor_version}"
+    tier_labels_by_color: dict[str, list[str]] = {}
+    for tier in custom_tiers:
+        color = str(tier.get("color") or "gray")
+        tier_labels_by_color.setdefault(color, []).append(_tier_option_label(tier))
+    row_class_rules: dict[str, Any] = {}
+    tier_row_css: dict[str, dict[str, str]] = {}
+    for color, labels in tier_labels_by_color.items():
+        safe_color = color if color in AUCTION_TIER_PALETTE else "gray"
+        hex_color = AUCTION_TIER_PALETTE[safe_color][2]
+        class_name = f"fantasy-tier-{safe_color}"
+        row_class_rules[class_name] = JsCode(
+            f"""function(params) {{
+                return params.data && {json.dumps(labels, ensure_ascii=False)}.includes(
+                    params.data['Fascia personale']
+                );
+            }}"""
+        )
+        tier_row_css[f".{class_name}"] = {
+            "background": (
+                "linear-gradient(90deg, "
+                f"color-mix(in srgb, {hex_color} 28%, #080b0a), "
+                "#080b0a 82%) !important"
+            ),
+            "border-left": f"5px solid {hex_color} !important",
+            "box-shadow": (
+                f"inset 0 0 18px color-mix(in srgb, {hex_color} 10%, transparent)"
+            ),
+        }
+    metric_columns = [
+        ("Bonus", "Propensione bonus", 132, "#ffb020", ""),
+        ("Titolarita", "Titolarità", 105, "#19e6b0", "%"),
+        ("Affidabilita", "Affidabilità", 112, "#62d8ff", ""),
+        ("Rischio infortuni", "Rischio infortuni", 125, "#f4538a", ""),
+        ("Potenziale", "Potenziale", 105, "#b895ff", ""),
+        ("Indice", "Indice", 90, "#19e6b0", ""),
+    ]
+    column_defs: list[dict[str, Any]] = [
+        {"field": "_player_id", "hide": True},
+        {
+            "field": "Scheda",
+            "headerName": "Apri",
+            "editable": True,
+            "cellRenderer": "agCheckboxCellRenderer",
+            "cellEditor": "agCheckboxCellEditor",
+            "width": 72,
+            "pinned": "left",
+        },
+        {
+            "field": "In rosa",
+            "editable": True,
+            "cellRenderer": "agCheckboxCellRenderer",
+            "cellEditor": "agCheckboxCellEditor",
+            "width": 88,
+            "pinned": "left",
+        },
+        {"field": "★", "width": 55},
+        {
+            "field": "Fascia personale",
+            "editable": True,
+            "cellEditor": "agSelectCellEditor",
+            "cellEditorParams": {"values": [no_tier, *tier_id_by_label]},
+            "minWidth": 180,
+        },
+        {"field": "Ruolo", "width": 78},
+        {
+            "field": "Giocatore",
+            "width": 180,
+            "minWidth": 150,
+            "pinned": "left",
+            "lockPinned": True,
+            "suppressMovable": True,
+        },
+        {"field": "Squadra", "width": 86},
+        {"field": "Q", "width": 65, "type": "numericColumn"},
+        {"field": "FM attesa", "width": 94, "type": "numericColumn"},
+        {"field": "Gol attesi", "width": 92, "type": "numericColumn"},
+        {"field": "Assist attesi", "width": 100, "type": "numericColumn"},
+    ]
+    column_defs.extend(
+        {
+            "field": field,
+            "headerName": header,
+            "width": width,
+            "cellStyle": _auction_metric_style(color),
+            "valueFormatter": _auction_metric_formatter(suffix),
+        }
+        for field, header, width, color, suffix in metric_columns
+    )
+    column_defs.append({"field": "Fascia", "width": 90})
+    grid_response = AgGrid(
+        display,
+        gridOptions={
+            "defaultColDef": {
+                "sortable": True,
+                "resizable": True,
+                "filter": False,
+                "editable": False,
+                "suppressHeaderMenuButton": True,
+            },
+            "columnDefs": column_defs,
+            "getRowId": JsCode(
+                "function(params) { return params.data._player_id; }"
+            ),
+            "rowClassRules": row_class_rules,
+            "singleClickEdit": True,
+            "stopEditingWhenCellsLoseFocus": True,
+            "suppressRowClickSelection": True,
+            "rowHeight": 38,
+            "headerHeight": 42,
+            "animateRows": False,
+        },
+        height=min(620, 88 + max(len(display), 1) * 38),
+        key=editor_key,
+        data_return_mode="AS_INPUT",
+        update_on=[("cellValueChanged", 250)],
+        allow_unsafe_jscode=True,
+        enable_enterprise_modules=False,
+        theme="streamlit",
+        show_toolbar=False,
+        show_search=False,
+        show_download_button=False,
+        server_sync_strategy="client_wins",
+        custom_css={
+            ".ag-root-wrapper": {
+                "border": "1px solid rgba(25,230,176,.22) !important",
+                "border-radius": "10px !important",
+                "overflow": "hidden !important",
+            },
+            ".ag-header": {
+                "background": "#1a1f22 !important",
+                "border-bottom": "1px solid rgba(244,251,247,.13) !important",
+            },
+            ".ag-pinned-left-header": {
+                "border-right": "2px solid rgba(25,230,176,.32) !important",
+            },
+            ".ag-pinned-left-cols-container": {
+                "border-right": "2px solid rgba(25,230,176,.32) !important",
+                "box-shadow": "8px 0 18px rgba(0,0,0,.24) !important",
+                "z-index": "2 !important",
+            },
+            ".ag-row": {
+                "background": "#080b0a",
+                "color": "#edf7f2",
+                "border-bottom": "1px solid rgba(244,251,247,.08)",
+            },
+            ".ag-row-hover": {"background": "#10201b !important"},
+            **tier_row_css,
+        },
+    )
+    edited = grid_response.data
+    if not isinstance(edited, pd.DataFrame):
+        edited = pd.DataFrame(edited)
+    changes: list[dict[str, Any]] = []
+    for _, edited_row in edited.iterrows():
+        player_id = str(edited_row.get("_player_id") or "")
+        player = catalog_by_id.get(player_id)
+        if not player:
+            continue
+        current_owned = player_id in purchased_ids
+        edited_owned = bool(edited_row.get("In rosa"))
+        current_tier = player_tiers.get(player_id)
+        current_tier_label = (
+            tier_label_by_id.get(str(current_tier.get("id")), no_tier)
+            if current_tier else no_tier
+        )
+        edited_tier_label = str(edited_row.get("Fascia personale") or no_tier)
+        if edited_owned == current_owned and edited_tier_label == current_tier_label:
+            continue
+        change: dict[str, Any] = {
+            "player": player,
+            "in_roster": edited_owned,
+        }
+        if edited_tier_label != current_tier_label:
+            change["tier_id"] = (
+                None if edited_tier_label == no_tier
+                else tier_id_by_label[edited_tier_label]
+            )
+        changes.append(change)
+    selected_ids = [
+        str(row.get("_player_id"))
+        for _, row in edited.iterrows()
+        if bool(row.get("Scheda"))
+    ]
+    action_column, hint_column = st.columns([1.1, 2.2])
+    if action_column.button(
+        f"Salva modifiche ({len(changes)})",
+        type="primary",
+        use_container_width=True,
+        disabled=not changes,
+        key=f"save_list_grid_{editor_key}",
+    ):
+        try:
+            update_list_assignments(league, changes)
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            touch_workspace(workspace)
+            _save_workspace(workspace, storage)
+            st.session_state[version_key] = int(
+                st.session_state.get(version_key, 0)
+            ) + 1
+            st.rerun()
+    hint_column.caption(
+        "Spunta In rosa per aggiungere o rimuovere più giocatori; scegli la fascia e salva una sola volta."
+    )
+    return selected_ids
 
 
 def _render_auction_catalog_editor(
@@ -2531,8 +2826,17 @@ def _render_quick_purchase(
 def _render_roster_table(
     workspace: dict[str, Any], league: dict[str, Any], storage: FantasyWorkspaceStorage
 ) -> None:
+    catalog_by_id = {
+        str(player.get("id")): player for player in workspace.get("catalog", [])
+    }
     purchases = sorted(
-        league.get("purchases", []),
+        (
+            {
+                **catalog_by_id.get(str(row.get("player_id")), {}),
+                **row,
+            }
+            for row in league.get("purchases", [])
+        ),
         key=lambda row: ("PDCA".find(str(row.get("role", ""))), str(row.get("name", ""))),
     )
     if not purchases:
@@ -2540,6 +2844,8 @@ def _render_roster_table(
     list_mode = league.get("game_mode") == GAME_MODE_LIST
     st.markdown("#### Rosa dal listone" if list_mode else "#### Acquisti")
     price_label = "Costo listone" if list_mode else "Prezzo asta"
+    upcoming_matchday = season_next_matchday()
+    news_items = _cached_fantasy_news()
     rows = [
         {
             "Ruolo": row.get("role"),
@@ -2549,10 +2855,28 @@ def _render_roster_table(
             "FM attesa": row.get("expected_fantasy_average"),
             "Gol attesi": row.get("expected_goals"),
             "Assist attesi": row.get("expected_assists"),
+            f"Impiego G{upcoming_matchday}": player_availability(
+                row,
+                news_items,
+                matchday=upcoming_matchday,
+                next_matchday_number=upcoming_matchday,
+            ).get("appearance_probability"),
         }
         for row in purchases
     ]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.dataframe(
+        pd.DataFrame(rows),
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            f"Impiego G{upcoming_matchday}": st.column_config.ProgressColumn(
+                "Prob. impiego",
+                min_value=0,
+                max_value=100,
+                format="%.0f%%",
+            )
+        },
+    )
     remove_column, action_column = st.columns([2.3, 0.7])
     selected_id = remove_column.selectbox(
         "Correggi un acquisto",
@@ -3075,8 +3399,28 @@ def _render_top_xi_editor(
     league: dict[str, Any],
     storage: FantasyWorkspaceStorage,
 ) -> None:
-    purchases = league.get("purchases", [])
+    catalog_by_id = {
+        str(player.get("id")): player for player in workspace.get("catalog", [])
+    }
+    purchases = [
+        {
+            **catalog_by_id.get(str(row.get("player_id")), {}),
+            **row,
+        }
+        for row in league.get("purchases", [])
+    ]
     by_id = {str(row.get("player_id")): row for row in purchases}
+    upcoming_matchday = season_next_matchday()
+    news_items = _cached_fantasy_news()
+    availability_by_id = {
+        str(row.get("player_id")): player_availability(
+            row,
+            news_items,
+            matchday=upcoming_matchday,
+            next_matchday_number=upcoming_matchday,
+        )
+        for row in purchases
+    }
     current = top_xi_summary(league)
     mode = "personalizzata" if league.get("preferred_xi_customized") else "automatica"
     st.markdown(
@@ -3093,6 +3437,10 @@ def _render_top_xi_editor(
         formation_options,
         index=formation_options.index(default_formation),
         key=f"preferred_formation_{league['id']}",
+    )
+    st.caption(
+        f"Probabilità di impiego G{upcoming_matchday}: stima individuale da titolarità, "
+        "presenze attese e precedenti, affidabilità, rischio, ruolo e notizie ufficiali."
     )
     saved_formation = str(league.get("preferred_formation") or default_formation)
     if league.get("preferred_xi_customized") and formation == saved_formation:
@@ -3167,7 +3515,10 @@ def _render_top_xi_editor(
                         selected_ids.append(selected_id)
                         st.markdown(
                             _lineup_player_card(
-                                by_id[selected_id], f"{role}{slot_index + 1}"
+                                by_id[selected_id],
+                                f"{role}{slot_index + 1}",
+                                availability=availability_by_id.get(selected_id),
+                                matchday=upcoming_matchday,
                             ),
                             unsafe_allow_html=True,
                         )
@@ -3215,18 +3566,41 @@ def _render_top_xi_editor(
         st.warning(f"Completa il campo: mancano {missing} giocatori alla Top 11.")
 
 
-def _lineup_player_card(player: dict[str, Any], position: str) -> str:
+def _lineup_player_card(
+    player: dict[str, Any],
+    position: str,
+    *,
+    availability: dict[str, Any] | None = None,
+    matchday: int | None = None,
+) -> str:
     name = str(player.get("name") or "Giocatore")
     parts = [part for part in name.replace(".", " ").split() if part]
     initials = "".join(part[0] for part in parts[:2]).upper() or "XI"
     role = str(player.get("role") or "").lower()
     fantasy_average = _format_stat(player.get("expected_fantasy_average"), 2)
+    appearance = int(
+        _number_or_none((availability or {}).get("appearance_probability"), 0) or 0
+    )
+    tone = (
+        "out" if (availability or {}).get("availability_unavailable")
+        else "ready" if appearance >= 80
+        else "watch" if appearance >= 55
+        else "low"
+    )
+    reason = escape(
+        str((availability or {}).get("availability_reason") or ""), quote=True
+    )
+    appearance_badge = (
+        f'<span class="fantasy-xi-appearance {tone}" title="{reason}">'
+        f'G{int(matchday or 0)} · {appearance}%</span>'
+        if availability else ""
+    )
     return (
         f'<div class="fantasy-lineup-card role-{role}">'
         f'<div class="fantasy-lineup-shirt"><i>{escape(initials)}</i><span>{escape(position)}</span></div>'
         f'<div class="fantasy-lineup-copy"><small>{escape(str(player.get("team") or "—"))}</small>'
         f'<strong>{escape(name)}</strong><div><span>Q {float(player.get("price") or 0):.0f}</span>'
-        f'<span>FM {fantasy_average}</span></div></div></div>'
+        f'<span>FM {fantasy_average}</span>{appearance_badge}</div></div></div>'
     )
 
 
@@ -3656,6 +4030,10 @@ def render_fantasy_styles() -> None:
         .fantasy-lineup-copy>strong { overflow:hidden; color:#f7fffb; font-size:.72rem; line-height:1.08; text-overflow:ellipsis; white-space:nowrap; }
         .fantasy-lineup-copy>div { display:flex; flex-wrap:wrap; gap:.2rem; margin-top:.18rem; }
         .fantasy-lineup-copy>div span { padding:.09rem .22rem; border-radius:4px; color:#c9ddd5; background:rgba(255,255,255,.07); font-size:.48rem; font-weight:800; }
+        .fantasy-lineup-copy>div .fantasy-xi-appearance { border:1px solid rgba(98,216,255,.34); color:#a9ecff; background:rgba(98,216,255,.12); box-shadow:0 0 12px rgba(98,216,255,.08); }
+        .fantasy-lineup-copy>div .fantasy-xi-appearance.ready { border-color:rgba(25,230,176,.4); color:#83f4d4; background:rgba(25,230,176,.13); }
+        .fantasy-lineup-copy>div .fantasy-xi-appearance.watch { border-color:rgba(255,176,32,.42); color:#ffd17b; background:rgba(255,176,32,.13); }
+        .fantasy-lineup-copy>div .fantasy-xi-appearance.low,.fantasy-lineup-copy>div .fantasy-xi-appearance.out { border-color:rgba(244,83,138,.44); color:#ff9abd; background:rgba(244,83,138,.14); }
         .fantasy-lineup-card.empty { display:flex; flex-direction:column; justify-content:center; gap:.12rem; border-style:dashed; opacity:.7; text-align:center; }
         .fantasy-lineup-card.empty span { color:var(--accent); font-size:.58rem; font-weight:950; }
         .fantasy-lineup-card.empty strong { color:#c7d6d0; font-size:.59rem; letter-spacing:.05em; }

@@ -135,6 +135,32 @@ def test_probable_bench_changes_only_the_immediately_next_round():
     assert future_signal["appearance_probability"] > next_signal["appearance_probability"]
 
 
+def test_appearance_probability_is_individual_not_a_fixed_starter_band():
+    first = player(50, "A", "ROM", starter=90, risk=8)
+    first.update(
+        {
+            "expected_appearances": 35,
+            "appearances_previous": 36,
+            "reliability": 94,
+        }
+    )
+    second = player(51, "A", "MIL", starter=90, risk=38)
+    second.update(
+        {
+            "expected_appearances": 27,
+            "appearances_previous": 18,
+            "reliability": 72,
+        }
+    )
+
+    first_signal = player_availability(first, [], matchday=1, next_matchday_number=1)
+    second_signal = player_availability(second, [], matchday=1, next_matchday_number=1)
+
+    assert first_signal["appearance_probability"] > second_signal["appearance_probability"]
+    assert first_signal["appearance_probability"] != 94
+    assert "presenze attese" in first_signal["availability_reason"]
+
+
 def test_what_if_simulation_never_mutates_the_roster():
     league, _ = complete_league()
     league["purchases"] = league["purchases"][:2]

@@ -29,6 +29,7 @@ from fantasy.service import (
     top_xi_formation,
     top_xi_summary,
     update_auction_assignments,
+    update_list_assignments,
     update_league_settings,
 )
 
@@ -99,6 +100,38 @@ def test_list_mode_has_no_participants_and_uses_official_quote() -> None:
     assert league["participants"] is None
     assert purchase["price"] == 17
     assert roster_summary(league)["remaining_budget"] == 83
+
+
+def test_list_board_updates_roster_and_personal_tier_atomically() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Listone modificabile",
+        initial_budget=50,
+        participants=None,
+        game_mode=GAME_MODE_LIST,
+        roster_slots={"P": 1, "D": 1, "C": 1, "A": 1},
+    )
+    player = make_player(name="Molina N.", team="ROM", role="D", quote=18)
+    top_tier = next(
+        tier for tier in league["auction_tiers"] if tier["name"] == "Top"
+    )
+
+    update_list_assignments(
+        league,
+        [{"player": player, "in_roster": True, "tier_id": top_tier["id"]}],
+    )
+
+    assert [row["name"] for row in league["purchases"]] == ["Molina N."]
+    assert auction_player_tier(league, player["id"])["name"] == "Top"
+
+    update_list_assignments(
+        league,
+        [{"player": player, "in_roster": False}],
+    )
+
+    assert league["purchases"] == []
+    assert auction_player_tier(league, player["id"])["name"] == "Top"
 
 
 def test_custom_slots_cannot_drop_below_current_roster() -> None:

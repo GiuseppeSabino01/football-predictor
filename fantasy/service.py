@@ -118,9 +118,8 @@ def create_league(
         "purchases": [],
         "auction_managers": _new_auction_managers(int(participants or 0))
         if game_mode == GAME_MODE_AUCTION else [],
-        "auction_tiers": _new_auction_tiers()
-        if game_mode == GAME_MODE_AUCTION else [],
-        "auction_tiers_initialized": game_mode == GAME_MODE_AUCTION,
+        "auction_tiers": _new_auction_tiers(),
+        "auction_tiers_initialized": True,
         "auction_player_tiers": {},
         "watchlist": [],
         "analysis": "",
@@ -225,6 +224,10 @@ def update_league_settings(
             if not league.get("auction_tiers"):
                 league["auction_tiers"] = _new_auction_tiers()
             league["auction_tiers_initialized"] = True
+    if not league.get("auction_tiers_initialized"):
+        if not league.get("auction_tiers"):
+            league["auction_tiers"] = _new_auction_tiers()
+        league["auction_tiers_initialized"] = True
     _invalidate_sasa(league)
 
 
@@ -265,8 +268,6 @@ def rename_auction_manager(league: dict[str, Any], manager_id: str, name: str) -
 
 
 def create_auction_tier(league: dict[str, Any], name: str, color: str) -> dict[str, Any]:
-    if league.get("game_mode") != GAME_MODE_AUCTION:
-        raise ValueError("Le fasce personalizzate sono disponibili solo per l'asta.")
     clean_name = name.strip()
     clean_color = color.strip().lower()
     if not clean_name:
@@ -418,6 +419,39 @@ def update_auction_assignments(
             raise ValueError("Il prezzo non puo essere negativo.")
         if bool(change.get("update_assignment", True)):
             _apply_auction_assignment(draft, player, clean_manager_id, price)
+        if "tier_id" in change:
+            _apply_auction_player_tier(draft, player_id, change.get("tier_id"))
+    league.clear()
+    league.update(draft)
+
+
+def update_list_assignments(
+    league: dict[str, Any], changes: list[dict[str, Any]]
+) -> None:
+    """Apply list-mode roster and personal-tier edits atomically."""
+    if league.get("game_mode") != GAME_MODE_LIST:
+        raise ValueError("Questa funzione e disponibile solo per il listone.")
+    if not changes:
+        return
+    draft = deepcopy(league)
+    seen: set[str] = set()
+    for change in changes:
+        player = change.get("player")
+        if not isinstance(player, dict):
+            raise ValueError("Giocatore non valido.")
+        player_id = str(player.get("id") or "")
+        if not player_id or player_id in seen:
+            raise ValueError("Ogni giocatore puo essere modificato una sola volta.")
+        seen.add(player_id)
+        current_owned = any(
+            str(row.get("player_id")) == player_id
+            for row in draft.get("purchases", [])
+        )
+        desired_owned = bool(change.get("in_roster"))
+        if desired_owned and not current_owned:
+            add_purchase(draft, player, _number(player.get("quote")))
+        elif current_owned and not desired_owned:
+            remove_purchase(draft, player_id)
         if "tier_id" in change:
             _apply_auction_player_tier(draft, player_id, change.get("tier_id"))
     league.clear()
@@ -651,10 +685,14 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
         "expected_goals": _optional_number(player.get("expected_goals")),
         "expected_assists": _optional_number(player.get("expected_assists")),
         "expected_fantasy_average": _optional_number(player.get("expected_fantasy_average")),
+        "expected_appearances": _optional_number(player.get("expected_appearances")),
+        "appearances_previous": _optional_number(player.get("appearances_previous")),
         "starter_probability": _optional_number(player.get("starter_probability")),
         "fantasy_score": player_score(player),
         "reliability": _optional_number(player.get("reliability")),
         "risk": _optional_number(player.get("risk")),
+        "bonus": _optional_number(player.get("bonus")),
+        "potential": _optional_number(player.get("potential")),
         "tier": player.get("tier"),
         "profile": player.get("profile"),
         "acquired_at": utc_now(),
@@ -1256,14 +1294,10 @@ def _normalize_league(league: dict[str, Any]) -> None:
         league["auction_tiers"] = []
     if not isinstance(league["auction_player_tiers"], dict):
         league["auction_player_tiers"] = {}
-    if league["game_mode"] == GAME_MODE_AUCTION and not league.get(
-        "auction_tiers_initialized"
-    ):
+    if not league.get("auction_tiers_initialized"):
         if not league["auction_tiers"]:
             league["auction_tiers"] = _new_auction_tiers()
         league["auction_tiers_initialized"] = True
-    else:
-        league.setdefault("auction_tiers_initialized", False)
     valid_tier_ids = set()
     for tier in league["auction_tiers"]:
         tier.setdefault("id", uuid4().hex)

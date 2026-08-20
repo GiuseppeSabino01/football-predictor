@@ -44,6 +44,27 @@ def test_generic_role_player_class_does_not_turn_everyone_into_goalkeeper() -> N
     assert players[0]["role"] == "D"
 
 
+def test_new_player_uses_official_classic_role_metadata() -> None:
+    html = """
+    <table><thead><tr><th>Nome</th><th>Squadra</th><th>Qt.I</th><th>Qt.A</th><th>FVM</th></tr></thead>
+    <tbody><tr class="player-row" data-filter-role-classic="d">
+    <th class="player-role player-role-classic"><span class="role" data-value="d"></span></th>
+    <th class="player-role player-role-mantra"><span class="role role-mantra" data-value="e" title="Esterno"></span></th>
+    <th><a href="/serie-a/squadre/roma/molina-n/4998">Molina N.</a></th>
+    <td>ROM</td><td>18</td><td>18</td><td>87</td></tr></tbody></table>
+    """
+
+    players = parse_official_html(
+        html,
+        [{"id": "seed", "name": "Seed", "team": "ROM", "role": "D"}],
+    )
+
+    assert len(players) == 1
+    assert players[0]["name"] == "Molina N."
+    assert players[0]["role"] == "D"
+    assert players[0]["quote"] == 18
+
+
 def test_official_update_preserves_analysis_fields() -> None:
     seed_player = load_seed_catalog()[0]
     current = [{**seed_player, "expected_goals": 7.5, "profile": "profilo personalizzato"}]
