@@ -14,6 +14,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from fantasy.catalog import make_player_id, normalize_catalog_dataframe, normalize_role
+from fantasy.analytics import bonus_propensity
 from fantasy.service import player_score
 
 
@@ -175,6 +176,7 @@ def merge_catalog_updates(
     else:
         base = _merge_official(base, official_players or [])
     for player in base:
+        player["bonus"] = bonus_propensity(player, base)
         player["fantasy_score"] = player_score(player)
     return sorted(
         base,
