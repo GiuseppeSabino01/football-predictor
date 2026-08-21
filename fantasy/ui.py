@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import escape
 from typing import Any
 
@@ -13,15 +13,19 @@ import streamlit as st
 from bs4 import BeautifulSoup
 from st_aggrid import AgGrid, JsCode
 
+from config.settings import Settings
 from fantasy.analytics import (
     PERCENTILE_METRICS,
-    number as analytics_number,
-    optional_number as analytics_optional_number,
     pareto_frontier,
     player_derived_stats,
     role_percentiles,
 )
-from config.settings import Settings
+from fantasy.analytics import (
+    number as analytics_number,
+)
+from fantasy.analytics import (
+    optional_number as analytics_optional_number,
+)
 from fantasy.catalog import catalog_dataframe, make_player, merge_catalog
 from fantasy.decision_center import (
     FIXTURE_SOURCE_URL,
@@ -54,8 +58,8 @@ from fantasy.service import (
     auction_player_tier,
     auction_price_board,
     auction_taken_player_ids,
-    create_league,
     create_auction_tier,
+    create_league,
     delete_auction_tier,
     delete_league,
     find_league,
@@ -64,26 +68,26 @@ from fantasy.service import (
     record_auction_purchase,
     remove_auction_purchase,
     remove_purchase,
+    rename_auction_manager,
     reset_preferred_xi,
     role_balance_recommendation,
-    rename_auction_manager,
     roster_summary,
     run_auction_multiverse,
     set_captain,
     set_preferred_xi,
+    simulate_auction_purchases,
     toggle_watchlist,
     top_xi_for_formation,
     top_xi_formation,
     top_xi_summary,
     touch_workspace,
     update_auction_assignments,
+    update_league_settings,
     update_list_assignments,
     utc_now,
-    update_league_settings,
 )
 from fantasy.storage import FantasyWorkspaceStorage
 from nlp.gemini_client import GeminiClient
-
 
 WORKSPACE_SESSION_KEY = "fantasy_workspace"
 SASA_ANALYSIS_VERSION = 2
@@ -100,7 +104,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.21 v24.7 · Asta Multiverso")
+    st.caption("Fantacalcio · Build 2026.08.21 v24.8 · Simulatore asta")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -761,6 +765,10 @@ def _render_auction_room(
     )
     _render_auction_tier_manager(workspace, league, storage)
     with st.expander("Gestisci partecipanti e rose dell'asta"):
+        simulation_message_key = f"auction_simulation_message_{league['id']}"
+        simulation_message = st.session_state.pop(simulation_message_key, None)
+        if simulation_message:
+            st.success(simulation_message)
         st.markdown("##### Nomi delle squadre")
         with st.form(f"auction_manager_names_{league['id']}"):
             name_columns = st.columns(2)
@@ -786,6 +794,51 @@ def _render_auction_room(
                     rename_auction_manager(league, manager_id, name)
                 touch_workspace(workspace)
                 _save_workspace(workspace, storage)
+                st.rerun()
+
+        st.markdown("##### Simula asta")
+        st.caption(
+            "Aggiunge giocatori casuali a tutte le squadre per provare prezzi, "
+            "FantaDNA e Multiverso senza compilare manualmente l'asta."
+        )
+        maximum_simulated_players = min(
+            (summary["remaining_slots"] for summary in summaries.values()),
+            default=0,
+        )
+        simulation_count_column, simulation_button_column = st.columns([2.2, 1])
+        simulated_players = simulation_count_column.number_input(
+            "Nuovi giocatori per squadra",
+            min_value=1,
+            max_value=max(maximum_simulated_players, 1),
+            value=min(10, max(maximum_simulated_players, 1)),
+            step=1,
+            disabled=maximum_simulated_players == 0,
+            key=f"auction_simulation_count_{league['id']}",
+        )
+        simulation_button_column.markdown("<div style='height:1.78rem'></div>", unsafe_allow_html=True)
+        simulate_clicked = simulation_button_column.button(
+            "Simula asta",
+            type="primary",
+            use_container_width=True,
+            disabled=maximum_simulated_players == 0,
+            key=f"simulate_auction_{league['id']}",
+        )
+        if simulate_clicked:
+            try:
+                generated = simulate_auction_purchases(
+                    league,
+                    catalog,
+                    int(simulated_players),
+                )
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.session_state[simulation_message_key] = (
+                    f"Asta simulata: aggiunti {len(generated)} giocatori "
+                    f"({int(simulated_players)} per squadra)."
+                )
                 st.rerun()
 
         st.markdown("##### Rose registrate")
