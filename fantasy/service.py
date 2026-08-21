@@ -118,6 +118,8 @@ def create_league(
         "purchases": [],
         "min_bid": 1,
         "auction_mode": "per_ruolo",
+        "auction_current_role": "P",
+        "risk_profile": "bilanciato",
         "auction_state_version": 0,
         "auction_sale_events": [],
         "auction_history": [],
@@ -446,6 +448,177 @@ def opponent_dna_profiles(
     from fantasy.opponent_dna import build_opponent_dna
 
     return build_opponent_dna(league, catalog)
+
+
+def build_auction_snapshot(
+    league: dict[str, Any], catalog: list[dict[str, Any]]
+) -> Any:
+    """Create the immutable state consumed by Multiverse simulations."""
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        raise ValueError("Il Multiverso e disponibile solo in modalita asta.")
+    from fantasy.multiverse import (
+        AuctionSnapshot,
+        OwnedPlayerState,
+        ParticipantState,
+        PlayerState,
+        SaleEventState,
+        compute_role_utilities,
+        viable_player_ids,
+    )
+    from fantasy.opponent_dna import dna_buyer_multiplier
+
+    _ensure_auction_sale_events(league)
+    managers = auction_managers(league)
+    summaries = {
+        str(manager.get("id")): auction_manager_summary(league, str(manager.get("id")))
+        for manager in managers
+    }
+    dna_profiles = {
+        str(profile["manager_id"]): profile
+        for profile in opponent_dna_profiles(league, catalog)
+    }
+    utilities = compute_role_utilities(catalog)
+    viable_ids = viable_player_ids(catalog, utilities)
+    price_board = auction_price_board(league, catalog)
+    taken_ids = auction_taken_player_ids(league)
+    catalog_by_id = {str(player.get("id")): player for player in catalog}
+    tier_by_id = {
+        str(tier.get("id")): str(tier.get("name") or "")
+        for tier in league.get("auction_tiers", [])
+    }
+    tier_assignments = {
+        str(player_id): tier_by_id.get(str(tier_id), "")
+        for player_id, tier_id in league.get("auction_player_tiers", {}).items()
+    }
+
+    participants = []
+    user_manager_id = ""
+    for manager in managers:
+        manager_id = str(manager.get("id"))
+        if manager.get("is_user"):
+            user_manager_id = manager_id
+        summary = summaries[manager_id]
+        purchases = summary["purchases"]
+        roster_players = tuple(
+            OwnedPlayerState(
+                player_id=str(purchase.get("player_id")),
+                name=str(purchase.get("name") or ""),
+                role=str(purchase.get("role") or "").upper(),
+                utility=round(
+                    utilities.get(str(purchase.get("player_id")), 0.0), 4
+                ),
+            )
+            for purchase in purchases
+        )
+        profile = dna_profiles.get(manager_id, {})
+        participants.append(
+            ParticipantState(
+                manager_id=manager_id,
+                name=str(manager.get("name") or "Partecipante"),
+                initial_budget=int(league.get("initial_budget") or 0),
+                remaining_budget=int(round(summary["remaining_budget"])),
+                roster=tuple(str(purchase.get("player_id")) for purchase in purchases),
+                roster_players=roster_players,
+                remaining_slots_by_role=tuple(
+                    int(summary["missing"].get(role, 0)) for role in ROLE_LABELS
+                ),
+                dna_confidence=str(profile.get("confidence") or "bassa"),
+                dna_sample_size=int(profile.get("sample_size") or 0),
+            )
+        )
+
+    available_players = []
+    for player in catalog:
+        player_id = str(player.get("id") or "")
+        role = str(player.get("role") or "").upper()
+        if not player_id or role not in ROLE_LABELS or player_id in taken_ids:
+            continue
+        estimate = price_board.get(player_id, {})
+        personal_tier = tier_assignments.get(player_id) or None
+        multipliers = tuple(
+            dna_buyer_multiplier(
+                dna_profiles.get(str(manager.get("id")), {}),
+                role=role,
+                tier=personal_tier or str(player.get("tier") or "") or None,
+                team=str(player.get("team") or "") or None,
+                player=player,
+                stage_urgency=50,
+            )
+            for manager in managers
+        )
+        available_players.append(
+            PlayerState(
+                player_id=player_id,
+                name=str(player.get("name") or ""),
+                role=role,
+                team=str(player.get("team") or ""),
+                quotation=_number(player.get("quote")),
+                initial_price=_number(estimate.get("initial")),
+                updated_price=_number(estimate.get("updated")),
+                strategic_max=_number(estimate.get("strategic")),
+                expected_fantasy_average=_optional_number(
+                    player.get("expected_fantasy_average")
+                ),
+                expected_goals=_optional_number(player.get("expected_goals")),
+                expected_assists=_optional_number(player.get("expected_assists")),
+                bonus_propensity=_optional_number(player.get("bonus")),
+                starter_probability=_optional_number(player.get("starter_probability")),
+                reliability=_optional_number(player.get("reliability")),
+                injury_risk=_optional_number(player.get("risk")),
+                potential=_optional_number(player.get("potential")),
+                index=_optional_number(player.get("index"))
+                or _optional_number(player.get("fantasy_score")),
+                personal_tier=personal_tier,
+                utility=round(utilities.get(player_id, 0.0), 4),
+                viable=player_id in viable_ids,
+                buyer_multipliers=multipliers,
+            )
+        )
+
+    sold_players = tuple(
+        SaleEventState(
+            event_id=str(event.get("event_id") or ""),
+            player_id=str(event.get("player_id") or ""),
+            manager_id=str(event.get("manager_id") or ""),
+            role=str(event.get("role") or "").upper(),
+            paid_price=int(round(_number(event.get("paid_price")))),
+            nomination_number=int(event.get("nomination_number") or 0),
+        )
+        for event in league.get("auction_sale_events", [])
+    )
+    return AuctionSnapshot(
+        fantasy_id=str(league.get("id") or ""),
+        user_manager_id=user_manager_id,
+        total_budget=int(league.get("initial_budget") or 0),
+        min_bid=max(int(league.get("min_bid") or 1), 1),
+        auction_mode=str(league.get("auction_mode") or "per_ruolo"),
+        current_role=str(league.get("auction_current_role") or "P"),
+        roster_rules=tuple(
+            int(league.get("roster_slots", DEFAULT_ROSTER_SLOTS).get(role, 0))
+            for role in ROLE_LABELS
+        ),
+        participants=tuple(participants),
+        available_players=tuple(available_players),
+        sold_players=sold_players,
+        personal_tiers=tuple(sorted(tier_assignments.items())),
+        personal_targets=tuple(sorted(str(player_id) for player_id in league.get("watchlist", []))),
+        risk_profile=str(league.get("risk_profile") or "bilanciato"),
+        modifier_enabled=bool(league.get("modifier_enabled")),
+        state_version=int(league.get("auction_state_version") or 0),
+    )
+
+
+def run_auction_multiverse(
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    *,
+    mode: str = "standard",
+    seed: int | None = None,
+) -> dict[str, Any]:
+    from fantasy.multiverse import simulate_multiverse
+
+    snapshot = build_auction_snapshot(league, catalog)
+    return simulate_multiverse(snapshot, mode=mode, seed=seed)
 
 
 def _auction_sale_event(
@@ -1552,6 +1725,14 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("purchases", [])
     league.setdefault("min_bid", 1)
     league.setdefault("auction_mode", "per_ruolo")
+    league.setdefault("auction_current_role", "P")
+    league.setdefault("risk_profile", "bilanciato")
+    if league["auction_mode"] not in {"per_ruolo", "libera"}:
+        league["auction_mode"] = "per_ruolo"
+    if league["auction_current_role"] not in ROLE_LABELS:
+        league["auction_current_role"] = "P"
+    if league["risk_profile"] not in {"prudente", "bilanciato", "aggressivo"}:
+        league["risk_profile"] = "bilanciato"
     league.setdefault("auction_state_version", 0)
     league.setdefault("auction_sale_events", [])
     league.setdefault("auction_history", [])
