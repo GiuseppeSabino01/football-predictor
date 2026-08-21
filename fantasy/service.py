@@ -116,6 +116,11 @@ def create_league(
         "captain_enabled": bool(captain_enabled),
         "captain_player_id": None,
         "purchases": [],
+        "min_bid": 1,
+        "auction_mode": "per_ruolo",
+        "auction_state_version": 0,
+        "auction_sale_events": [],
+        "auction_history": [],
         "auction_managers": _new_auction_managers(int(participants or 0))
         if game_mode == GAME_MODE_AUCTION else [],
         "auction_tiers": _new_auction_tiers(),
@@ -329,16 +334,31 @@ def auction_taken_player_ids(league: dict[str, Any]) -> set[str]:
 
 
 def record_auction_purchase(
-    league: dict[str, Any], manager_id: str, player: dict[str, Any], price: float
+    league: dict[str, Any],
+    manager_id: str,
+    player: dict[str, Any],
+    price: float,
+    *,
+    expected_price_at_sale: float | None = None,
+    nominated_by_manager_id: str | None = None,
 ) -> dict[str, Any]:
     if league.get("game_mode") != GAME_MODE_AUCTION:
         raise ValueError("Questa funzione e disponibile solo per l'asta.")
     manager = next((row for row in auction_managers(league) if row.get("id") == manager_id), None)
     if not manager:
         raise ValueError("Partecipante non trovato.")
+    min_bid = max(_number(league.get("min_bid")), 1.0)
+    if float(price) < min_bid:
+        raise ValueError(f"Il prezzo minimo e {min_bid:.0f} credito.")
     player_id = str(player.get("id") or "")
     if player_id in auction_taken_player_ids(league):
         raise ValueError("Questo giocatore e gia stato acquistato.")
+    manager_summary_before = auction_manager_summary(league, manager_id)
+    expected_at_sale = (
+        float(expected_price_at_sale)
+        if expected_price_at_sale is not None
+        else _expected_auction_price_at_sale(league, player)
+    )
     if manager.get("is_user"):
         purchase = add_purchase(league, player, price)
     else:
@@ -354,10 +374,28 @@ def record_auction_purchase(
         manager["purchases"] = draft["purchases"]
         league["updated_at"] = utc_now()
         _invalidate_sasa(league)
+    purchase["expected_price_at_sale"] = expected_at_sale
+    _upsert_auction_sale_event(
+        league,
+        player=player,
+        manager_id=manager_id,
+        paid_price=price,
+        expected_price_at_sale=expected_at_sale,
+        remaining_budget_before=manager_summary_before["remaining_budget"],
+        remaining_slots_before=manager_summary_before["remaining_slots"],
+        nominated_by_manager_id=nominated_by_manager_id,
+    )
+    _bump_auction_state(league)
     return purchase
 
 
-def remove_auction_purchase(league: dict[str, Any], manager_id: str, player_id: str) -> None:
+def remove_auction_purchase(
+    league: dict[str, Any],
+    manager_id: str,
+    player_id: str,
+    *,
+    remove_event: bool = True,
+) -> None:
     manager = next((row for row in auction_managers(league) if row.get("id") == manager_id), None)
     if not manager:
         raise ValueError("Partecipante non trovato.")
@@ -369,6 +407,12 @@ def remove_auction_purchase(league: dict[str, Any], manager_id: str, player_id: 
         ]
         league["updated_at"] = utc_now()
         _invalidate_sasa(league)
+    if remove_event:
+        league["auction_sale_events"] = [
+            event for event in league.get("auction_sale_events", [])
+            if str(event.get("player_id")) != str(player_id)
+        ]
+    _bump_auction_state(league)
 
 
 def auction_player_assignment(
@@ -392,6 +436,192 @@ def auction_player_assignment(
                 "purchase": purchase,
             }
     return None
+
+
+def opponent_dna_profiles(
+    league: dict[str, Any], catalog: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Return FantaDNA profiles after repairing legacy events in memory."""
+    _ensure_auction_sale_events(league)
+    from fantasy.opponent_dna import build_opponent_dna
+
+    return build_opponent_dna(league, catalog)
+
+
+def _auction_sale_event(
+    league: dict[str, Any], player_id: str
+) -> dict[str, Any] | None:
+    clean_id = str(player_id)
+    return next(
+        (
+            event for event in league.get("auction_sale_events", [])
+            if str(event.get("player_id")) == clean_id
+        ),
+        None,
+    )
+
+
+def _expected_auction_price_at_sale(
+    league: dict[str, Any], player: dict[str, Any]
+) -> float:
+    estimate = auction_price_board(league, [player]).get(str(player.get("id")), {})
+    return max(
+        _number(estimate.get("updated"))
+        or _number(estimate.get("initial"))
+        or _initial_auction_price(player, _number(league.get("initial_budget"))),
+        1.0,
+    )
+
+
+def _upsert_auction_sale_event(
+    league: dict[str, Any],
+    *,
+    player: dict[str, Any],
+    manager_id: str,
+    paid_price: float,
+    expected_price_at_sale: float,
+    remaining_budget_before: float,
+    remaining_slots_before: int,
+    nominated_by_manager_id: str | None,
+) -> dict[str, Any]:
+    events = league.setdefault("auction_sale_events", [])
+    player_id = str(player.get("id") or player.get("player_id") or "")
+    event = _auction_sale_event(league, player_id)
+    now = utc_now()
+    if event is None:
+        total_slots = sum(
+            int(value) for value in league.get("roster_slots", DEFAULT_ROSTER_SLOTS).values()
+        ) * max(len(auction_managers(league)), 1)
+        nomination_number = max(
+            (int(item.get("nomination_number") or 0) for item in events),
+            default=0,
+        ) + 1
+        event = {
+            "event_id": uuid4().hex,
+            "fantasy_id": str(league.get("id") or ""),
+            "player_id": player_id,
+            "nomination_number": nomination_number,
+            "auction_progress": min((nomination_number - 1) / max(total_slots, 1), 1.0),
+            "created_at": now,
+        }
+        events.append(event)
+    event.update(
+        {
+            "fantasy_id": str(league.get("id") or ""),
+            "player_id": player_id,
+            "manager_id": str(manager_id),
+            "role": str(player.get("role") or "").upper(),
+            "team": str(player.get("team") or ""),
+            "paid_price": float(paid_price),
+            "expected_price_at_sale": max(float(expected_price_at_sale), 1.0),
+            "remaining_budget_before": float(remaining_budget_before),
+            "remaining_slots_before": int(remaining_slots_before),
+            "nominated_by_manager_id": (
+                str(nominated_by_manager_id) if nominated_by_manager_id else None
+            ),
+            "updated_at": now,
+        }
+    )
+    return event
+
+
+def _ensure_auction_sale_events(league: dict[str, Any]) -> None:
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        league["auction_sale_events"] = []
+        return
+    events = league.setdefault("auction_sale_events", [])
+    if not isinstance(events, list):
+        events = league["auction_sale_events"] = []
+    unique_events: dict[str, dict[str, Any]] = {}
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        player_id = str(event.get("player_id") or "")
+        if player_id and player_id not in unique_events:
+            unique_events[player_id] = event
+    league["auction_sale_events"] = list(unique_events.values())
+
+    rows: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    for manager in league.get("auction_managers", []):
+        purchases = (
+            league.get("purchases", [])
+            if manager.get("is_user") else manager.get("purchases", [])
+        )
+        for purchase in purchases:
+            rows.append((str(manager.get("id")), manager, purchase))
+    rows.sort(key=lambda item: str(item[2].get("acquired_at") or ""))
+    total_slots = sum(
+        int(value) for value in league.get("roster_slots", DEFAULT_ROSTER_SLOTS).values()
+    ) * max(len(league.get("auction_managers", [])), 1)
+    spent_before: dict[str, float] = {str(manager.get("id")): 0.0 for manager in league.get("auction_managers", [])}
+    slots_before: dict[str, int] = {
+        str(manager.get("id")): sum(
+            int(value) for value in league.get("roster_slots", DEFAULT_ROSTER_SLOTS).values()
+        )
+        for manager in league.get("auction_managers", [])
+    }
+    for position, (manager_id, _manager, purchase) in enumerate(rows, start=1):
+        player_id = str(purchase.get("player_id") or "")
+        event = _auction_sale_event(league, player_id)
+        expected = max(
+            _number(purchase.get("expected_price_at_sale"))
+            or _initial_auction_price(purchase, _number(league.get("initial_budget"))),
+            1.0,
+        )
+        if event is None:
+            created_at = str(purchase.get("acquired_at") or utc_now())
+            used_numbers = {
+                int(item.get("nomination_number") or 0)
+                for item in league.get("auction_sale_events", [])
+            }
+            nomination_number = position
+            if nomination_number in used_numbers:
+                nomination_number = max(used_numbers, default=0) + 1
+            event = {
+                "event_id": uuid4().hex,
+                "fantasy_id": str(league.get("id") or ""),
+                "player_id": player_id,
+                "nomination_number": nomination_number,
+                "auction_progress": min(
+                    (nomination_number - 1) / max(total_slots, 1), 1.0
+                ),
+                "created_at": created_at,
+            }
+            league["auction_sale_events"].append(event)
+        event.setdefault("event_id", uuid4().hex)
+        event["fantasy_id"] = str(league.get("id") or "")
+        event.update(
+            {
+                "manager_id": manager_id,
+                "role": str(purchase.get("role") or "").upper(),
+                "team": str(purchase.get("team") or ""),
+                "paid_price": _number(purchase.get("price")),
+                "expected_price_at_sale": expected,
+            }
+        )
+        event.setdefault("nomination_number", position)
+        event.setdefault("auction_progress", min((position - 1) / max(total_slots, 1), 1.0))
+        event.setdefault(
+            "remaining_budget_before",
+            max(_number(league.get("initial_budget")) - spent_before[manager_id], 0.0),
+        )
+        event.setdefault("remaining_slots_before", slots_before[manager_id])
+        event.setdefault("nominated_by_manager_id", None)
+        event.setdefault("created_at", str(purchase.get("acquired_at") or utc_now()))
+        event.setdefault("updated_at", event["created_at"])
+        purchase["expected_price_at_sale"] = expected
+        spent_before[manager_id] += _number(purchase.get("price"))
+        slots_before[manager_id] = max(slots_before[manager_id] - 1, 0)
+
+    assigned_ids = {str(purchase.get("player_id")) for _, _, purchase in rows}
+    league["auction_sale_events"] = [
+        event for event in league.get("auction_sale_events", [])
+        if str(event.get("player_id")) in assigned_ids
+    ]
+
+
+def _bump_auction_state(league: dict[str, Any]) -> None:
+    league["auction_state_version"] = int(league.get("auction_state_version") or 0) + 1
 
 
 def update_auction_assignments(
@@ -475,6 +705,9 @@ def _apply_auction_assignment(
     managers = auction_managers(league)
     if not any(str(manager.get("id")) == manager_id for manager in managers):
         raise ValueError("Partecipante non trovato.")
+    min_bid = max(_number(league.get("min_bid")), 1.0)
+    if price < min_bid:
+        raise ValueError(f"Il prezzo minimo e {min_bid:.0f} credito.")
     if current_manager_id == manager_id and current:
         purchase = current["purchase"]
         manager_summary = auction_manager_summary(league, manager_id)
@@ -485,13 +718,51 @@ def _apply_auction_assignment(
                 f"massimo {available:.0f}."
             )
         purchase["price"] = price
+        event = _auction_sale_event(league, player_id)
+        _upsert_auction_sale_event(
+            league,
+            player=player,
+            manager_id=manager_id,
+            paid_price=price,
+            expected_price_at_sale=(
+                _number(event.get("expected_price_at_sale"))
+                if event else _expected_auction_price_at_sale(league, player)
+            ),
+            remaining_budget_before=(
+                _number(event.get("remaining_budget_before"))
+                if event else available
+            ),
+            remaining_slots_before=(
+                int(event.get("remaining_slots_before") or manager_summary["remaining_slots"])
+                if event else manager_summary["remaining_slots"]
+            ),
+            nominated_by_manager_id=(event.get("nominated_by_manager_id") if event else None),
+        )
         league["updated_at"] = utc_now()
         _invalidate_sasa(league)
+        _bump_auction_state(league)
         return
 
     if current_manager_id:
-        remove_auction_purchase(league, current_manager_id, player_id)
-    record_auction_purchase(league, manager_id, player, price)
+        existing_event = _auction_sale_event(league, player_id)
+        remove_auction_purchase(
+            league, current_manager_id, player_id, remove_event=False
+        )
+    else:
+        existing_event = None
+    record_auction_purchase(
+        league,
+        manager_id,
+        player,
+        price,
+        expected_price_at_sale=(
+            _number(existing_event.get("expected_price_at_sale"))
+            if existing_event else None
+        ),
+        nominated_by_manager_id=(
+            existing_event.get("nominated_by_manager_id") if existing_event else None
+        ),
+    )
 
 
 def _apply_auction_player_tier(
@@ -1265,6 +1536,7 @@ def touch_workspace(workspace: dict[str, Any]) -> None:
 
 
 def _normalize_league(league: dict[str, Any]) -> None:
+    league.setdefault("id", uuid4().hex)
     league.setdefault("season", "2026/27")
     league.setdefault("initial_budget", 250)
     league.setdefault("game_mode", GAME_MODE_AUCTION)
@@ -1278,6 +1550,11 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("captain_enabled", False)
     league.setdefault("captain_player_id", None)
     league.setdefault("purchases", [])
+    league.setdefault("min_bid", 1)
+    league.setdefault("auction_mode", "per_ruolo")
+    league.setdefault("auction_state_version", 0)
+    league.setdefault("auction_sale_events", [])
+    league.setdefault("auction_history", [])
     league.setdefault("auction_managers", [])
     if league["game_mode"] == GAME_MODE_AUCTION:
         _resize_auction_managers(league, int(league.get("participants") or 0))
@@ -1288,6 +1565,7 @@ def _normalize_league(league: dict[str, Any]) -> None:
             manager.setdefault("purchases", [])
     else:
         league["auction_managers"] = []
+        league["auction_sale_events"] = []
     league.setdefault("auction_tiers", [])
     league.setdefault("auction_player_tiers", {})
     if not isinstance(league["auction_tiers"], list):
@@ -1319,6 +1597,7 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("sasa_analysis_version", 0)
     league.setdefault("read_alert_ids", [])
     league.setdefault("updated_at", utc_now())
+    _ensure_auction_sale_events(league)
 
 
 def _number(value: Any) -> float:
