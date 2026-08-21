@@ -89,6 +89,20 @@ def test_few_purchases_have_low_confidence_and_regression_to_league_mean() -> No
     assert any("Segnale preliminare" in evidence for evidence in profile["evidence"])
 
 
+def test_spending_percentages_use_initial_budget_as_denominator() -> None:
+    _, league = _league(participants=2)
+    rival = auction_managers(league)[1]
+    defenders = [_player(index, role="D") for index in range(1, 3)]
+    record_auction_purchase(league, rival["id"], defenders[0], 25)
+    record_auction_purchase(league, rival["id"], defenders[1], 50)
+
+    profile = _profile(league, defenders, rival["id"])
+
+    assert profile["role_preferences"]["D"]["spend_share"] == pytest.approx(0.30)
+    assert profile["auction_phase_preferences"]["iniziale"]["spend_share"] == pytest.approx(0.30)
+    assert any("30% del budget iniziale" in evidence for evidence in profile["evidence"])
+
+
 def test_price_or_owner_correction_updates_one_sale_event() -> None:
     _, league = _league()
     managers = auction_managers(league)

@@ -66,9 +66,9 @@ def dna_buyer_multiplier(
     """Translate a FantaDNA profile into the bounded multiplier used by simulations."""
     role_data = profile.get("role_preferences", {}).get(str(role).upper(), {})
     adjusted_role_share = _score(
-        role_data.get("adjusted_spend_share"), default=0.25
+        role_data.get("adjusted_spend_share"), default=0.0
     )
-    league_role_share = _score(role_data.get("league_spend_share"), default=0.25)
+    league_role_share = _score(role_data.get("league_spend_share"), default=0.0)
     role_affinity = _clip(
         50 + (adjusted_role_share - league_role_share) * 100, 0, 100
     )
@@ -170,6 +170,7 @@ def _raw_profile(
         for event in events
     ]
     total_spent = sum(weights)
+    initial_budget = max(_number(league.get("initial_budget")), 0.0)
     price_ratios = [
         max(_number(event.get("paid_price")), 0.0)
         / max(_number(event.get("expected_price_at_sale")), 1.0)
@@ -182,7 +183,7 @@ def _raw_profile(
         for event, weight in zip(events, weights)
         if str(event.get("player_id")) in top_player_ids
     )
-    top_share = top_spent / total_spent if total_spent else None
+    top_share = top_spent / initial_budget if initial_budget else None
     concentration = (
         sum((weight / total_spent) ** 2 for weight in weights) if total_spent else None
     )
@@ -226,13 +227,14 @@ def _raw_profile(
     phase_preferences = {
         phase: {
             "purchase_share": phase_counts[phase] / phase_total_count if phase_total_count else 0.0,
-            "spend_share": phase_spend[phase] / total_spent if total_spent else 0.0,
+            "spend_share": phase_spend[phase] / initial_budget if initial_budget else 0.0,
+            "relative_spend_share": phase_spend[phase] / total_spent if total_spent else 0.0,
         }
         for phase in PHASES
     }
     patience = (
         sum(
-            phase_preferences[phase]["spend_share"] * phase_score
+            phase_preferences[phase]["relative_spend_share"] * phase_score
             for phase, phase_score in zip(PHASES, (0, 50, 100))
         )
         if total_spent else None
@@ -251,7 +253,7 @@ def _raw_profile(
         "patience": patience,
         "role_preferences": {
             role: {
-                "spend_share": role_spend[role] / total_spent if total_spent else 0.0,
+                "spend_share": role_spend[role] / initial_budget if initial_budget else 0.0,
                 "purchase_share": role_counts[role] / effective_sample if effective_sample else 0.0,
                 "slot_share": int(slots.get(role, 0)) / total_slots,
             }
@@ -295,7 +297,7 @@ def _league_averages(raw_profiles: Iterable[dict[str, Any]]) -> dict[str, Any]:
             float(profile["role_preferences"][role]["spend_share"])
             for profile in observed
         ]
-        averages["role_preferences"][role] = sum(values) / len(values) if values else 0.25
+        averages["role_preferences"][role] = sum(values) / len(values) if values else 0.0
     return averages
 
 
@@ -463,7 +465,7 @@ def _evidence(
     top_share = float(raw.get("top_share") or 0)
     league_top_share = float(league_averages.get("top_share") or 0)
     evidence.append(
-        f"{prefix}destina il {top_share:.0%} della spesa ai top 20% del ruolo, "
+        f"{prefix}destina il {top_share:.0%} del budget iniziale ai top 20% del ruolo, "
         f"contro il {league_top_share:.0%} medio della lega."
     )
     concentration = float(raw.get("concentration") or 0)
@@ -481,7 +483,7 @@ def _evidence(
     role_delta = role_data["adjusted_spend_share"] - role_data["league_spend_share"]
     if abs(role_delta) >= 0.03:
         evidence.append(
-            f"{prefix}sul ruolo {role} concentra {role_data['spend_share']:.0%} della spesa, "
+            f"{prefix}sul ruolo {role} usa il {role_data['spend_share']:.0%} del budget iniziale, "
             f"{abs(role_delta):.0%} {'più' if role_delta > 0 else 'meno'} della media corretta della lega."
         )
     if team_preferences:
@@ -490,7 +492,7 @@ def _evidence(
             f"Preferenza osservabile per {team['team']}: {team['purchases']} acquisti "
             f"({team['observed_share']:.0%} del campione)."
         )
-    late_share = raw["phase_preferences"]["finale"]["spend_share"]
+    late_share = raw["phase_preferences"]["finale"]["relative_spend_share"]
     if late_share >= 0.45:
         evidence.append(f"{prefix}concentra il {late_share:.0%} della spesa nella fase finale.")
     return evidence
