@@ -100,7 +100,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.21 v24.6 · Asta Multiverso")
+    st.caption("Fantacalcio · Build 2026.08.21 v24.7 · Asta Multiverso")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -1193,7 +1193,7 @@ def _render_auction_multiverse(
                         [
                             {
                                 "Giocatore": value["name"],
-                                "Probabilità acquisto": value["probability"],
+                                "Probabilità acquisto": value["probability"] * 100,
                             }
                             for value in targets.values()
                         ]
@@ -1203,7 +1203,7 @@ def _render_auction_multiverse(
                     column_config={
                         "Probabilità acquisto": st.column_config.ProgressColumn(
                             min_value=0,
-                            max_value=1,
+                            max_value=100,
                             format="%.0f%%",
                         )
                     },
@@ -1219,7 +1219,7 @@ def _render_auction_multiverse(
                             {
                                 "Ruolo": player["role"],
                                 "Giocatore": player["name"],
-                                "Probabilità": player["probability"],
+                                "Probabilità": player["probability"] * 100,
                             }
                             for player in common
                         ]
@@ -1228,7 +1228,7 @@ def _render_auction_multiverse(
                     use_container_width=True,
                     column_config={
                         "Probabilità": st.column_config.ProgressColumn(
-                            min_value=0, max_value=1, format="%.0f%%"
+                            min_value=0, max_value=100, format="%.0f%%"
                         )
                     },
                 )
@@ -1246,7 +1246,7 @@ def _render_auction_multiverse(
                         {
                             "Ruolo": player["role"],
                             "Giocatore": player["name"],
-                            "Probabilità": player["probability"],
+                            "Probabilità": player["probability"] * 100,
                             "Utilità": player["utility"],
                         }
                         for player in alternatives
