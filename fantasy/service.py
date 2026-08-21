@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import random
 from copy import deepcopy
 from datetime import datetime, timezone
 from itertools import combinations
 from typing import Any
 from uuid import uuid4
-
 
 DEFAULT_ROSTER_SLOTS = {"P": 3, "D": 7, "C": 7, "A": 5}
 GAME_MODE_AUCTION = "auction"
@@ -389,6 +389,109 @@ def record_auction_purchase(
     )
     _bump_auction_state(league)
     return purchase
+
+
+def simulate_auction_purchases(
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    players_per_manager: int,
+    *,
+    seed: int | None = None,
+) -> list[dict[str, Any]]:
+    """Atomically add random, legal auction purchases to every manager."""
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        raise ValueError("La simulazione e disponibile solo in modalita asta.")
+    requested = int(players_per_manager)
+    if requested <= 0:
+        raise ValueError("Seleziona almeno un giocatore per squadra.")
+    if not catalog:
+        raise ValueError("Il listone non contiene giocatori disponibili.")
+
+    draft = deepcopy(league)
+    managers = auction_managers(draft)
+    if not managers:
+        raise ValueError("Configura almeno un partecipante all'asta.")
+    for manager in managers:
+        summary = auction_manager_summary(draft, str(manager.get("id")))
+        if requested > summary["remaining_slots"]:
+            raise ValueError(
+                f"{manager.get('name') or 'Una squadra'} ha solo "
+                f"{summary['remaining_slots']} slot disponibili."
+            )
+
+    taken_ids = auction_taken_player_ids(draft)
+    available_by_role = {
+        role: [
+            player
+            for player in catalog
+            if str(player.get("role") or "").upper() == role
+            and str(player.get("id") or "") not in taken_ids
+        ]
+        for role in ROLE_LABELS
+    }
+    rng = random.Random(seed)
+    for players in available_by_role.values():
+        rng.shuffle(players)
+
+    min_bid = max(int(round(_number(draft.get("min_bid")))), 1)
+    generated: list[dict[str, Any]] = []
+    for _round in range(requested):
+        manager_order = list(managers)
+        rng.shuffle(manager_order)
+        for manager in manager_order:
+            manager_id = str(manager.get("id"))
+            summary = auction_manager_summary(draft, manager_id)
+            eligible_roles = [
+                role
+                for role in ROLE_LABELS
+                if summary["missing"].get(role, 0) > 0 and available_by_role[role]
+            ]
+            if not eligible_roles:
+                raise ValueError(
+                    f"Non ci sono abbastanza giocatori disponibili per completare "
+                    f"la simulazione di {manager.get('name') or 'una squadra'}."
+                )
+            role = rng.choices(
+                eligible_roles,
+                weights=[summary["missing"][item] for item in eligible_roles],
+                k=1,
+            )[0]
+            player = available_by_role[role].pop()
+            legal_max = int(
+                summary["remaining_budget"]
+                - min_bid * (summary["remaining_slots"] - 1)
+            )
+            if legal_max < min_bid:
+                raise ValueError(
+                    f"Crediti insufficienti per simulare altri acquisti di "
+                    f"{manager.get('name') or 'una squadra'}."
+                )
+            expected_price = _expected_auction_price_at_sale(draft, player)
+            price = min(
+                max(round(expected_price * rng.uniform(0.55, 1.45)), min_bid),
+                legal_max,
+            )
+            record_auction_purchase(
+                draft,
+                manager_id,
+                player,
+                price,
+                expected_price_at_sale=expected_price,
+            )
+            generated.append(
+                {
+                    "manager_id": manager_id,
+                    "manager_name": str(manager.get("name") or ""),
+                    "player_id": str(player.get("id") or ""),
+                    "player_name": str(player.get("name") or ""),
+                    "role": role,
+                    "price": price,
+                }
+            )
+
+    league.clear()
+    league.update(draft)
+    return generated
 
 
 def remove_auction_purchase(
