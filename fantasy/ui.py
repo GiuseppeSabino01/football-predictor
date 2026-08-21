@@ -68,6 +68,7 @@ from fantasy.service import (
     role_balance_recommendation,
     rename_auction_manager,
     roster_summary,
+    run_auction_multiverse,
     set_captain,
     set_preferred_xi,
     toggle_watchlist,
@@ -99,7 +100,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.21 v24.5 · FantaDNA avversari")
+    st.caption("Fantacalcio · Build 2026.08.21 v24.6 · Asta Multiverso")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -561,6 +562,7 @@ def _render_preparation(
     if not list_mode:
         _render_auction_room(workspace, league, storage, catalog)
         _render_opponents_dna(league, catalog)
+        _render_auction_multiverse(workspace, league, storage, catalog)
     purchased_ids = (
         {str(row.get("player_id")) for row in league.get("purchases", [])}
         if list_mode else auction_taken_player_ids(league)
@@ -1007,6 +1009,258 @@ def _render_opponents_dna(
             )
         elif int(profile.get("sample_size", 0)) >= 5:
             st.caption("Nessuna preferenza di squadra statisticamente credibile.")
+
+
+def _render_auction_multiverse(
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    storage: FantasyWorkspaceStorage,
+    catalog: list[dict[str, Any]],
+) -> None:
+    with st.expander("Multiverso · Simula il resto dell'asta"):
+        st.caption(
+            "Esplora molte prosecuzioni possibili partendo da crediti, slot, prezzi, "
+            "fasce e FantaDNA reali. I calcoli sono deterministici e non usano un LLM."
+        )
+        if not catalog:
+            st.info("Il listone deve essere disponibile per avviare il Multiverso.")
+            return
+
+        mode_column, role_column, risk_column, depth_column = st.columns(4)
+        auction_mode = mode_column.selectbox(
+            "Ordine dell'asta",
+            ["per_ruolo", "libera"],
+            index=0 if league.get("auction_mode") == "per_ruolo" else 1,
+            format_func=lambda value: "Per ruolo" if value == "per_ruolo" else "Asta libera",
+            key=f"multiverse_auction_mode_{league['id']}",
+        )
+        current_role = role_column.selectbox(
+            "Ruolo corrente",
+            list(ROLE_LABELS),
+            index=list(ROLE_LABELS).index(
+                str(league.get("auction_current_role") or "P")
+            ),
+            format_func=lambda value: ROLE_LABELS[value],
+            disabled=auction_mode == "libera",
+            key=f"multiverse_current_role_{league['id']}",
+        )
+        risk_profile = risk_column.selectbox(
+            "Profilo strategico",
+            ["prudente", "bilanciato", "aggressivo"],
+            index=["prudente", "bilanciato", "aggressivo"].index(
+                str(league.get("risk_profile") or "bilanciato")
+            ),
+            format_func=str.capitalize,
+            key=f"multiverse_risk_{league['id']}",
+        )
+        simulation_mode = depth_column.selectbox(
+            "Profondità",
+            ["rapida", "standard", "approfondita"],
+            index=1,
+            format_func=lambda value: {
+                "rapida": "Rapida · 250",
+                "standard": "Standard · 1.000",
+                "approfondita": "Approfondita · 5.000",
+            }[value],
+            key=f"multiverse_depth_{league['id']}",
+        )
+
+        settings_changed = (
+            auction_mode != league.get("auction_mode")
+            or current_role != league.get("auction_current_role")
+            or risk_profile != league.get("risk_profile")
+        )
+        if settings_changed:
+            league["auction_mode"] = auction_mode
+            league["auction_current_role"] = current_role
+            league["risk_profile"] = risk_profile
+            league["auction_state_version"] = int(
+                league.get("auction_state_version") or 0
+            ) + 1
+            league["updated_at"] = utc_now()
+            touch_workspace(workspace)
+            _save_workspace(workspace, storage)
+            st.rerun()
+
+        seed_value = st.number_input(
+            "Seed opzionale per ripetere esattamente lo stesso scenario",
+            min_value=0,
+            max_value=2_147_483_647,
+            value=0,
+            step=1,
+            help="Lascia 0 per usare un seed derivato automaticamente dallo stato dell'asta.",
+            key=f"multiverse_seed_{league['id']}",
+        )
+        spinner_label = {
+            "rapida": "Simulo 250 universi...",
+            "standard": "Simulo 1.000 universi...",
+            "approfondita": "Simulo 5.000 universi: potrebbe richiedere alcuni secondi...",
+        }[simulation_mode]
+        try:
+            with st.spinner(spinner_label):
+                result = run_auction_multiverse(
+                    league,
+                    catalog,
+                    mode=simulation_mode,
+                    seed=int(seed_value) if seed_value else None,
+                )
+        except (TypeError, ValueError) as error:
+            st.error(f"Multiverso non disponibile: {error}")
+            return
+
+        stamp_key = (
+            f"multiverse_stamp_{league['id']}_{result['state_hash']}_"
+            f"{result['mode']}_{result['seed']}"
+        )
+        if stamp_key not in st.session_state:
+            st.session_state[stamp_key] = utc_now()
+        updated_time = str(st.session_state[stamp_key]).split("T")[-1][:5]
+        result_caption = (
+            f"Risultato basato su {result['simulation_count']:,} simulazioni · "
+            f"seed {result['seed']} · aggiornato alle {updated_time}."
+        )
+        st.caption(result_caption.replace(",", "."))
+
+        completion, median_strength, prudent = st.columns(3)
+        completion.metric(
+            "Probabilità completamento",
+            f"{result['completion_probability']:.0%}",
+        )
+        median_strength.metric(
+            "Forza mediana prevista", f"{result['median_roster_strength']:.1f}"
+        )
+        prudent.metric("Scenario prudente · P10", f"{result['p10_roster_strength']:.1f}")
+        favorable, final_budget, fragile = st.columns(3)
+        favorable.metric("Scenario favorevole · P90", f"{result['p90_roster_strength']:.1f}")
+        final_budget.metric(
+            "Budget finale atteso", f"{result['expected_remaining_budget']:.1f}"
+        )
+        fragile_roles = result.get("fragile_roles") or []
+        fragile_role = fragile_roles[0] if fragile_roles else {}
+        fragile.metric(
+            "Reparto più fragile",
+            str(fragile_role.get("role") or "—"),
+            (
+                f"{fragile_role.get('completion_probability', 0):.0%} completamento"
+                if fragile_role else None
+            ),
+            delta_color="off",
+        )
+
+        distribution = result.get("roster_strength_distribution", [])
+        if distribution:
+            figure = go.Figure(
+                go.Histogram(
+                    x=distribution,
+                    nbinsx=24,
+                    marker_color="#19e6b0",
+                    opacity=0.78,
+                    hovertemplate="Forza %{x:.1f}<br>Scenari %{y}<extra></extra>",
+                )
+            )
+            for value, color, label in (
+                (result["p10_roster_strength"], "#ff5d73", "P10"),
+                (result["median_roster_strength"], "#f4fbf7", "Mediana"),
+                (result["p90_roster_strength"], "#62d8ff", "P90"),
+            ):
+                figure.add_vline(
+                    x=value,
+                    line_color=color,
+                    line_dash="dash",
+                    annotation_text=label,
+                    annotation_position="top",
+                )
+            figure.update_layout(
+                title="Distribuzione della forza della rosa finale",
+                xaxis_title="Forza rosa · 0–100",
+                yaxis_title="Universi",
+                height=330,
+                margin=dict(l=20, r=20, t=55, b=20),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+            )
+            st.plotly_chart(figure, use_container_width=True)
+
+        targets = result.get("probability_of_acquiring_targets", {})
+        common = result.get("most_common_final_roster", [])[:3]
+        targets_column, common_column = st.columns(2)
+        with targets_column:
+            st.markdown("##### Obiettivi personali")
+            if targets:
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "Giocatore": value["name"],
+                                "Probabilità acquisto": value["probability"],
+                            }
+                            for value in targets.values()
+                        ]
+                    ).sort_values("Probabilità acquisto", ascending=False),
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "Probabilità acquisto": st.column_config.ProgressColumn(
+                            min_value=0,
+                            max_value=1,
+                            format="%.0f%%",
+                        )
+                    },
+                )
+            else:
+                st.info("Aggiungi giocatori alla watchlist per seguirli come obiettivi.")
+        with common_column:
+            st.markdown("##### Acquisti più frequenti")
+            if common:
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "Ruolo": player["role"],
+                                "Giocatore": player["name"],
+                                "Probabilità": player["probability"],
+                            }
+                            for player in common
+                        ]
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "Probabilità": st.column_config.ProgressColumn(
+                            min_value=0, max_value=1, format="%.0f%%"
+                        )
+                    },
+                )
+
+        alternatives = result.get("best_available_alternatives", [])
+        if alternatives:
+            st.markdown("##### Alternative più ricorrenti")
+            st.caption(
+                "Giocatori non presenti tra gli obiettivi personali che il modello acquista "
+                "più spesso mantenendo una buona utilità di reparto."
+            )
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Ruolo": player["role"],
+                            "Giocatore": player["name"],
+                            "Probabilità": player["probability"],
+                            "Utilità": player["utility"],
+                        }
+                        for player in alternatives
+                    ]
+                ),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Probabilità": st.column_config.NumberColumn(format="%.0f%%"),
+                    "Utilità": st.column_config.NumberColumn(format="%.1f"),
+                },
+            )
+        for warning in result.get("warnings", []):
+            st.warning(warning)
 
 
 def _render_auction_tier_manager(
