@@ -60,6 +60,7 @@ from fantasy.service import (
     delete_league,
     find_league,
     list_trade_analysis,
+    opponent_dna_profiles,
     record_auction_purchase,
     remove_auction_purchase,
     remove_purchase,
@@ -98,7 +99,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.20 v24.4 · Bonus propensity")
+    st.caption("Fantacalcio · Build 2026.08.21 v24.5 · FantaDNA avversari")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -559,6 +560,7 @@ def _render_preparation(
     list_mode = league.get("game_mode") == GAME_MODE_LIST
     if not list_mode:
         _render_auction_room(workspace, league, storage, catalog)
+        _render_opponents_dna(league, catalog)
     purchased_ids = (
         {str(row.get("player_id")) for row in league.get("purchases", [])}
         if list_mode else auction_taken_player_ids(league)
@@ -837,6 +839,174 @@ def _render_auction_room(
                 st.rerun()
         else:
             st.info("Nessuna aggiudicazione registrata per questa squadra.")
+
+
+def _render_opponents_dna(
+    league: dict[str, Any], catalog: list[dict[str, Any]]
+) -> None:
+    profiles = [
+        profile for profile in opponent_dna_profiles(league, catalog)
+        if not profile.get("is_user")
+    ]
+    with st.expander("Avversari · FantaDNA", expanded=any(
+        profile.get("sample_size", 0) >= 5 for profile in profiles
+    )):
+        st.caption(
+            "Profili calcolati soltanto dalle aggiudicazioni reali di questo fantacalcio. "
+            "Con pochi acquisti i valori vengono riportati verso la media della lega."
+        )
+        if not profiles:
+            st.info("Aggiungi almeno un avversario per attivare il FantaDNA.")
+            return
+        profile_by_id = {str(profile["manager_id"]): profile for profile in profiles}
+        selected_id = st.selectbox(
+            "Fantaallenatore",
+            list(profile_by_id),
+            format_func=lambda manager_id: profile_by_id[manager_id]["manager_name"],
+            key=f"opponent_dna_manager_{league['id']}",
+        )
+        profile = profile_by_id[selected_id]
+        summary = auction_manager_summary(league, selected_id)
+        confidence = str(profile.get("confidence", "bassa"))
+        st.markdown(
+            f'<div class="fantasy-dna-header"><div><span>FANTADNA · CONFIDENZA {escape(confidence.upper())}</span>'
+            f'<strong>{escape(str(profile.get("manager_name")))}</strong>'
+            f'<small>{int(profile.get("sample_size", 0))} acquisti analizzati · '
+            f'{summary["remaining_budget"]:.0f} crediti residui · '
+            f'{summary["remaining_slots"]} slot mancanti</small></div>'
+            f'<b>{profile.get("aggression_score", 50):.0f}<small>/100 aggressività</small></b></div>',
+            unsafe_allow_html=True,
+        )
+
+        if int(profile.get("sample_size", 0)) == 0:
+            st.info(
+                "Profilo ancora neutrale: nessuna conclusione comportamentale viene mostrata "
+                "finché non registri acquisti reali."
+            )
+        elif confidence == "bassa":
+            st.warning(
+                "Campione ridotto: questi sono segnali preliminari, non caratteristiche certe."
+            )
+
+        benchmarks = profile.get("league_benchmarks", {})
+        has_data = int(profile.get("sample_size", 0)) > 0
+
+        def league_delta(field: str) -> str | None:
+            if not has_data:
+                return None
+            delta = float(profile.get(field, 50)) - float(benchmarks.get(field, 50))
+            return f"{delta:+.0f} vs lega"
+
+        aggression, top_bias, concentration, patience = st.columns(4)
+        aggression.metric(
+            "Aggressività", f'{profile["aggression_score"]:.0f}/100',
+            league_delta("aggression_score"), delta_color="off",
+        )
+        top_bias.metric(
+            "Propensione ai top", f'{profile["top_player_bias"]:.0f}/100',
+            league_delta("top_player_bias"), delta_color="off",
+        )
+        concentration.metric(
+            "Concentrazione budget", f'{profile["budget_concentration"]:.0f}/100',
+            league_delta("budget_concentration"), delta_color="off",
+        )
+        patience.metric(
+            "Pazienza", f'{profile["patience_score"]:.0f}/100',
+            league_delta("patience_score"), delta_color="off",
+        )
+
+        st.markdown("##### Evidenze")
+        for evidence in profile.get("evidence", []):
+            st.markdown(f"- {escape(str(evidence))}")
+
+        role_rows = []
+        for role, values in profile.get("role_preferences", {}).items():
+            role_rows.append(
+                {
+                    "Ruolo": role,
+                    "Spesa osservata": values.get("spend_share", 0),
+                    "Spesa corretta": values.get("adjusted_spend_share", 0),
+                    "Media lega": values.get("league_spend_share", 0),
+                    "Quota slot": values.get("slot_share", 0),
+                }
+            )
+        phase_rows = [
+            {
+                "Fase": phase.capitalize(),
+                "Acquisti": values.get("purchase_share", 0),
+                "Spesa": values.get("spend_share", 0),
+            }
+            for phase, values in profile.get("auction_phase_preferences", {}).items()
+        ]
+        roles_column, phases_column = st.columns(2)
+        with roles_column:
+            st.markdown("##### Preferenze di reparto")
+            st.dataframe(
+                pd.DataFrame(role_rows),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    column: st.column_config.NumberColumn(format="%.0f%%")
+                    for column in ("Spesa osservata", "Spesa corretta", "Media lega", "Quota slot")
+                },
+            )
+        with phases_column:
+            st.markdown("##### Tempismo degli acquisti")
+            st.dataframe(
+                pd.DataFrame(phase_rows),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Acquisti": st.column_config.NumberColumn(format="%.0f%%"),
+                    "Spesa": st.column_config.NumberColumn(format="%.0f%%"),
+                },
+            )
+
+        bonus, starter, reliability, potential, injuries = st.columns(5)
+        bonus.metric(
+            "Bonus", f'{profile["bonus_preference"]:.0f}',
+            league_delta("bonus_preference"), delta_color="off",
+        )
+        starter.metric(
+            "Titolarità", f'{profile["starter_preference"]:.0f}',
+            league_delta("starter_preference"), delta_color="off",
+        )
+        reliability.metric(
+            "Affidabilità", f'{profile["reliability_preference"]:.0f}',
+            league_delta("reliability_preference"), delta_color="off",
+        )
+        potential.metric(
+            "Potenziale", f'{profile["potential_preference"]:.0f}',
+            league_delta("potential_preference"), delta_color="off",
+        )
+        injuries.metric(
+            "Basso rischio", f'{profile["low_injury_risk_preference"]:.0f}',
+            league_delta("low_injury_risk_preference"), delta_color="off",
+        )
+        team_preferences = profile.get("team_preferences", [])
+        if team_preferences:
+            st.markdown("##### Squadre sovrarappresentate")
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Squadra": item["team"],
+                            "Acquisti": item["purchases"],
+                            "Nel FantaDNA": item["observed_share"],
+                            "Nel listone": item["availability_share"],
+                        }
+                        for item in team_preferences
+                    ]
+                ),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Nel FantaDNA": st.column_config.NumberColumn(format="%.0f%%"),
+                    "Nel listone": st.column_config.NumberColumn(format="%.0f%%"),
+                },
+            )
+        elif int(profile.get("sample_size", 0)) >= 5:
+            st.caption("Nessuna preferenza di squadra statisticamente credibile.")
 
 
 def _render_auction_tier_manager(
@@ -2845,7 +3015,16 @@ def _render_auction(
             "Aggiungi" if list_mode else "Acquista", type="primary", use_container_width=True
         ):
             try:
-                add_purchase(league, selected_player, price)
+                if list_mode:
+                    add_purchase(league, selected_player, price)
+                else:
+                    user_manager = next(
+                        manager for manager in auction_managers(league)
+                        if manager.get("is_user")
+                    )
+                    record_auction_purchase(
+                        league, str(user_manager.get("id")), selected_player, price
+                    )
             except ValueError as error:
                 st.error(str(error))
             else:
@@ -2897,7 +3076,16 @@ def _render_quick_purchase(
             try:
                 player = make_player(name=name, team=team, role=role, quote=price)
                 workspace["catalog"] = merge_catalog(workspace.get("catalog", []), [player])
-                add_purchase(league, player, price)
+                if league.get("game_mode") == GAME_MODE_AUCTION:
+                    user_manager = next(
+                        manager for manager in auction_managers(league)
+                        if manager.get("is_user")
+                    )
+                    record_auction_purchase(
+                        league, str(user_manager.get("id")), player, price
+                    )
+                else:
+                    add_purchase(league, player, price)
             except ValueError as error:
                 st.error(str(error))
             else:
@@ -2968,7 +3156,14 @@ def _render_roster_table(
         key=f"remove_purchase_select_{league['id']}",
     )
     if action_column.button("Rimuovi", use_container_width=True, key=f"remove_purchase_{league['id']}"):
-        remove_purchase(league, selected_id)
+        if list_mode:
+            remove_purchase(league, selected_id)
+        else:
+            user_manager = next(
+                manager for manager in auction_managers(league)
+                if manager.get("is_user")
+            )
+            remove_auction_purchase(league, str(user_manager.get("id")), selected_id)
         touch_workspace(workspace)
         _save_workspace(workspace, storage)
         st.rerun()
@@ -4173,6 +4368,13 @@ def render_fantasy_styles() -> None:
         .fantasy-manager-card>strong { overflow:hidden; color:#f4fbf7; font-size:.76rem; text-overflow:ellipsis; white-space:nowrap; }
         .fantasy-manager-card>small { grid-column:1; color:#899791; font-size:.58rem; }
         .fantasy-manager-card>b { grid-column:2; grid-row:2/4; color:#ffbe45; font-size:1.05rem; }
+        .fantasy-dna-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin:.4rem 0 .8rem; padding:.9rem 1rem; border:1px solid rgba(98,216,255,.3); border-radius:12px; background:linear-gradient(125deg,rgba(98,216,255,.1),rgba(8,10,11,.72)); }
+        .fantasy-dna-header>div { display:flex; flex-direction:column; gap:.12rem; }
+        .fantasy-dna-header span { color:#62d8ff; font-size:.6rem; font-weight:950; letter-spacing:.1em; }
+        .fantasy-dna-header strong { color:#f4fbf7; font-size:1.05rem; }
+        .fantasy-dna-header small { color:#95a39e; }
+        .fantasy-dna-header>b { color:#62d8ff; font-size:1.7rem; line-height:.9; text-align:right; }
+        .fantasy-dna-header>b small { display:block; margin-top:.3rem; font-size:.52rem; font-weight:800; }
         .fantasy-custom-tier-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:.48rem; margin:.35rem 0 .75rem; }
         .fantasy-custom-tier { display:grid; grid-template-columns:auto 1fr; gap:.05rem .45rem; align-items:center; padding:.58rem .65rem; border:1px solid color-mix(in srgb,var(--tier-color) 38%,transparent); border-left:4px solid var(--tier-color); border-radius:10px; background:linear-gradient(135deg,color-mix(in srgb,var(--tier-color) 10%,transparent),rgba(8,10,11,.62)); }
         .fantasy-custom-tier>span { grid-row:1/3; font-size:1.05rem; filter:drop-shadow(0 0 8px var(--tier-color)); }
