@@ -104,7 +104,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.21 v24.8 · Simulatore asta")
+    st.caption("Fantacalcio · Build 2026.08.21 v24.9 · Tutte le rose")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -841,7 +841,33 @@ def _render_auction_room(
                 )
                 st.rerun()
 
-        st.markdown("##### Rose registrate")
+        st.markdown("##### Rose di tutte le squadre")
+        all_roster_rows = [
+            {
+                "Fantasquadra": str(manager.get("name") or ""),
+                "Tipo": "La tua" if manager.get("is_user") else "Avversario",
+                "Ruolo": purchase.get("role"),
+                "Giocatore": purchase.get("name"),
+                "Club": purchase.get("team"),
+                "Prezzo": purchase.get("price"),
+            }
+            for manager in managers
+            for purchase in summaries[str(manager.get("id"))]["purchases"]
+        ]
+        if all_roster_rows:
+            st.dataframe(
+                pd.DataFrame(all_roster_rows),
+                hide_index=True,
+                use_container_width=True,
+                height=min(640, 36 * (len(all_roster_rows) + 1)),
+                column_config={
+                    "Prezzo": st.column_config.NumberColumn(format="%.0f CR"),
+                },
+            )
+        else:
+            st.info("Nessuna rosa contiene ancora giocatori.")
+
+        st.markdown("##### Dettaglio e correzioni")
         selected_manager_id = st.selectbox(
             "Visualizza squadra",
             [str(manager.get("id")) for manager in managers],
@@ -979,17 +1005,17 @@ def _render_opponents_dna(
             role_rows.append(
                 {
                     "Ruolo": role,
-                    "Spesa osservata": values.get("spend_share", 0),
-                    "Spesa corretta": values.get("adjusted_spend_share", 0),
-                    "Media lega": values.get("league_spend_share", 0),
-                    "Quota slot": values.get("slot_share", 0),
+                    "Spesa osservata": values.get("spend_share", 0) * 100,
+                    "Spesa corretta": values.get("adjusted_spend_share", 0) * 100,
+                    "Media lega": values.get("league_spend_share", 0) * 100,
+                    "Quota slot": values.get("slot_share", 0) * 100,
                 }
             )
         phase_rows = [
             {
                 "Fase": phase.capitalize(),
-                "Acquisti": values.get("purchase_share", 0),
-                "Spesa": values.get("spend_share", 0),
+                "Acquisti": values.get("purchase_share", 0) * 100,
+                "Spesa": values.get("spend_share", 0) * 100,
             }
             for phase, values in profile.get("auction_phase_preferences", {}).items()
         ]
@@ -1047,8 +1073,8 @@ def _render_opponents_dna(
                         {
                             "Squadra": item["team"],
                             "Acquisti": item["purchases"],
-                            "Nel FantaDNA": item["observed_share"],
-                            "Nel listone": item["availability_share"],
+                            "Nel FantaDNA": item["observed_share"] * 100,
+                            "Nel listone": item["availability_share"] * 100,
                         }
                         for item in team_preferences
                     ]
