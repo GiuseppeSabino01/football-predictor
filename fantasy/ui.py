@@ -38,6 +38,7 @@ from fantasy.decision_center import (
     season_next_matchday,
     simulate_purchase,
 )
+from fantasy.export import build_listone_excel
 from fantasy.official_catalog import (
     OFFICIAL_CATALOG_URL,
     catalog_fingerprint,
@@ -100,11 +101,19 @@ AUCTION_TIER_PALETTE = {
     "purple": ("Viola", "🟣", "#b895ff"),
     "gray": ("Grigio", "⚪", "#a7b0ad"),
 }
+CATALOG_AUTOSAVE_DEBOUNCE_MS = 1200
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def _cached_listone_excel(
+    catalog: list[dict[str, Any]], league: dict[str, Any]
+) -> bytes:
+    return build_listone_excel(catalog, league)
 
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.21 v24.10 · Rose avversari")
+    st.caption("Fantacalcio · Build 2026.08.21 v24.11 · Export Excel · Autosave fluido")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -667,6 +676,17 @@ def _render_preparation(
         )
         + f'<b>{len(frame)}</b></div>',
         unsafe_allow_html=True,
+    )
+    safe_league_name = "".join(
+        character if character.isalnum() else "_"
+        for character in str(league.get("name") or "fantacalcio")
+    ).strip("_") or "fantacalcio"
+    st.download_button(
+        "Scarica listone Excel",
+        data=_cached_listone_excel(catalog, league),
+        file_name=f"listone_{safe_league_name}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"download_listone_{league['id']}",
     )
     version_key = f"catalog_board_version_{league['id']}"
     board_version = int(st.session_state.get(version_key, 0))
@@ -1630,7 +1650,7 @@ def _render_list_catalog_editor(
         height=min(620, 88 + max(len(display), 1) * 38),
         key=editor_key,
         data_return_mode="AS_INPUT",
-        update_on=[("cellValueChanged", 250)],
+        update_on=[("cellValueChanged", CATALOG_AUTOSAVE_DEBOUNCE_MS)],
         allow_unsafe_jscode=True,
         enable_enterprise_modules=False,
         theme="streamlit",
@@ -1707,11 +1727,10 @@ def _render_list_catalog_editor(
         else:
             touch_workspace(workspace)
             _save_workspace(workspace, storage)
-            st.session_state[version_key] = int(
-                st.session_state.get(version_key, 0)
-            ) + 1
-            st.rerun()
-    st.caption("Modifiche salvate automaticamente.")
+    st.caption(
+        "Salvataggio automatico dopo una breve pausa: puoi modificare più righe "
+        "consecutive senza ricaricare la tabella."
+    )
     return selected_ids
 
 
@@ -1975,7 +1994,7 @@ def _render_auction_catalog_editor(
         height=min(620, 88 + max(len(display), 1) * 38),
         key=editor_key,
         data_return_mode="AS_INPUT",
-        update_on=[("cellValueChanged", 250)],
+        update_on=[("cellValueChanged", CATALOG_AUTOSAVE_DEBOUNCE_MS)],
         allow_unsafe_jscode=True,
         enable_enterprise_modules=False,
         theme="streamlit",
@@ -2080,11 +2099,9 @@ def _render_auction_catalog_editor(
         else:
             touch_workspace(workspace)
             _save_workspace(workspace, storage)
-            st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
-            st.rerun()
     st.caption(
-        "Salvataggio automatico: seleziona il fantaallenatore dal menu e inserisci i crediti da tastiera. "
-        "Le righe già assegnate vengono attenuate."
+        "Salvataggio automatico dopo una breve pausa: puoi aggiornare più righe senza "
+        "ricaricare la tabella. Le righe già assegnate vengono attenuate."
     )
     return selected_ids
 
