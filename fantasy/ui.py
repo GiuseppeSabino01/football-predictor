@@ -104,7 +104,7 @@ AUCTION_TIER_PALETTE = {
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.21 v24.9 · Tutte le rose")
+    st.caption("Fantacalcio · Build 2026.08.21 v24.10 · Rose avversari")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -841,85 +841,61 @@ def _render_auction_room(
                 )
                 st.rerun()
 
-        st.markdown("##### Rose di tutte le squadre")
-        all_roster_rows = [
-            {
-                "Fantasquadra": str(manager.get("name") or ""),
-                "Tipo": "La tua" if manager.get("is_user") else "Avversario",
-                "Ruolo": purchase.get("role"),
-                "Giocatore": purchase.get("name"),
-                "Club": purchase.get("team"),
-                "Prezzo": purchase.get("price"),
-            }
-            for manager in managers
-            for purchase in summaries[str(manager.get("id"))]["purchases"]
-        ]
-        if all_roster_rows:
-            st.dataframe(
-                pd.DataFrame(all_roster_rows),
-                hide_index=True,
-                use_container_width=True,
-                height=min(640, 36 * (len(all_roster_rows) + 1)),
-                column_config={
-                    "Prezzo": st.column_config.NumberColumn(format="%.0f CR"),
-                },
-            )
-        else:
-            st.info("Nessuna rosa contiene ancora giocatori.")
-
-        st.markdown("##### Dettaglio e correzioni")
-        selected_manager_id = st.selectbox(
-            "Visualizza squadra",
-            [str(manager.get("id")) for manager in managers],
-            format_func=lambda value: next(
-                str(manager.get("name")) for manager in managers if manager.get("id") == value
-            ),
-            key=f"auction_roster_manager_{league['id']}",
-        )
-        selected_summary = summaries[selected_manager_id]
-        purchases = selected_summary["purchases"]
-        budget_a, budget_b, budget_c = st.columns(3)
-        budget_a.metric("Spesi", f"{selected_summary['spent']:.0f}")
-        budget_b.metric("Crediti residui", f"{selected_summary['remaining_budget']:.0f}")
-        budget_c.metric("Giocatori", f"{selected_summary['roster_size']}/{selected_summary['target_size']}")
-        if purchases:
-            st.dataframe(
-                pd.DataFrame(
-                    [
-                        {
-                            "Ruolo": row.get("role"),
-                            "Giocatore": row.get("name"),
-                            "Squadra": row.get("team"),
-                            "Prezzo": row.get("price"),
-                            "Fascia": row.get("tier"),
-                        }
-                        for row in purchases
-                    ]
-                ),
-                hide_index=True,
-                use_container_width=True,
-            )
-            correction_column, remove_column = st.columns([2.2, 0.8])
-            correction_id = correction_column.selectbox(
-                "Correggi un'aggiudicazione",
-                [str(row.get("player_id")) for row in purchases],
+        st.markdown("##### Rose degli avversari")
+        opponent_managers = [manager for manager in managers if not manager.get("is_user")]
+        if opponent_managers:
+            selected_opponent_id = st.selectbox(
+                "Scegli avversario",
+                [str(manager.get("id")) for manager in opponent_managers],
                 format_func=lambda value: next(
-                    str(row.get("name")) for row in purchases
-                    if str(row.get("player_id")) == value
+                    str(manager.get("name"))
+                    for manager in opponent_managers
+                    if manager.get("id") == value
                 ),
-                key=f"auction_remove_select_{league['id']}_{selected_manager_id}",
+                key=f"auction_opponent_roster_{league['id']}",
             )
-            if remove_column.button(
-                "Rimuovi",
-                use_container_width=True,
-                key=f"auction_remove_{league['id']}_{selected_manager_id}",
-            ):
-                remove_auction_purchase(league, selected_manager_id, correction_id)
-                touch_workspace(workspace)
-                _save_workspace(workspace, storage)
-                st.rerun()
+            opponent_purchases = summaries[selected_opponent_id]["purchases"]
+            if opponent_purchases:
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "Giocatore": purchase.get("name"),
+                                "Crediti": purchase.get("price"),
+                            }
+                            for purchase in opponent_purchases
+                        ]
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "Crediti": st.column_config.NumberColumn(format="%.0f"),
+                    },
+                )
+                correction_column, remove_column = st.columns([2.2, 0.8])
+                correction_id = correction_column.selectbox(
+                    "Correggi un'aggiudicazione",
+                    [str(row.get("player_id")) for row in opponent_purchases],
+                    format_func=lambda value: next(
+                        str(row.get("name"))
+                        for row in opponent_purchases
+                        if str(row.get("player_id")) == value
+                    ),
+                    key=f"auction_remove_select_{league['id']}_{selected_opponent_id}",
+                )
+                if remove_column.button(
+                    "Rimuovi",
+                    use_container_width=True,
+                    key=f"auction_remove_{league['id']}_{selected_opponent_id}",
+                ):
+                    remove_auction_purchase(league, selected_opponent_id, correction_id)
+                    touch_workspace(workspace)
+                    _save_workspace(workspace, storage)
+                    st.rerun()
+            else:
+                st.info("Nessun giocatore registrato per questo avversario.")
         else:
-            st.info("Nessuna aggiudicazione registrata per questa squadra.")
+            st.info("Aggiungi almeno un avversario per visualizzarne la rosa.")
 
 
 def _render_opponents_dna(
