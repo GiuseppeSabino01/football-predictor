@@ -143,8 +143,6 @@ class PredictionService:
         except Exception as exc:
             errors.append(f"API-Football fixture non disponibili: {exc}")
 
-        # API-Football free mode salta le stagioni > 2024. Per la Serie A
-        # usiamo quindi un feed fixture gratuito come fallback, senza chiavi.
         if has_serie_a and not any(_is_serie_a_match(match) for match in matches):
             try:
                 matches.extend(self.serie_a_history.fixtures_for_date(target_date))
@@ -161,6 +159,15 @@ class PredictionService:
             matches = []
         if matches:
             return _unique_matches(matches)
+
+        # Fallback finale e indipendente da API/feed esterni.
+        # Serve a garantire la disponibilita delle fixture Serie A gia note
+        # anche se Streamlit/API-Football/football-data.org non restituiscono dati.
+        if has_serie_a:
+            seeded = _hardcoded_serie_a_fixtures(target_date)
+            if seeded:
+                errors.append("Serie A caricata dal calendario locale di fallback.")
+                return seeded
 
         if has_worldcup:
             try:
@@ -325,6 +332,49 @@ def _is_worldcup_match(match: Match) -> bool:
 def _is_serie_a_match(match: Match) -> bool:
     competition = match.competition.lower()
     return match.league_id == 135 or "serie a" in competition
+
+
+def _hardcoded_serie_a_fixtures(target_date: date) -> list[Match]:
+    schedule: dict[str, list[tuple[str, str, str]]] = {
+        "2026-08-22": [
+            ("18:30", "Inter", "Monza"),
+            ("18:30", "Udinese", "Como"),
+            ("20:45", "Genoa", "Napoli"),
+            ("20:45", "Parma", "Cagliari"),
+        ],
+        "2026-08-23": [
+            ("18:30", "Frosinone", "Juventus"),
+            ("18:30", "Venezia", "Lecce"),
+            ("20:45", "Atalanta", "Sassuolo"),
+            ("20:45", "Torino", "Milan"),
+        ],
+        "2026-08-24": [
+            ("18:30", "Bologna", "Lazio"),
+            ("20:45", "Roma", "Fiorentina"),
+        ],
+    }
+    rows = schedule.get(target_date.isoformat(), [])
+    matches: list[Match] = []
+    for index, (kickoff_time, home, away) in enumerate(rows):
+        kickoff = datetime.strptime(
+            f"{target_date.isoformat()} {kickoff_time}", "%Y-%m-%d %H:%M"
+        )
+        matches.append(
+            Match(
+                id=f"serie-a-local-{target_date.isoformat()}-{index}",
+                source="serie-a-local",
+                competition="Serie A 2026/27",
+                season=2026,
+                match_date=kickoff,
+                home_team=home,
+                away_team=away,
+                status="SCHEDULED",
+                stage="Regular Season",
+                league_id=135,
+                raw={"fallback": True},
+            )
+        )
+    return matches
 
 
 def _unique_matches(matches: list[Match]) -> list[Match]:
