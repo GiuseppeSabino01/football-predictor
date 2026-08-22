@@ -38,6 +38,7 @@ from services.worldcup_simulator import (
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
 SESSION_SCHEMA_VERSION = "fantasy-v1"
+PREDICTION_MODEL_VERSION = "serie-a-empirical-v3"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
 VIEW_OPTIONS = ["Home", "Road To New York", "Fantacalcio", "GiGi", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
@@ -56,7 +57,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.22 · Serie A · Scoreline statistici v2")
+    st.caption("Build 2026.08.22 · Serie A · Modello empirico v3")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
@@ -67,7 +68,12 @@ def require_login() -> bool:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def load_predictions(target_date: date, competition_keys: tuple[str, ...]) -> tuple[list[MatchPrediction], list[str]]:
+def load_predictions(
+    target_date: date,
+    competition_keys: tuple[str, ...],
+    model_version: str,
+) -> tuple[list[MatchPrediction], list[str]]:
+    del model_version  # Il valore fa parte della cache key e cambia a ogni modello.
     service = PredictionService(settings())
     signature = inspect.signature(service.predictions_for_date)
     if "competition_keys" in signature.parameters:
@@ -2413,7 +2419,11 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
         return
     with st.spinner("Carico partite, quote, news e pronostici..."):
         try:
-            predictions, errors = load_predictions(target_date, competition_keys)
+            predictions, errors = load_predictions(
+                target_date,
+                competition_keys,
+                PREDICTION_MODEL_VERSION,
+            )
         except TypeError as exc:
             st.error("Errore di compatibilita nel servizio predizioni. Riavvia l'app Streamlit dopo il deploy.")
             st.code(str(exc))

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS, Competition
+from config.competitions import (
+    DEFAULT_COMPETITIONS,
+    SUPPORTED_COMPETITIONS,
+    Competition,
+)
 from config.settings import Settings
 from data_sources.api_football import APIFootballClient
 from data_sources.football_data_org import FootballDataOrgClient
@@ -12,6 +16,7 @@ from data_sources.openligadb import OpenLigaDBClient
 from data_sources.rss_italian_news import ItalianRssNewsClient
 from data_sources.serie_a_history import SerieAHistoryClient
 from features.historical_stats import HistoricalStatsBuilder, frame_is_usable
+from features.team_strength import SERIE_A_STRENGTH_RATINGS
 from models.ensemble import EnsemblePredictor
 from nlp.gemini_client import GeminiClient
 from nlp.market_probability import LLMMarketProbabilityEstimator
@@ -198,15 +203,21 @@ class PredictionService:
         matches: list[Match],
         errors: list[str],
     ) -> dict[str, int]:
-        if not any("world cup" in match.competition.lower() or "wm 2026" in match.competition.lower() for match in matches):
-            return {}
+        ratings = (
+            dict(SERIE_A_STRENGTH_RATINGS)
+            if any(_is_serie_a_match(match) for match in matches)
+            else {}
+        )
+        if not any(_is_worldcup_match(match) for match in matches):
+            return ratings
         try:
-            ratings = self.national_elo.ratings_for_date(target_date)
+            national_ratings = self.national_elo.ratings_for_date(target_date)
         except Exception as exc:
             errors.append(f"Elo nazionali online non disponibili, uso seed locale: {exc}")
-            return {}
-        if not ratings:
+            return ratings
+        if not national_ratings:
             errors.append("Elo nazionali online vuoti, uso seed locale.")
+        ratings.update(national_ratings)
         return ratings
 
     def _load_historical_stats(

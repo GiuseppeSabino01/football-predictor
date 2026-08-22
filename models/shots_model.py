@@ -37,7 +37,7 @@ class ShotsModel:
 
     def _team_total_picks(self, stat_name: str, side: str, team: str, expected_count: float) -> list[MarketPick]:
         line = self._dynamic_half_line(expected_count)
-        over_probability = self._poisson_over_probability(expected_count, line)
+        over_probability = self._empirical_over_probability(expected_count, line)
         under_probability = 1 - over_probability
         note = (
             f"{team}: volume {stat_name} atteso {expected_count:.1f}; "
@@ -80,12 +80,10 @@ class ShotsModel:
         return max(0.5, min(35.5, line))
 
     @staticmethod
-    def _poisson_over_probability(expected_count: float, line: float) -> float:
-        threshold = int(math.floor(line)) + 1
-        return 1 - sum(
-            math.exp(-expected_count) * (expected_count ** count) / math.factorial(count)
-            for count in range(threshold)
-        )
+    def _empirical_over_probability(expected_count: float, line: float) -> float:
+        dispersion = max(0.75, math.sqrt(max(expected_count, 0.1)) * 0.85)
+        standardized_edge = (expected_count - line) / dispersion
+        return 1 / (1 + math.exp(-1.7 * standardized_edge))
 
     @staticmethod
     def _expected_corners(team_xg: float, opponent_xg: float) -> float:

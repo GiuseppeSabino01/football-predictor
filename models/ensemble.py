@@ -13,11 +13,11 @@ from features.market_features import (
 )
 from features.news_features import apply_news_adjustments
 from features.team_strength import blend_probabilities, rating_based_1x2
-from models.poisson import (
-    both_teams_to_score,
-    over_under_25,
-    representative_score_for_outcome,
-    score_matrix,
+from models.empirical_score import (
+    empirical_1x2,
+    empirical_both_teams_to_score,
+    empirical_over_under_25,
+    empirical_scoreline,
 )
 from models.shots_model import ShotsModel
 from schemas import MarketPick, Match, MatchPrediction, NewsSignal
@@ -64,9 +64,6 @@ class EnsemblePredictor:
             away_xg = (stats_xg[1] * 0.70) + (probability_xg[1] * 0.30)
         else:
             home_xg, away_xg = self._xg_from_probabilities(probs, match)
-        matrix = score_matrix(home_xg, away_xg)
-        matrix = self._apply_h2h_score_boost(matrix, historical_stats)
-
         has_odds = bool(implied_1x2_from_odds(odds_rows))
         confidence = confidence_level(
             has_market_odds=has_odds,
@@ -80,8 +77,21 @@ class EnsemblePredictor:
         picks = []
         picks.extend(self._one_x_two_picks(match, probs, odds_rows, confidence))
         picks.extend(self._double_chance_picks(probs, confidence))
-        picks.extend(self._probability_market_picks(over_under_25(matrix), "Over/Under 2.5", confidence))
-        picks.extend(self._probability_market_picks(both_teams_to_score(matrix), "Goal/No Goal", confidence))
+        over_rate, btts_rate = self._historical_goal_rates(historical_stats)
+        picks.extend(
+            self._probability_market_picks(
+                empirical_over_under_25(home_xg, away_xg, over_rate),
+                "Over/Under 2.5",
+                confidence,
+            )
+        )
+        picks.extend(
+            self._probability_market_picks(
+                empirical_both_teams_to_score(home_xg, away_xg, btts_rate),
+                "Goal/No Goal",
+                confidence,
+            )
+        )
         picks.extend(self._knockout_pick(match, probs, confidence))
         picks.extend(self.shots_model.team_shots(match.home_team, match.away_team, home_xg, away_xg))
         picks.extend(self.shots_model.player_props(lineups))
@@ -89,9 +99,13 @@ class EnsemblePredictor:
         warnings = []
         if not has_odds:
             if stats_probs:
-                warnings.append("Quote mercato non disponibili: modello basato su storico, Elo, Poisson e news.")
+                warnings.append(
+                    "Quote mercato non disponibili: modello basato su storico, forza squadra, xG e news."
+                )
             elif rating_probs:
-                warnings.append("Quote mercato non disponibili: modello basato su Elo nazionale, Poisson e news.")
+                warnings.append(
+                    "Quote mercato non disponibili: modello basato su forza squadra, xG e news."
+                )
             else:
                 warnings.append("Quote mercato e rating squadra non disponibili: modello basato su baseline.")
         if any("tiri" in p.market.lower() or "angoli" in p.market.lower() for p in picks):
@@ -101,7 +115,7 @@ class EnsemblePredictor:
 
         top = max((pick for pick in picks if pick.market == "1X2"), key=lambda p: p.probability)
         top_outcome = max(probs, key=probs.get)
-        predicted_score = representative_score_for_outcome(matrix, top_outcome)
+        predicted_score = empirical_scoreline(home_xg, away_xg, top_outcome, probs)
         summary = (
             f"Pick principale: {top.selection} al {top.probability:.1%}. "
             f"Scenario risultato stimato: {predicted_score} "
@@ -193,26 +207,24 @@ class EnsemblePredictor:
 
     @staticmethod
     def _probabilities_from_xg(xg: tuple[float, float]) -> dict[str, float]:
-        matrix = score_matrix(xg[0], xg[1])
-        home = sum(prob for (home_goals, away_goals), prob in matrix.items() if home_goals > away_goals)
-        draw = sum(prob for (home_goals, away_goals), prob in matrix.items() if home_goals == away_goals)
-        away = sum(prob for (home_goals, away_goals), prob in matrix.items() if home_goals < away_goals)
-        return {"home": home, "draw": draw, "away": away}
+        return empirical_1x2(xg[0], xg[1])
 
     @staticmethod
-    def _apply_h2h_score_boost(
-        matrix: dict[tuple[int, int], float],
+    def _historical_goal_rates(
         stats: MatchHistoricalStats | None,
-    ) -> dict[tuple[int, int], float]:
-        if not stats or stats.h2h.matches < 3 or not stats.h2h.most_common_score:
-            return matrix
-        score, frequency = stats.h2h.most_common_score
-        if frequency < 0.35:
-            return matrix
-        boosted = dict(matrix)
-        boosted[score] = boosted.get(score, 0.0) * (1 + min(2.2, frequency * 3.0))
-        total = sum(boosted.values())
-        return {key: value / total for key, value in boosted.items()}
+    ) -> tuple[float | None, float | None]:
+        if not stats or not stats.has_meaningful_data:
+            return None, None
+        over_rate = (
+            stats.home_recent.over25_rate + stats.away_recent.over25_rate
+        ) / 2
+        btts_rate = (
+            stats.home_recent.btts_rate + stats.away_recent.btts_rate
+        ) / 2
+        if stats.h2h.matches >= 3:
+            over_rate = over_rate * 0.75 + (stats.h2h.over25_rate or 0.0) * 0.25
+            btts_rate = btts_rate * 0.75 + (stats.h2h.btts_rate or 0.0) * 0.25
+        return over_rate, btts_rate
 
     @staticmethod
     def _blend_many(weighted_probabilities: list[tuple[dict[str, float], float]]) -> dict[str, float]:

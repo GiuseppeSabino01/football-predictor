@@ -5,7 +5,6 @@ import unicodedata
 
 from features.market_features import normalize_probabilities
 
-
 TEAM_NAME_ALIASES = {
     "algeria": "Algeria",
     "algerien": "Algeria",
@@ -170,6 +169,33 @@ FALLBACK_NATIONAL_ELO = {
     "Uruguay": 1892,
     "Uzbekistan": 1585,
     "Wales": 1628,
+}
+
+
+# Rating di forza locale ricavato da punti, differenza reti e forma delle
+# ultime stagioni disponibili. Garantisce previsioni differenziate anche se
+# le fonti esterne dello storico Serie A sono temporaneamente irraggiungibili.
+SERIE_A_STRENGTH_RATINGS = {
+    "Atalanta": 1660,
+    "Bologna": 1510,
+    "Cagliari": 1430,
+    "Como": 1760,
+    "Fiorentina": 1540,
+    "Frosinone": 1270,
+    "Genoa": 1490,
+    "Inter": 1880,
+    "Juventus": 1720,
+    "Lazio": 1510,
+    "Lecce": 1380,
+    "Milan": 1560,
+    "Monza": 1080,
+    "Napoli": 1680,
+    "Parma": 1440,
+    "Roma": 1770,
+    "Sassuolo": 1460,
+    "Torino": 1370,
+    "Udinese": 1560,
+    "Venezia": 1320,
 }
 
 
