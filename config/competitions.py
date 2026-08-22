@@ -15,7 +15,7 @@ class Competition:
 
 SUPPORTED_COMPETITIONS: dict[str, Competition] = {
     "worldcup": Competition("worldcup", "FIFA World Cup 2026", 1, 2026, "WC", True),
-    "serie_a": Competition("serie_a", "Serie A", 135, 2025, "SA"),
+    "serie_a": Competition("serie_a", "Serie A 2026/27", 135, 2026, "SA"),
     "premier": Competition("premier", "Premier League", 39, 2025, "PL"),
     "liga": Competition("liga", "La Liga", 140, 2025, "PD"),
     "bundesliga": Competition("bundesliga", "Bundesliga", 78, 2025, "BL1"),
@@ -40,4 +40,3 @@ DEFAULT_COMPETITIONS = [
 
 
 WORLD_CUP_KEYS = ["worldcup"]
-
