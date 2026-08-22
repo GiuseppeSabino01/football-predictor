@@ -22,6 +22,11 @@ import streamlit.components.v1 as components
 import fantasy.service as fantasy_service
 import fantasy.storage as fantasy_storage
 import fantasy.ui as fantasy_ui
+import features.team_strength as prediction_team_strength
+import models.empirical_score as prediction_empirical_score
+import models.ensemble as prediction_ensemble
+import models.shots_model as prediction_shots_model
+import services.predictor as prediction_service
 from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
 from config.settings import load_settings
 from features.market_features import fair_odd, recommendation, value_score
@@ -29,7 +34,6 @@ from features.team_strength import canonical_team_name
 from nlp.gemini_client import GeminiClient
 from nlp.jarvis_assistant import JarvisAssistant
 from schemas import MarketPick, MatchPrediction
-from services.predictor import PredictionService
 from services.worldcup_simulator import (
     KNOCKOUT_SOURCE_URL,
     SCHEDULE_SOURCE_URL,
@@ -38,7 +42,7 @@ from services.worldcup_simulator import (
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
 SESSION_SCHEMA_VERSION = "fantasy-v1"
-PREDICTION_MODEL_VERSION = "serie-a-empirical-v3"
+PREDICTION_MODEL_VERSION = "serie-a-empirical-v4-runtime-reload"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
 VIEW_OPTIONS = ["Home", "Road To New York", "Fantacalcio", "GiGi", "Predict manuale", "Config"]
 WORLD_CUP_START = date(2026, 6, 11)
@@ -46,6 +50,16 @@ WORLD_CUP_START = date(2026, 6, 11)
 
 def settings():
     return load_settings()
+
+
+def fresh_prediction_service():
+    """Ricarica il motore dopo gli aggiornamenti Streamlit senza riusare moduli obsoleti."""
+    importlib.reload(prediction_team_strength)
+    importlib.reload(prediction_empirical_score)
+    importlib.reload(prediction_shots_model)
+    importlib.reload(prediction_ensemble)
+    importlib.reload(prediction_service)
+    return prediction_service.PredictionService(settings())
 
 
 def require_login() -> bool:
@@ -57,7 +71,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.22 · Serie A · Modello empirico v3")
+    st.caption("Build 2026.08.22 · Serie A · Modello empirico v4")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
@@ -74,7 +88,7 @@ def load_predictions(
     model_version: str,
 ) -> tuple[list[MatchPrediction], list[str]]:
     del model_version  # Il valore fa parte della cache key e cambia a ogni modello.
-    service = PredictionService(settings())
+    service = fresh_prediction_service()
     signature = inspect.signature(service.predictions_for_date)
     if "competition_keys" in signature.parameters:
         return service.predictions_for_date(target_date, competition_keys=competition_keys)
@@ -1438,7 +1452,7 @@ def render_manual_prediction() -> None:
     away = right.text_input("Squadra trasferta", value="Brazil")
     competition = st.text_input("Competizione", value="Manuale")
     if st.button("Calcola pronostico"):
-        st.session_state["manual_prediction"] = PredictionService(settings()).predict_single(home, away, competition)
+        st.session_state["manual_prediction"] = fresh_prediction_service().predict_single(home, away, competition)
     if "manual_prediction" in st.session_state:
         render_prediction_card(st.session_state["manual_prediction"])
 
@@ -2723,7 +2737,7 @@ def render_gemini_probability_button(
     button_label = "Ricalcola probabilita" if has_model_probability else "Calcola probabilita"
     col_button, col_hint = st.columns([1.1, 3])
     if col_button.button(button_label, key=f"gemini_{prediction_key}"):
-        service = PredictionService(settings())
+        service = fresh_prediction_service()
         prediction_to_enrich = deepcopy(base_prediction)
         with st.spinner(f"Calcolo probabilita per {prediction_to_enrich.match.label}..."):
             enriched_prediction = service.enrich_prediction_with_gemini(prediction_to_enrich)
@@ -2757,7 +2771,7 @@ def load_saved_gemini_prediction(base_prediction: MatchPrediction, prediction_ke
     if cached_prediction:
         return cached_prediction
 
-    service = PredictionService(settings())
+    service = fresh_prediction_service()
     saved_prediction = service.load_cached_gemini_prediction(prediction_key, base_prediction)
     if saved_prediction:
         st.session_state.setdefault("llm_predictions", {})[prediction_key] = saved_prediction
