@@ -9,7 +9,6 @@ import requests
 from config.settings import Settings
 from schemas import Match
 
-
 # Calendario ufficiale noto della Serie A 2026/27. Il seed rende GiGi
 # indipendente dai limiti di API-Football e dai feed CSV non aggiornati.
 # Le giornate successive possono continuare ad arrivare dalle API configurate.
@@ -76,7 +75,10 @@ class SerieAHistoryClient:
 
     def load(self, target_date: date) -> pd.DataFrame:
         frames: list[pd.DataFrame] = []
-        for season in ("2526", "2627"):
+        # Manteniamo piu stagioni: le neopromosse possono non avere dati
+        # nell'ultima Serie A, ma le loro annate precedenti restano preziose
+        # per evitare una baseline identica per tutte le partite.
+        for season in ("2324", "2425", "2526", "2627"):
             frame = self._load_season(season)
             if not frame.empty:
                 frames.append(frame)

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import date, datetime
 import hashlib
 import importlib
 import inspect
 import json
+import sys
+from copy import deepcopy
+from datetime import date, datetime
 from html import escape
 from pathlib import Path
-import sys
 from typing import Any
-
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -20,19 +19,22 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
-from config.settings import load_settings
 import fantasy.service as fantasy_service
 import fantasy.storage as fantasy_storage
 import fantasy.ui as fantasy_ui
+from config.competitions import DEFAULT_COMPETITIONS, SUPPORTED_COMPETITIONS
+from config.settings import load_settings
 from features.market_features import fair_odd, recommendation, value_score
 from features.team_strength import canonical_team_name
 from nlp.gemini_client import GeminiClient
 from nlp.jarvis_assistant import JarvisAssistant
+from schemas import MarketPick, MatchPrediction
 from services.predictor import PredictionService
-from services.worldcup_simulator import KNOCKOUT_SOURCE_URL, SCHEDULE_SOURCE_URL, WorldCupSimulator
-from schemas import MatchPrediction, MarketPick
-
+from services.worldcup_simulator import (
+    KNOCKOUT_SOURCE_URL,
+    SCHEDULE_SOURCE_URL,
+    WorldCupSimulator,
+)
 
 st.set_page_config(page_title="Football Betting Predictor", layout="wide")
 SESSION_SCHEMA_VERSION = "fantasy-v1"
@@ -54,7 +56,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.20 · Fantasy v24.4 · Bonus propensity")
+    st.caption("Build 2026.08.22 · Serie A · Scoreline statistici v2")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:

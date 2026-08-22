@@ -13,7 +13,12 @@ from features.market_features import (
 )
 from features.news_features import apply_news_adjustments
 from features.team_strength import blend_probabilities, rating_based_1x2
-from models.poisson import both_teams_to_score, exact_score_for_outcome, over_under_25, score_matrix
+from models.poisson import (
+    both_teams_to_score,
+    over_under_25,
+    representative_score_for_outcome,
+    score_matrix,
+)
 from models.shots_model import ShotsModel
 from schemas import MarketPick, Match, MatchPrediction, NewsSignal
 
@@ -96,10 +101,11 @@ class EnsemblePredictor:
 
         top = max((pick for pick in picks if pick.market == "1X2"), key=lambda p: p.probability)
         top_outcome = max(probs, key=probs.get)
-        predicted_score = exact_score_for_outcome(matrix, top_outcome)
+        predicted_score = representative_score_for_outcome(matrix, top_outcome)
         summary = (
             f"Pick principale: {top.selection} al {top.probability:.1%}. "
-            f"Risultato esatto stimato: {predicted_score}."
+            f"Scenario risultato stimato: {predicted_score} "
+            f"(xG {home_xg:.2f}-{away_xg:.2f})."
         )
         return MatchPrediction(
             match=match,
@@ -145,8 +151,11 @@ class EnsemblePredictor:
         home_level = stats.home_vs_away_level
         away_level = stats.away_vs_home_level
         h2h = stats.h2h
-        recent_home_xg = (home.avg_goals_for * 0.45) + (away.avg_goals_against * 0.35)
-        recent_away_xg = (away.avg_goals_for * 0.45) + (home.avg_goals_against * 0.35)
+        # Attacco e difesa devono sommare a uno. I precedenti pesi (0.45 +
+        # 0.35) comprimevano artificialmente tutti gli xG del 20%, facendo
+        # convergere quasi ogni risultato verso 1-0 o 0-1.
+        recent_home_xg = (home.avg_goals_for * 0.55) + (away.avg_goals_against * 0.45)
+        recent_away_xg = (away.avg_goals_for * 0.55) + (home.avg_goals_against * 0.45)
         home_xg = recent_home_xg
         away_xg = recent_away_xg
 
