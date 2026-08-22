@@ -10,6 +10,7 @@ from data_sources.international_results import InternationalResultsClient
 from data_sources.national_elo import NationalEloClient
 from data_sources.openligadb import OpenLigaDBClient
 from data_sources.rss_italian_news import ItalianRssNewsClient
+from data_sources.serie_a_history import SerieAHistoryClient
 from features.historical_stats import HistoricalStatsBuilder, frame_is_usable
 from models.ensemble import EnsemblePredictor
 from nlp.gemini_client import GeminiClient
@@ -27,6 +28,7 @@ class PredictionService:
         self.api_football = APIFootballClient(settings)
         self.football_data_org = FootballDataOrgClient(settings)
         self.international_results = InternationalResultsClient(settings)
+        self.serie_a_history = SerieAHistoryClient(settings)
         self.national_elo = NationalEloClient(settings)
         self.openligadb = OpenLigaDBClient(settings)
         self.news_client = ItalianRssNewsClient(settings)
@@ -54,9 +56,9 @@ class PredictionService:
         teams = sorted({team for match in matches for team in (match.home_team, match.away_team)})
         articles = self._load_news(teams, errors)
         team_ratings = self._load_team_ratings(target_date, matches, errors)
-        stats_builder = self._load_historical_stats(target_date, matches, errors)
+        stats_builders = self._load_historical_stats(target_date, matches, errors)
         predictions = [
-            self._predict_match(match, [], articles, errors, team_ratings, stats_builder)
+            self._predict_match(match, [], articles, errors, team_ratings, stats_builders)
             for match in matches
         ]
         return predictions, errors
@@ -127,6 +129,8 @@ class PredictionService:
     ) -> list[Match]:
         matches: list[Match] = []
         has_worldcup = any(competition.key == "worldcup" for competition in competitions)
+        has_serie_a = any(competition.key == "serie_a" for competition in competitions)
+
         if has_worldcup:
             try:
                 matches.extend(self.openligadb.worldcup_matches_for_date(target_date))
@@ -139,6 +143,14 @@ class PredictionService:
         except Exception as exc:
             errors.append(f"API-Football fixture non disponibili: {exc}")
 
+        # API-Football free mode salta le stagioni > 2024. Per la Serie A
+        # usiamo quindi un feed fixture gratuito come fallback, senza chiavi.
+        if has_serie_a and not any(_is_serie_a_match(match) for match in matches):
+            try:
+                matches.extend(self.serie_a_history.fixtures_for_date(target_date))
+            except Exception as exc:
+                errors.append(f"Fixture Serie A gratuite non disponibili: {exc}")
+
         if matches:
             return _unique_matches(matches)
 
@@ -146,7 +158,7 @@ class PredictionService:
             matches = self.football_data_org.matches_for_date(target_date, competitions)
         except Exception as exc:
             errors.append(f"football-data.org fixture non disponibili: {exc}")
-            return []
+            matches = []
         if matches:
             return _unique_matches(matches)
 
@@ -195,18 +207,30 @@ class PredictionService:
         target_date: date,
         matches: list[Match],
         errors: list[str],
-    ) -> HistoricalStatsBuilder | None:
-        if not any("world cup" in match.competition.lower() or "wm 2026" in match.competition.lower() for match in matches):
-            return None
-        try:
-            frame = self.international_results.load(target_date)
-        except Exception as exc:
-            errors.append(f"Storico nazionali non disponibile: {exc}")
-            return None
-        if not frame_is_usable(frame):
-            errors.append("Storico nazionali vuoto o non utilizzabile.")
-            return None
-        return HistoricalStatsBuilder(frame)
+    ) -> dict[str, HistoricalStatsBuilder]:
+        builders: dict[str, HistoricalStatsBuilder] = {}
+
+        if any(_is_worldcup_match(match) for match in matches):
+            try:
+                frame = self.international_results.load(target_date)
+                if frame_is_usable(frame):
+                    builders["worldcup"] = HistoricalStatsBuilder(frame)
+                else:
+                    errors.append("Storico nazionali vuoto o non utilizzabile.")
+            except Exception as exc:
+                errors.append(f"Storico nazionali non disponibile: {exc}")
+
+        if any(_is_serie_a_match(match) for match in matches):
+            try:
+                frame = self.serie_a_history.load(target_date)
+                if frame_is_usable(frame):
+                    builders["serie_a"] = HistoricalStatsBuilder(frame)
+                else:
+                    errors.append("Storico Serie A vuoto o non utilizzabile.")
+            except Exception as exc:
+                errors.append(f"Storico Serie A non disponibile: {exc}")
+
+        return builders
 
     def _predict_match(
         self,
@@ -215,7 +239,7 @@ class PredictionService:
         articles: list[NewsArticle],
         errors: list[str],
         team_ratings: dict[str, int] | None = None,
-        stats_builder: HistoricalStatsBuilder | None = None,
+        stats_builders: dict[str, HistoricalStatsBuilder] | None = None,
     ) -> MatchPrediction:
         relevant_signals = [
             signal
@@ -235,6 +259,14 @@ class PredictionService:
                 lineups = self.api_football.lineups_for_fixture(match.id)
             except Exception:
                 lineups = []
+
+        stats_builder = None
+        if stats_builders:
+            if _is_worldcup_match(match):
+                stats_builder = stats_builders.get("worldcup")
+            elif _is_serie_a_match(match):
+                stats_builder = stats_builders.get("serie_a")
+
         historical_stats = (
             stats_builder.build(match.home_team, match.away_team, team_ratings=team_ratings)
             if stats_builder
@@ -285,8 +317,19 @@ class PredictionService:
         return [SUPPORTED_COMPETITIONS[key] for key in keys if key in SUPPORTED_COMPETITIONS]
 
 
+def _is_worldcup_match(match: Match) -> bool:
+    competition = match.competition.lower()
+    return "world cup" in competition or "wm 2026" in competition
+
+
+def _is_serie_a_match(match: Match) -> bool:
+    competition = match.competition.lower()
+    return match.league_id == 135 or "serie a" in competition
+
+
 def _unique_matches(matches: list[Match]) -> list[Match]:
     unique: dict[str, Match] = {}
     for match in matches:
-        unique[match.id] = match
+        key = f"{match.match_date.date()}|{match.home_team.lower()}|{match.away_team.lower()}"
+        unique[key] = match
     return list(unique.values())
