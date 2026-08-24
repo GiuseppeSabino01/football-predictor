@@ -19,6 +19,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+import fantasy.export as fantasy_export
 import fantasy.service as fantasy_service
 import fantasy.storage as fantasy_storage
 import fantasy.ui as fantasy_ui
@@ -62,6 +63,15 @@ def fresh_prediction_service():
     return prediction_service.PredictionService(settings())
 
 
+def fresh_fantasy_ui():
+    """Ricarica i moduli Fantacalcio nell'ordine delle loro dipendenze."""
+    importlib.reload(fantasy_service)
+    importlib.reload(fantasy_storage)
+    importlib.reload(fantasy_export)
+    importlib.reload(fantasy_ui)
+    return fantasy_ui
+
+
 def require_login() -> bool:
     app_password = settings().app_password
     if not app_password:
@@ -71,7 +81,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.24 · Serie A v4 · Fantacalcio v25")
+    st.caption("Build 2026.08.24 · Serie A v4 · Fantacalcio v25.1")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
@@ -117,10 +127,7 @@ def main() -> None:
     elif page == "Road To New York":
         render_road_to_new_york()
     elif page == "Fantacalcio":
-        importlib.reload(fantasy_service)
-        importlib.reload(fantasy_storage)
-        importlib.reload(fantasy_ui)
-        fantasy_ui.render_fantasy_page(settings())
+        fresh_fantasy_ui().render_fantasy_page(settings())
     elif page == "GiGi":
         render_jarvis_page()
     elif page == "Predict manuale":
