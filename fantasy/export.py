@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import math
+import unicodedata
+from copy import deepcopy
 from io import BytesIO
 from typing import Any
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from fantasy.catalog import catalog_dataframe
 from fantasy.service import (
     GAME_MODE_AUCTION,
+    GAME_MODE_LIST,
+    auction_managers,
     auction_player_assignment,
     auction_player_tier,
+    create_auction_tier,
+    update_auction_assignments,
+    update_list_assignments,
 )
 
 TIER_FILLS = {
@@ -23,6 +31,17 @@ TIER_FILLS = {
     "blue": "CFE2F3",
     "purple": "D9D2E9",
     "gray": "D9D9D9",
+}
+MAX_IMPORT_BYTES = 20 * 1024 * 1024
+MAX_IMPORT_ROWS = 10_000
+RESTORE_HEADERS = {
+    "Giocatore",
+    "Squadra",
+    "Ruolo",
+    "Fascia personale",
+    "In rosa",
+    "Fantaallenatore",
+    "Crediti",
 }
 
 
@@ -37,6 +56,7 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
     extra_headers = ["Propensione bonus", "Potenziale", "Profilo"]
     headers = [
         "Giocatore",
+        "ID giocatore",
         "Squadra",
         "Ruolo",
         "Fascia personale",
@@ -60,7 +80,7 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
         for tier in league.get("auction_tiers", [])
     }
     tier_counts = {name: 0 for name in tier_color_by_name}
-    for player, (_, base_row) in zip(catalog, base_frame.iterrows()):
+    for player, (_, base_row) in zip(catalog, base_frame.iterrows(), strict=True):
         player_id = str(player.get("id") or "")
         personal_tier = auction_player_tier(league, player_id)
         personal_tier_name = (
@@ -92,6 +112,7 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
 
         values = {
             "Giocatore": base_row.get("Giocatore"),
+            "ID giocatore": player_id,
             "Squadra": base_row.get("Squadra"),
             "Ruolo": base_row.get("Ruolo"),
             "Fascia personale": personal_tier_name,
@@ -112,6 +133,8 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
                 cell.fill = PatternFill("solid", fgColor=fill_color)
 
     _style_listone_sheet(sheet)
+    id_column = headers.index("ID giocatore") + 1
+    sheet.column_dimensions[get_column_letter(id_column)].hidden = True
     if sheet.max_row > 1:
         table = Table(displayName="ListoneFantacalcio", ref=sheet.dimensions)
         table.tableStyleInfo = TableStyleInfo(
@@ -137,6 +160,321 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
+
+
+def restore_listone_excel(
+    raw: bytes,
+    catalog: list[dict[str, Any]],
+    league: dict[str, Any],
+) -> dict[str, Any]:
+    """Restore tiers and ownership from an Excel previously exported by the app."""
+    if not raw:
+        raise ValueError("Il file Excel e vuoto.")
+    if len(raw) > MAX_IMPORT_BYTES:
+        raise ValueError("Il file Excel supera il limite di 20 MB.")
+    try:
+        workbook = load_workbook(BytesIO(raw), data_only=True, read_only=True)
+    except Exception as exc:
+        raise ValueError(
+            "Il file non e un Excel valido o risulta danneggiato."
+        ) from exc
+    if "Listone" not in workbook.sheetnames:
+        raise ValueError(
+            "Foglio 'Listone' non trovato: carica un Excel esportato dall'app."
+        )
+
+    sheet = workbook["Listone"]
+    raw_headers = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), ())
+    headers = [_cell_text(value) for value in raw_headers]
+    missing_headers = sorted(RESTORE_HEADERS.difference(headers))
+    if missing_headers:
+        raise ValueError(
+            "Colonne necessarie mancanti: " + ", ".join(missing_headers) + "."
+        )
+
+    rows: list[dict[str, Any]] = []
+    for position, values in enumerate(
+        sheet.iter_rows(min_row=2, values_only=True), start=2
+    ):
+        if position > MAX_IMPORT_ROWS + 1:
+            raise ValueError(
+                "Il file contiene troppe righe per essere un listone valido."
+            )
+        row = dict(zip(headers, values, strict=False))
+        if _cell_text(row.get("Giocatore")):
+            rows.append(row)
+    if not rows:
+        raise ValueError("Il foglio 'Listone' non contiene giocatori.")
+
+    matched_rows, unmatched = _match_restore_rows(rows, catalog)
+    if not matched_rows:
+        raise ValueError("Nessun giocatore del file corrisponde al listone attuale.")
+
+    draft = deepcopy(league)
+    tier_definitions = _tier_definitions(workbook, matched_rows, draft)
+    draft["auction_tiers"] = []
+    draft["auction_player_tiers"] = {}
+    draft["auction_tiers_initialized"] = True
+    tier_ids: dict[str, str] = {}
+    for tier_name, color in tier_definitions:
+        tier = create_auction_tier(draft, tier_name, color)
+        tier_ids[_restore_key(tier_name)] = str(tier["id"])
+
+    if draft.get("game_mode") == GAME_MODE_AUCTION:
+        restored_purchases = _restore_auction_rows(draft, matched_rows, tier_ids)
+    elif draft.get("game_mode") == GAME_MODE_LIST:
+        restored_purchases = _restore_list_rows(draft, matched_rows, tier_ids)
+    else:
+        raise ValueError("Modalita del fantacalcio non riconosciuta.")
+
+    league.clear()
+    league.update(draft)
+    return {
+        "matched": len(matched_rows),
+        "purchases": restored_purchases,
+        "tier_assignments": sum(
+            1 for row in matched_rows if _cell_text(row.get("Fascia personale"))
+        ),
+        "unmatched": unmatched,
+    }
+
+
+def _match_restore_rows(
+    rows: list[dict[str, Any]], catalog: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], list[str]]:
+    by_id = {str(player.get("id") or ""): player for player in catalog}
+    by_full_key: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    by_name_role: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for player in catalog:
+        name = _restore_key(player.get("name"))
+        team = _restore_key(player.get("team"))
+        role = _restore_key(player.get("role"))
+        by_full_key.setdefault((name, team, role), []).append(player)
+        by_name_role.setdefault((name, role), []).append(player)
+
+    matched: list[dict[str, Any]] = []
+    unmatched: list[str] = []
+    used_player_ids: set[str] = set()
+    for row in rows:
+        player_id = _cell_text(row.get("ID giocatore"))
+        player = by_id.get(player_id) if player_id else None
+        if player is None:
+            full_candidates = by_full_key.get(
+                (
+                    _restore_key(row.get("Giocatore")),
+                    _restore_key(row.get("Squadra")),
+                    _restore_key(row.get("Ruolo")),
+                ),
+                [],
+            )
+            if len(full_candidates) == 1:
+                player = full_candidates[0]
+            else:
+                fallback_candidates = by_name_role.get(
+                    (
+                        _restore_key(row.get("Giocatore")),
+                        _restore_key(row.get("Ruolo")),
+                    ),
+                    [],
+                )
+                if len(fallback_candidates) == 1:
+                    player = fallback_candidates[0]
+        if player is None:
+            unmatched.append(_cell_text(row.get("Giocatore")))
+            continue
+        clean_id = str(player.get("id") or "")
+        if clean_id in used_player_ids:
+            player_name = _cell_text(row.get("Giocatore"))
+            raise ValueError(f"Il giocatore {player_name} compare piu volte.")
+        used_player_ids.add(clean_id)
+        matched.append({**row, "_player": player})
+    return matched, unmatched
+
+
+def _tier_definitions(
+    workbook: Any,
+    matched_rows: list[dict[str, Any]],
+    league: dict[str, Any],
+) -> list[tuple[str, str]]:
+    definitions: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    if "Fasce personali" in workbook.sheetnames:
+        sheet = workbook["Fasce personali"]
+        for values in sheet.iter_rows(min_row=2, values_only=True):
+            name = _cell_text(values[0] if values else None)
+            if not name or _restore_key(name) in seen:
+                continue
+            color = _cell_text(values[1] if len(values) > 1 else "gray").lower()
+            definitions.append((name, color if color in TIER_FILLS else "gray"))
+            seen.add(_restore_key(name))
+    if not definitions:
+        for tier in league.get("auction_tiers", []):
+            name = _cell_text(tier.get("name"))
+            if not name or _restore_key(name) in seen:
+                continue
+            color = _cell_text(tier.get("color")).lower()
+            definitions.append((name, color if color in TIER_FILLS else "gray"))
+            seen.add(_restore_key(name))
+    for row in matched_rows:
+        name = _cell_text(row.get("Fascia personale"))
+        if name and _restore_key(name) not in seen:
+            definitions.append((name, "gray"))
+            seen.add(_restore_key(name))
+    return definitions
+
+
+def _restore_auction_rows(
+    league: dict[str, Any],
+    rows: list[dict[str, Any]],
+    tier_ids: dict[str, str],
+) -> int:
+    managers = auction_managers(league)
+    if not managers:
+        raise ValueError("Aggiungi almeno due partecipanti prima di importare l'asta.")
+    league["purchases"] = []
+    for manager in managers:
+        manager["purchases"] = []
+    league["auction_sale_events"] = []
+    league["auction_history"] = []
+
+    manager_flags: dict[str, bool] = {}
+    manager_labels: dict[str, str] = {}
+    for row in rows:
+        name = _cell_text(row.get("Fantaallenatore"))
+        if not name:
+            if _parse_credits(row.get("Crediti")) is not None:
+                player_name = _cell_text(row.get("Giocatore"))
+                raise ValueError(
+                    f"Crediti presenti senza fantaallenatore per {player_name}."
+                )
+            continue
+        key = _restore_key(name)
+        is_user = _is_yes(row.get("In rosa"))
+        if key in manager_flags and manager_flags[key] != is_user:
+            raise ValueError(f"Il fantaallenatore {name} ha assegnazioni incoerenti.")
+        manager_flags[key] = is_user
+        manager_labels[key] = name
+
+    user_keys = [key for key, is_user in manager_flags.items() if is_user]
+    if len(user_keys) > 1:
+        raise ValueError("Nel file risultano piu nomi associati alla tua squadra.")
+    user_manager = next(manager for manager in managers if manager.get("is_user"))
+    manager_ids: dict[str, str] = {}
+    if user_keys:
+        user_key = user_keys[0]
+        user_manager["name"] = manager_labels[user_key]
+        manager_ids[user_key] = str(user_manager["id"])
+
+    available_opponents = [
+        manager for manager in managers if not manager.get("is_user")
+    ]
+    used_opponent_ids: set[str] = set()
+    opponent_keys = [key for key, is_user in manager_flags.items() if not is_user]
+    for key in opponent_keys:
+        matching = next(
+            (
+                manager
+                for manager in available_opponents
+                if str(manager.get("id")) not in used_opponent_ids
+                and _restore_key(manager.get("name")) == key
+            ),
+            None,
+        )
+        if matching is None:
+            matching = next(
+                (
+                    manager
+                    for manager in available_opponents
+                    if str(manager.get("id")) not in used_opponent_ids
+                ),
+                None,
+            )
+        if matching is None:
+            raise ValueError(
+                "Il file contiene piu avversari della lega selezionata. "
+                "Aumenta prima il numero di partecipanti nelle impostazioni."
+            )
+        matching["name"] = manager_labels[key]
+        manager_ids[key] = str(matching["id"])
+        used_opponent_ids.add(str(matching["id"]))
+
+    changes: list[dict[str, Any]] = []
+    purchases = 0
+    for row in rows:
+        manager_name = _cell_text(row.get("Fantaallenatore"))
+        tier_name = _cell_text(row.get("Fascia personale"))
+        change: dict[str, Any] = {"player": row["_player"]}
+        if manager_name:
+            credits = _parse_credits(row.get("Crediti"))
+            if credits is None or credits <= 0:
+                raise ValueError(
+                    f"Crediti non validi per {_cell_text(row.get('Giocatore'))}."
+                )
+            change.update(
+                {
+                    "manager_id": manager_ids[_restore_key(manager_name)],
+                    "price": credits,
+                    "update_assignment": True,
+                }
+            )
+            purchases += 1
+        else:
+            change["update_assignment"] = False
+        if tier_name:
+            change["tier_id"] = tier_ids[_restore_key(tier_name)]
+        if manager_name or tier_name:
+            changes.append(change)
+    update_auction_assignments(league, changes)
+    return purchases
+
+
+def _restore_list_rows(
+    league: dict[str, Any],
+    rows: list[dict[str, Any]],
+    tier_ids: dict[str, str],
+) -> int:
+    league["purchases"] = []
+    changes = []
+    purchases = 0
+    for row in rows:
+        in_roster = _is_yes(row.get("In rosa"))
+        tier_name = _cell_text(row.get("Fascia personale"))
+        change: dict[str, Any] = {
+            "player": row["_player"],
+            "in_roster": in_roster,
+        }
+        if tier_name:
+            change["tier_id"] = tier_ids[_restore_key(tier_name)]
+        changes.append(change)
+        purchases += int(in_roster)
+    update_list_assignments(league, changes)
+    return purchases
+
+
+def _parse_credits(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Valore crediti non valido: {value}.") from exc
+    if not math.isfinite(result):
+        raise ValueError("Il valore dei crediti deve essere un numero finito.")
+    return result
+
+
+def _is_yes(value: Any) -> bool:
+    return _restore_key(value) in {"si", "yes", "true", "1", "x"}
+
+
+def _cell_text(value: Any) -> str:
+    return str(value).strip() if value is not None else ""
+
+
+def _restore_key(value: Any) -> str:
+    text = unicodedata.normalize("NFKD", _cell_text(value))
+    ascii_text = text.encode("ascii", "ignore").decode("ascii")
+    return " ".join(ascii_text.casefold().split())
 
 
 def _style_listone_sheet(sheet: Any) -> None:

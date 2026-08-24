@@ -38,7 +38,7 @@ from fantasy.decision_center import (
     season_next_matchday,
     simulate_purchase,
 )
-from fantasy.export import build_listone_excel
+from fantasy.export import build_listone_excel, restore_listone_excel
 from fantasy.official_catalog import (
     OFFICIAL_CATALOG_URL,
     catalog_fingerprint,
@@ -113,7 +113,7 @@ def _cached_listone_excel(
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.21 v24.11 · Export Excel · Autosave fluido")
+    st.caption("Fantacalcio · Build 2026.08.24 v25 · Backup Excel bidirezionale")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -681,15 +681,60 @@ def _render_preparation(
         character if character.isalnum() else "_"
         for character in str(league.get("name") or "fantacalcio")
     ).strip("_") or "fantacalcio"
-    st.download_button(
+    version_key = f"catalog_board_version_{league['id']}"
+    board_version = int(st.session_state.get(version_key, 0))
+    import_message_key = f"listone_import_message_{league['id']}"
+    import_message = st.session_state.pop(import_message_key, None)
+    if import_message:
+        st.success(import_message)
+    download_column, upload_column = st.columns(2)
+    download_column.download_button(
         "Scarica listone Excel",
         data=_cached_listone_excel(catalog, league),
         file_name=f"listone_{safe_league_name}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key=f"download_listone_{league['id']}",
+        use_container_width=True,
     )
-    version_key = f"catalog_board_version_{league['id']}"
-    board_version = int(st.session_state.get(version_key, 0))
+    with upload_column.popover("Carica listone Excel", use_container_width=True):
+        st.caption(
+            "Ripristina fasce personali, fantaallenatori e crediti dal backup. "
+            "Le assegnazioni attuali della lega selezionata saranno sostituite."
+        )
+        uploaded_listone = st.file_uploader(
+            "Backup Excel",
+            type=["xlsx"],
+            accept_multiple_files=False,
+            key=f"upload_listone_{league['id']}",
+        )
+        restore_clicked = st.button(
+            "Ripristina dal file",
+            type="primary",
+            use_container_width=True,
+            disabled=uploaded_listone is None,
+            key=f"restore_listone_{league['id']}",
+        )
+        if restore_clicked and uploaded_listone is not None:
+            try:
+                restored = restore_listone_excel(
+                    uploaded_listone.getvalue(), catalog, league
+                )
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                touch_workspace(workspace)
+                _save_workspace(workspace, storage)
+                st.session_state[version_key] = board_version + 1
+                skipped = len(restored["unmatched"])
+                skipped_note = (
+                    f" · {skipped} giocatori non piu presenti nel listone ignorati"
+                    if skipped else ""
+                )
+                st.session_state[import_message_key] = (
+                    f"Backup ripristinato: {restored['purchases']} acquisti e "
+                    f"{restored['tier_assignments']} fasce{skipped_note}."
+                )
+                st.rerun()
     if list_mode:
         selected_ids = _render_list_catalog_editor(
             frame,
