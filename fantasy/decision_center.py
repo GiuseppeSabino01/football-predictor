@@ -495,11 +495,51 @@ def _player_news_context(player: dict[str, Any], item: dict[str, Any]) -> str:
     text = _news_text(item)
     folded = text.casefold()
     tokens = sorted(_name_tokens(player.get("name")), key=len, reverse=True)
-    positions = [folded.find(token) for token in tokens if folded.find(token) >= 0]
+    positions = [
+        match.start()
+        for token in tokens
+        for match in [re.search(rf"(?<!\w){re.escape(token)}(?!\w)", folded)]
+        if match
+    ]
     if not positions:
         return ""
     position = min(positions)
     return folded[max(position - 180, 0): position + 260]
+
+
+def _direct_player_news_context(
+    player: dict[str, Any], item: dict[str, Any]
+) -> str:
+    """Return headline clauses that explicitly mention the player.
+
+    Availability signals must be high precision: an injury elsewhere in a long
+    article is not evidence that every player named in that article is injured.
+    """
+    title = str(item.get("title") or "").casefold()
+    tokens = sorted(_name_tokens(player.get("name")), key=len, reverse=True)
+    if not title or not tokens:
+        return ""
+    clauses = re.split(
+        r"[.;:!?|–—]+|\b(?:mentre|invece|però|pero)\b",
+        title,
+    )
+    related = [
+        clause.strip()
+        for clause in clauses
+        if any(
+            re.search(rf"(?<!\w){re.escape(token)}(?!\w)", clause)
+            for token in tokens
+        )
+    ]
+    return " ".join(related)
+
+
+def _contains_signal_term(text: str, terms: tuple[str, ...]) -> bool:
+    return any(
+        bool(re.search(rf"(?<!\w){re.escape(term)}(?!\w)", text))
+        if len(term) <= 3 else term in text
+        for term in terms
+    )
 
 
 def _explicit_unavailable_until(text: str) -> int | None:
@@ -697,7 +737,7 @@ def player_availability(
     ]
     injury_terms = (
         "infortun", "lesion", "problema muscolare", "operat", "stop", "indispon",
-        "non convoc", "salta", "out", "allenamento a parte",
+        "non convoc", "salta", "out", "allenamento a parte", "si ferma", "ko",
     )
     suspension_terms = ("squalificat", "squalifica")
     recovered_terms = (
@@ -718,6 +758,7 @@ def player_availability(
         context = _player_news_context(player, item)
         if not context:
             continue
+        direct_context = _direct_player_news_context(player, item)
         status = str(item.get("status") or "").strip().casefold()
         unavailable_until = int(number(item.get("unavailable_until_matchday"))) or None
         return_matchday = int(number(item.get("return_matchday"))) or None
@@ -745,8 +786,8 @@ def player_availability(
         explicit_probability = item.get("appearance_probability")
         if explicit_probability is not None:
             probability = _clamp(explicit_probability)
-        if status in {"recovered", "available"} or any(
-            term in context for term in recovered_terms
+        if status in {"recovered", "available"} or _contains_signal_term(
+            direct_context, recovered_terms
         ):
             probability = max(probability, 82)
             result.update(
@@ -759,8 +800,12 @@ def player_availability(
                 }
             )
             break
-        is_suspended = status == "suspended" or any(term in context for term in suspension_terms)
-        is_injured = status == "injured" or any(term in context for term in injury_terms)
+        is_suspended = status == "suspended" or _contains_signal_term(
+            direct_context, suspension_terms
+        )
+        is_injured = status == "injured" or _contains_signal_term(
+            direct_context, injury_terms
+        )
         still_out = unavailable_until is None or int(matchday) <= unavailable_until
         if is_suspended or (is_injured and still_out):
             probability = 0 if is_suspended else min(probability, 8)
@@ -792,7 +837,7 @@ def player_availability(
             break
         if int(matchday) != upcoming:
             continue
-        if status == "bench" or any(term in context for term in bench_terms):
+        if status == "bench" or _contains_signal_term(direct_context, bench_terms):
             bench_ceiling = item.get("appearance_probability")
             if bench_ceiling is None:
                 bench_ceiling = max(25, probability * 0.62)
@@ -807,7 +852,9 @@ def player_availability(
                 }
             )
             break
-        elif status == "starter" or any(term in context for term in starter_terms):
+        elif status == "starter" or _contains_signal_term(
+            direct_context, starter_terms
+        ):
             starter_floor = item.get("appearance_probability")
             if starter_floor is None:
                 starter_floor = min(98, probability + 8)

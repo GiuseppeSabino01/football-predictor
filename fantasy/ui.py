@@ -115,7 +115,7 @@ def _cached_listone_excel(
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.25 v26.1 · Note e stato infortuni")
+    st.caption("Fantacalcio · Build 2026.08.25 v26.2 · Note e stato infortuni")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)

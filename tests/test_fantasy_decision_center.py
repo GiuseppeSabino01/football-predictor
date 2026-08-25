@@ -142,6 +142,37 @@ def test_injury_return_label_uses_published_duration() -> None:
     )
 
 
+def test_injury_of_another_player_does_not_flag_malen_paz_or_douvikas() -> None:
+    news = [{
+        "title": "Como, spazio a Douvikas: Diao infortunato e fuori causa",
+        "body": (
+            "Malen e Nico Paz sono regolarmente a disposizione. "
+            "Douvikas e candidato a partire dal primo minuto."
+        ),
+        "url": "https://www.fantacalcio.it/news/como-diao-stop.html",
+        "source": "Fantacalcio.it",
+        "verified": True,
+    }]
+    candidates = [
+        {**player(71, "A", "COM"), "name": "Malen"},
+        {**player(72, "C", "COM"), "name": "Nico Paz"},
+        {**player(73, "A", "COM"), "name": "Douvikas"},
+    ]
+
+    signals = [
+        player_availability(
+            candidate,
+            news,
+            matchday=2,
+            next_matchday_number=2,
+        )
+        for candidate in candidates
+    ]
+
+    assert all(signal["availability_status"] != "injured" for signal in signals)
+    assert all(not signal["availability_unavailable"] for signal in signals)
+
+
 def test_probable_bench_changes_only_the_immediately_next_round():
     candidate = player(50, "C", "ROM", starter=90)
     candidate["name"] = "Perrone"
