@@ -105,7 +105,7 @@ AUCTION_TIER_PALETTE = {
     "gray": ("Grigio", "⚪", "#a7b0ad"),
 }
 CATALOG_AUTOSAVE_DEBOUNCE_MS = 1200
-OFFICIAL_CATALOG_SESSION_KEY = "fantasy_official_catalog_session_v2642"
+OFFICIAL_CATALOG_SESSION_KEY = "fantasy_official_catalog_session_v2650"
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
@@ -118,7 +118,7 @@ def _cached_listone_excel(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.25 v26.4.2 · Trasferimenti ufficiali sincronizzati"
+        "Fantacalcio · Build 2026.08.25 v26.5.0 · Storico reale fino a cinque stagioni"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -290,24 +290,8 @@ def _catalog_injury_statuses(
             "indicator": "🩼",
             "return": injury_return_label(signal),
             "detail": f"{detail} · Fonte: {source}",
-            "risk_floor": _current_injury_risk_floor(signal),
         }
     return statuses
-
-
-def _current_injury_risk_floor(signal: dict[str, Any]) -> float:
-    """Ensure a currently published injury is reflected in the visible index."""
-    if signal.get("availability_status") == "returning":
-        return 60.0
-    return_matchday = _int_or_none(signal.get("return_matchday"))
-    upcoming = season_next_matchday()
-    if return_matchday and return_matchday - upcoming >= 5:
-        return 90.0
-    if return_matchday and return_matchday - upcoming >= 2:
-        return 82.0
-    if signal.get("return_month") or signal.get("estimated_return_date"):
-        return 85.0
-    return 75.0
 
 
 def _load_workspace(storage: FantasyWorkspaceStorage) -> dict[str, Any]:
@@ -385,9 +369,12 @@ def _refresh_purchased_player_data(
         "profile",
         "data_quality",
         "analysis_estimated",
+        "analysis_historical",
         "analysis_confidence",
         "analysis_comparables",
         "analysis_source",
+        "history_seasons",
+        "history_source",
     )
     for league in workspace.get("leagues", []):
         league_changed = False
@@ -1710,11 +1697,6 @@ def _render_list_catalog_editor(
             _number_or_none(catalog_by_id.get(str(player_id), {}).get(field), 0.0)
             or 0.0
         )
-        if field == "risk":
-            value = max(
-                value,
-                float(injury_statuses.get(str(player_id), {}).get("risk_floor") or 0),
-            )
         if 0 < value <= 1:
             value *= 100
         return round(max(0.0, min(100.0, value)), 1)
@@ -2054,11 +2036,6 @@ def _render_auction_catalog_editor(
     def player_metric(player_id: Any, field: str) -> float:
         player = catalog_by_id.get(str(player_id), {})
         value = _number_or_none(player.get(field), 0.0) or 0.0
-        if field == "risk":
-            value = max(
-                value,
-                float(injury_statuses.get(str(player_id), {}).get("risk_floor") or 0),
-            )
         if 0 < value <= 1:
             value *= 100
         return round(max(0.0, min(100.0, value)), 1)
@@ -3157,13 +3134,7 @@ def _render_player_detail(
     role = str(player.get("role", ""))
     catalog = workspace.get("catalog", [])
     derived = player_derived_stats(player)
-    injury_status = _catalog_injury_statuses([player]).get(
-        str(player.get("id") or ""), {}
-    )
-    displayed_injury_risk = max(
-        analytics_number(player.get("risk")),
-        analytics_number(injury_status.get("risk_floor")),
-    )
+    displayed_injury_risk = analytics_number(player.get("risk"))
     role_names = {
         "P": "Portiere",
         "D": "Difensore",
@@ -3184,7 +3155,13 @@ def _render_player_detail(
         """,
         unsafe_allow_html=True,
     )
-    if player.get("analysis_estimated"):
+    if player.get("analysis_historical"):
+        st.info(
+            "Analisi costruita sulle statistiche reali della carriera recente: "
+            f"{player.get('history_seasons', 0)} stagioni disponibili. Quotazione, "
+            "FVM e giocatori comparabili non determinano i valori tecnici."
+        )
+    elif player.get("analysis_estimated"):
         comparables = ", ".join(
             str(value) for value in player.get("analysis_comparables", []) if value
         )

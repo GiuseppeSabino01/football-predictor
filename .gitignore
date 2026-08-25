@@ -3,13 +3,16 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.history_cache/
 .pytest_tmp/
 .ruff_cache/
 .mypy_cache/
 .venv/
 venv/
+uv.lock
 data/*
 !data/fantacalcio_seed_2026_27.csv
+!data/player_history_5y_2026_27.json.gz
 logs/
 pytest-cache-files-*/
 *.db

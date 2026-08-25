@@ -38,3 +38,15 @@ def test_fantasy_reload_refreshes_catalog_before_ui() -> None:
     )
     assert "Origine dati" in frame.columns
     assert refreshed_ui.catalog_dataframe is streamlit_app.fantasy_catalog.catalog_dataframe
+
+
+def test_fantasy_reload_refreshes_player_history_before_estimates() -> None:
+    delattr(streamlit_app.fantasy_player_history, "attach_player_history")
+
+    streamlit_app.fresh_fantasy_ui()
+
+    assert hasattr(streamlit_app.fantasy_player_history, "attach_player_history")
+    assert (
+        streamlit_app.fantasy_catalog_estimates.attach_player_history
+        is streamlit_app.fantasy_player_history.attach_player_history
+    )
