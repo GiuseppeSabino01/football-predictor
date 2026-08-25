@@ -1,26 +1,31 @@
 from __future__ import annotations
 
+import io
+import re
+import unicodedata
 from copy import deepcopy
 from datetime import datetime, timezone
 from functools import lru_cache
-import io
 from pathlib import Path
-import re
-import unicodedata
 from urllib.parse import urljoin
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from fantasy.catalog import make_player_id, normalize_catalog_dataframe, normalize_role
 from fantasy.analytics import bonus_propensity
+from fantasy.catalog import make_player_id, normalize_catalog_dataframe, normalize_role
+from fantasy.catalog_estimates import enrich_missing_analysis, recalibrate_injury_risk
 from fantasy.service import player_score
 
-
 OFFICIAL_CATALOG_URL = "https://www.fantacalcio.it/quotazioni-fantacalcio"
-SEED_CATALOG_PATH = Path(__file__).resolve().parents[1] / "data" / "fantacalcio_seed_2026_27.csv"
+SEED_CATALOG_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "fantacalcio_seed_2026_27.csv"
+)
 MINIMUM_VALID_PLAYERS = 400
+# The public quotation page can briefly retain transferred players after the
+# active list has changed. Keep confirmed departures out during that lag.
+CONFIRMED_LIST_EXCLUSIONS = {("circati", "PAR")}
 
 
 @lru_cache(maxsize=1)
@@ -33,10 +38,7 @@ def load_seed_catalog() -> list[dict]:
         team = _text(raw.get("team"))
         if not name or not role:
             continue
-        player = {
-            key: _clean_value(value)
-            for key, value in raw.items()
-        }
+        player = {key: _clean_value(value) for key, value in raw.items()}
         player.update(
             {
                 "id": make_player_id(name, team, role),
@@ -48,7 +50,9 @@ def load_seed_catalog() -> list[dict]:
         )
         starter = _number(player.get("starter_probability"))
         player["starter_probability"] = starter * 100 if 0 < starter <= 1 else starter
-        player["fantasy_score"] = _number(player.get("fantasy_score")) or player_score(player)
+        player["fantasy_score"] = _number(player.get("fantasy_score")) or player_score(
+            player
+        )
         players.append(player)
     return players
 
@@ -94,13 +98,16 @@ def fetch_official_catalog(timeout: int = 18) -> dict:
         }
 
 
-def parse_official_html(html: str, seed_players: list[dict] | None = None) -> list[dict]:
+def parse_official_html(
+    html: str, seed_players: list[dict] | None = None
+) -> list[dict]:
     seed_players = seed_players or load_seed_catalog()
     seed_by_name = _players_by_name(seed_players)
     known_teams = {str(player.get("team", "")).upper() for player in seed_players}
     soup = BeautifulSoup(html, "html.parser")
     tables = [
-        table for table in soup.find_all("table")
+        table
+        for table in soup.find_all("table")
         if "fvm" in table.get_text(" ", strip=True).lower()
     ]
     players: list[dict] = []
@@ -114,12 +121,20 @@ def parse_official_html(html: str, seed_players: list[dict] | None = None) -> li
             cells = row.find_all("td")
             texts = [cell.get_text(" ", strip=True) for cell in cells]
             team_index = next(
-                (index for index, value in enumerate(texts) if value.upper() in known_teams),
+                (
+                    index
+                    for index, value in enumerate(texts)
+                    if value.upper() in known_teams
+                ),
                 None,
             )
             if team_index is None:
                 anchor_index = next(
-                    (index for index, cell in enumerate(cells) if cell.find("a", href=re.compile(r"/serie-a/squadre/", re.I))),
+                    (
+                        index
+                        for index, cell in enumerate(cells)
+                        if cell.find("a", href=re.compile(r"/serie-a/squadre/", re.I))
+                    ),
                     None,
                 )
                 if anchor_index is not None:
@@ -144,7 +159,11 @@ def parse_official_html(html: str, seed_players: list[dict] | None = None) -> li
             role = str(seed_match.get("role")) if seed_match else _detect_role(row)
             if role not in {"P", "D", "C", "A"}:
                 continue
-            player_id = str(seed_match.get("id")) if seed_match else make_player_id(name, team, role)
+            player_id = (
+                str(seed_match.get("id"))
+                if seed_match
+                else make_player_id(name, team, role)
+            )
             if player_id in seen:
                 continue
             seen.add(player_id)
@@ -175,7 +194,10 @@ def merge_catalog_updates(
         base = _authoritative_official_catalog(base, official_players)
     else:
         base = _merge_official(base, official_players or [])
+    base = [player for player in base if not _is_confirmed_list_exclusion(player)]
+    enrich_missing_analysis(base)
     for player in base:
+        recalibrate_injury_risk(player)
         player["bonus"] = bonus_propensity(player, base)
         player["fantasy_score"] = player_score(player)
     return sorted(
@@ -216,7 +238,11 @@ def _download_excel_catalog(
     download_url = urljoin(OFFICIAL_CATALOG_URL, match.group(0))
     response = session.get(
         download_url,
-        headers={**headers, "Referer": OFFICIAL_CATALOG_URL, "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*"},
+        headers={
+            **headers,
+            "Referer": OFFICIAL_CATALOG_URL,
+            "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*",
+        },
         timeout=timeout,
     )
     if response.status_code >= 400 or not response.content.startswith(b"PK"):
@@ -273,7 +299,9 @@ def _merge_official(base: list[dict], official: list[dict]) -> list[dict]:
     return base
 
 
-def _authoritative_official_catalog(analysis: list[dict], official: list[dict]) -> list[dict]:
+def _authoritative_official_catalog(
+    analysis: list[dict], official: list[dict]
+) -> list[dict]:
     by_id = {str(player.get("id")): player for player in analysis if player.get("id")}
     by_name = _players_by_name(analysis)
     result: list[dict] = []
@@ -325,7 +353,8 @@ def _detect_role(row) -> str:
         if data_value in {"P", "D", "C", "A"} and (
             "player-role-classic" in classes
             or "role-classic" in classes
-            or "role" in classes and "role-mantra" not in classes
+            or "role" in classes
+            and "role-mantra" not in classes
         ):
             return data_value
 
@@ -369,7 +398,12 @@ def _valid_role_distribution(players: list[dict]) -> bool:
     if len(players) < MINIMUM_VALID_PLAYERS:
         return False
     counts = _role_counts(players)
-    return counts["P"] >= 20 and counts["D"] >= 80 and counts["C"] >= 80 and counts["A"] >= 40
+    return (
+        counts["P"] >= 20
+        and counts["D"] >= 80
+        and counts["C"] >= 80
+        and counts["A"] >= 40
+    )
 
 
 def _players_by_name(players: list[dict]) -> dict[str, list[dict]]:
@@ -386,8 +420,17 @@ def _unique_seed_match(by_name: dict[str, list[dict]], name: str) -> dict | None
 
 def _normalize_name(value) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
-    text = "".join(character for character in text if not unicodedata.combining(character))
+    text = "".join(
+        character for character in text if not unicodedata.combining(character)
+    )
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def _is_confirmed_list_exclusion(player: dict) -> bool:
+    return (
+        _normalize_name(player.get("name")),
+        str(player.get("team") or "").upper(),
+    ) in CONFIRMED_LIST_EXCLUSIONS
 
 
 def _number_from_text(value: str) -> float | None:

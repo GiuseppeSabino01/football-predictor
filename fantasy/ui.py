@@ -116,7 +116,9 @@ def _cached_listone_excel(
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.25 v26.3 · Registro infortuni completo")
+    st.caption(
+        "Fantacalcio · Build 2026.08.25 v26.4 · Analisi completa e rischio ricalibrato"
+    )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -132,11 +134,13 @@ def render_fantasy_page(settings: Settings) -> None:
     summary = roster_summary(league)
     _render_league_hero(league, summary)
     list_mode = league.get("game_mode") == GAME_MODE_LIST
-    preparation_tab, squad_tab, decision_tab = st.tabs([
-        "Studia il listone" if list_mode else "Preparati all'asta",
-        "La mia squadra",
-        "Decision Center",
-    ])
+    preparation_tab, squad_tab, decision_tab = st.tabs(
+        [
+            "Studia il listone" if list_mode else "Preparati all'asta",
+            "La mia squadra",
+            "Decision Center",
+        ]
+    )
     with preparation_tab:
         _render_preparation(workspace, league, storage)
     with squad_tab:
@@ -198,12 +202,23 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
         if len(news) >= 40:
             break
     detail_keywords = (
-        "probabili formazioni", "infortun", "indispon", "squal", "convocat",
-        "stop", "recuper", "panchina", "ballottaggio",
+        "probabili formazioni",
+        "infortun",
+        "indispon",
+        "squal",
+        "convocat",
+        "stop",
+        "recuper",
+        "panchina",
+        "ballottaggio",
     )
     detailed = [
-        item for item in news
-        if any(keyword in str(item.get("title") or "").casefold() for keyword in detail_keywords)
+        item
+        for item in news
+        if any(
+            keyword in str(item.get("title") or "").casefold()
+            for keyword in detail_keywords
+        )
     ][:12]
 
     def load_article(item: dict[str, Any]) -> tuple[str, str, str]:
@@ -235,9 +250,12 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
     if detailed:
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(load_article, item) for item in detailed]
-            details = {url: (body, published) for url, body, published in (
-                future.result() for future in as_completed(futures)
-            )}
+            details = {
+                url: (body, published)
+                for url, body, published in (
+                    future.result() for future in as_completed(futures)
+                )
+            }
         for item in news:
             body, published = details.get(str(item.get("url") or ""), ("", ""))
             if body:
@@ -249,7 +267,7 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
 
 def _catalog_injury_statuses(
     players: list[dict[str, Any]],
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, Any]]:
     """Expose only published injury signals on the player board."""
     news_items = _cached_fantasy_news()
     upcoming = season_next_matchday()
@@ -271,14 +289,32 @@ def _catalog_injury_statuses(
             "indicator": "🩼",
             "return": injury_return_label(signal),
             "detail": f"{detail} · Fonte: {source}",
+            "risk_floor": _current_injury_risk_floor(signal),
         }
     return statuses
+
+
+def _current_injury_risk_floor(signal: dict[str, Any]) -> float:
+    """Ensure a currently published injury is reflected in the visible index."""
+    if signal.get("availability_status") == "returning":
+        return 60.0
+    return_matchday = _int_or_none(signal.get("return_matchday"))
+    upcoming = season_next_matchday()
+    if return_matchday and return_matchday - upcoming >= 5:
+        return 90.0
+    if return_matchday and return_matchday - upcoming >= 2:
+        return 82.0
+    if signal.get("return_month") or signal.get("estimated_return_date"):
+        return 85.0
+    return 75.0
 
 
 def _load_workspace(storage: FantasyWorkspaceStorage) -> dict[str, Any]:
     if WORKSPACE_SESSION_KEY not in st.session_state:
         st.session_state[WORKSPACE_SESSION_KEY] = storage.load()
-        st.session_state["fantasy_remote_synced"] = getattr(storage, "last_remote_save_ok", False)
+        st.session_state["fantasy_remote_synced"] = getattr(
+            storage, "last_remote_save_ok", False
+        )
     return st.session_state[WORKSPACE_SESSION_KEY]
 
 
@@ -340,8 +376,17 @@ def _refresh_purchased_player_data(
         "fantasy_score",
         "reliability",
         "risk",
+        "risk_source",
+        "risk_base",
+        "potential",
+        "value",
         "tier",
         "profile",
+        "data_quality",
+        "analysis_estimated",
+        "analysis_confidence",
+        "analysis_comparables",
+        "analysis_source",
     )
     for league in workspace.get("leagues", []):
         league_changed = False
@@ -362,7 +407,9 @@ def _refresh_purchased_player_data(
     return changed
 
 
-def _render_empty_workspace(workspace: dict[str, Any], storage: FantasyWorkspaceStorage) -> None:
+def _render_empty_workspace(
+    workspace: dict[str, Any], storage: FantasyWorkspaceStorage
+) -> None:
     st.markdown(
         """
         <section class="fantasy-empty">
@@ -457,7 +504,8 @@ def _render_create_form(
         name = st.text_input("Nome", placeholder="Es. Fanta amici")
         budget = st.number_input(
             "Crediti iniziali per ogni partecipante"
-            if game_mode == GAME_MODE_AUCTION else "Budget rosa",
+            if game_mode == GAME_MODE_AUCTION
+            else "Budget rosa",
             min_value=50,
             max_value=2000,
             value=500 if game_mode == GAME_MODE_AUCTION else 250,
@@ -475,20 +523,24 @@ def _render_create_form(
         st.markdown("**Composizione rosa**")
         slot_columns = st.columns(4)
         slots = {
-            role: int(slot_columns[index].number_input(
-                role,
-                min_value=0,
-                max_value=30,
-                value=DEFAULT_ROSTER_SLOTS[role],
-                key=f"create_slot_{key_suffix}_{role}",
-                help=ROLE_LABELS[role],
-            ))
+            role: int(
+                slot_columns[index].number_input(
+                    role,
+                    min_value=0,
+                    max_value=30,
+                    value=DEFAULT_ROSTER_SLOTS[role],
+                    key=f"create_slot_{key_suffix}_{role}",
+                    help=ROLE_LABELS[role],
+                )
+            )
             for index, role in enumerate(ROLE_LABELS)
         }
         modifier, captain = st.columns(2)
         modifier_enabled = modifier.toggle("Modificatore difesa", value=True)
         captain_enabled = captain.toggle("Capitano", value=False)
-        submitted = st.form_submit_button("Crea fantacalcio", type="primary", use_container_width=True)
+        submitted = st.form_submit_button(
+            "Crea fantacalcio", type="primary", use_container_width=True
+        )
     if not submitted:
         return
     try:
@@ -526,7 +578,8 @@ def _render_manage_form(
         name = st.text_input("Nome", value=league["name"])
         budget = st.number_input(
             "Crediti iniziali per ogni partecipante"
-            if game_mode == GAME_MODE_AUCTION else "Budget rosa",
+            if game_mode == GAME_MODE_AUCTION
+            else "Budget rosa",
             min_value=1,
             max_value=5000,
             value=int(league.get("initial_budget", 250)),
@@ -543,22 +596,28 @@ def _render_manage_form(
         current_slots = league.get("roster_slots", DEFAULT_ROSTER_SLOTS)
         slot_columns = st.columns(4)
         slots = {
-            role: int(slot_columns[index].number_input(
-                role,
-                min_value=0,
-                max_value=30,
-                value=int(current_slots.get(role, DEFAULT_ROSTER_SLOTS[role])),
-                key=f"manage_slot_{league['id']}_{role}",
-                help=ROLE_LABELS[role],
-            ))
+            role: int(
+                slot_columns[index].number_input(
+                    role,
+                    min_value=0,
+                    max_value=30,
+                    value=int(current_slots.get(role, DEFAULT_ROSTER_SLOTS[role])),
+                    key=f"manage_slot_{league['id']}_{role}",
+                    help=ROLE_LABELS[role],
+                )
+            )
             for index, role in enumerate(ROLE_LABELS)
         }
         modifier_column, captain_column = st.columns(2)
         modifier = modifier_column.toggle(
             "Modificatore difesa", value=bool(league.get("modifier_enabled"))
         )
-        captain = captain_column.toggle("Capitano", value=bool(league.get("captain_enabled")))
-        save_settings = st.form_submit_button("Salva", type="primary", use_container_width=True)
+        captain = captain_column.toggle(
+            "Capitano", value=bool(league.get("captain_enabled"))
+        )
+        save_settings = st.form_submit_button(
+            "Salva", type="primary", use_container_width=True
+        )
     if save_settings:
         try:
             update_league_settings(
@@ -578,21 +637,26 @@ def _render_manage_form(
             _save_workspace(workspace, storage)
             st.rerun()
 
+
 def _render_league_hero(league: dict[str, Any], summary: dict[str, Any]) -> None:
     completion = int(100 * summary["roster_size"] / max(summary["target_size"], 1))
     list_mode = league.get("game_mode") == GAME_MODE_LIST
-    context = "LISTONE" if list_mode else f"{league.get('participants', 0)} PARTECIPANTI"
+    context = (
+        "LISTONE" if list_mode else f"{league.get('participants', 0)} PARTECIPANTI"
+    )
     chips = ["LISTONE" if list_mode else "ASTA"]
     if league.get("captain_enabled"):
         chips.append("CAP")
-    chips_html = "".join(f'<span class="fantasy-mode-chip">{label}</span>' for label in chips)
+    chips_html = "".join(
+        f'<span class="fantasy-mode-chip">{label}</span>' for label in chips
+    )
     st.markdown(
         f"""
         <section class="fantasy-league-hero">
             <div>
-                <p class="fantasy-eyebrow">{escape(str(league.get('season', '')))} · {context}</p>
-                <h2>{escape(str(league.get('name', 'Fantacalcio')))}</h2>
-                <p>Rosa {summary['roster_size']}/{summary['target_size']} · {summary['remaining_budget']:.0f} crediti disponibili</p>
+                <p class="fantasy-eyebrow">{escape(str(league.get("season", "")))} · {context}</p>
+                <h2>{escape(str(league.get("name", "Fantacalcio")))}</h2>
+                <p>Rosa {summary["roster_size"]}/{summary["target_size"]} · {summary["remaining_budget"]:.0f} crediti disponibili</p>
             </div>
             <div class="fantasy-ring" style="--progress:{completion * 3.6}deg">
                 <span>{completion}%</span>
@@ -617,7 +681,8 @@ def _render_preparation(
         _render_auction_multiverse(workspace, league, storage, catalog)
     purchased_ids = (
         {str(row.get("player_id")) for row in league.get("purchases", [])}
-        if list_mode else auction_taken_player_ids(league)
+        if list_mode
+        else auction_taken_player_ids(league)
     )
     metric_a, metric_b, metric_c = st.columns(3)
     metric_a.metric("Giocatori nel listone", len(catalog))
@@ -634,8 +699,8 @@ def _render_preparation(
         f"""
         <section class="fantasy-source-card">
             <div><span>{source_status}</span><strong>Listone automatico Fantacalcio.it</strong>
-            <small>{escape(str(meta.get('message') or 'Controllo automatico attivo'))}</small></div>
-            <div><b>{len(catalog)}</b><small>giocatori · controllo {escape(checked_at or 'in corso')}</small></div>
+            <small>{escape(str(meta.get("message") or "Controllo automatico attivo"))}</small></div>
+            <div><b>{len(catalog)}</b><small>giocatori · controllo {escape(checked_at or "in corso")}</small></div>
         </section>
         """,
         unsafe_allow_html=True,
@@ -645,7 +710,9 @@ def _render_preparation(
         "Fonte: [quotazioni ufficiali Fantacalcio.it]"
         f"({meta.get('source_url') or OFFICIAL_CATALOG_URL}). Nessun CSV da caricare."
     )
-    if refresh_column.button("Aggiorna ora", use_container_width=True, key="refresh_official_catalog"):
+    if refresh_column.button(
+        "Aggiorna ora", use_container_width=True, key="refresh_official_catalog"
+    ):
         st.session_state.pop("fantasy_official_catalog_session", None)
         st.rerun()
 
@@ -661,7 +728,9 @@ def _render_preparation(
     st.progress(min(progress, 1.0), text=f"Rosa completata al {progress:.0%}")
     _render_role_plan(league, summary)
     advisor_catalog = (
-        catalog if list_mode else [
+        catalog
+        if list_mode
+        else [
             player for player in catalog if str(player.get("id")) not in purchased_ids
         ]
     )
@@ -669,14 +738,33 @@ def _render_preparation(
     if list_mode:
         _render_auction_tier_manager(workspace, league, storage)
 
-    search_column, role_column, team_column, sort_column = st.columns([1.5, 0.8, 1.1, 1.1])
+    search_column, role_column, team_column, sort_column = st.columns(
+        [1.5, 0.8, 1.1, 1.1]
+    )
     search = search_column.text_input("Cerca", placeholder="Nome giocatore")
-    selected_roles = role_column.multiselect("Ruolo", list(ROLE_LABELS), default=list(ROLE_LABELS))
-    teams = sorted({str(player.get("team", "")) for player in catalog if player.get("team")})
+    selected_roles = role_column.multiselect(
+        "Ruolo", list(ROLE_LABELS), default=list(ROLE_LABELS)
+    )
+    teams = sorted(
+        {str(player.get("team", "")) for player in catalog if player.get("team")}
+    )
     selected_teams = team_column.multiselect("Squadra", teams)
-    sort_options = ["Indice", "Quotazione", "FVM / 1000", "Quotazione prevista", "Gol attesi", "Assist attesi", "Titolarita %"]
+    sort_options = [
+        "Indice",
+        "Quotazione",
+        "FVM / 1000",
+        "Quotazione prevista",
+        "Gol attesi",
+        "Assist attesi",
+        "Titolarita %",
+    ]
     if not list_mode:
-        sort_options = ["Spesa strategica", "Spesa aggiornata", "Spesa iniziale", *sort_options]
+        sort_options = [
+            "Spesa strategica",
+            "Spesa aggiornata",
+            "Spesa iniziale",
+            *sort_options,
+        ]
     sort_label = sort_column.selectbox(
         "Ordina per",
         sort_options,
@@ -709,17 +797,20 @@ def _render_preparation(
     st.markdown(
         '<div class="fantasy-table-heading"><div><strong>Player board</strong>'
         + (
-            '<span>Assegna ogni giocatore, correggi il prezzo o scegli Non assegnato per rimuoverlo</span></div>'
-            if not list_mode else
-            '<span>Gestisci rosa, fascia e note; 🩼 segnala un infortunio con il rientro pubblicato</span></div>'
+            "<span>Assegna ogni giocatore, correggi il prezzo o scegli Non assegnato per rimuoverlo</span></div>"
+            if not list_mode
+            else "<span>Gestisci rosa, fascia e note; 🩼 segnala un infortunio con il rientro pubblicato</span></div>"
         )
-        + f'<b>{len(frame)}</b></div>',
+        + f"<b>{len(frame)}</b></div>",
         unsafe_allow_html=True,
     )
-    safe_league_name = "".join(
-        character if character.isalnum() else "_"
-        for character in str(league.get("name") or "fantacalcio")
-    ).strip("_") or "fantacalcio"
+    safe_league_name = (
+        "".join(
+            character if character.isalnum() else "_"
+            for character in str(league.get("name") or "fantacalcio")
+        ).strip("_")
+        or "fantacalcio"
+    )
     version_key = f"catalog_board_version_{league['id']}"
     board_version = int(st.session_state.get(version_key, 0))
     import_message_key = f"listone_import_message_{league['id']}"
@@ -767,7 +858,8 @@ def _render_preparation(
                 skipped = len(restored["unmatched"])
                 skipped_note = (
                     f" · {skipped} giocatori non piu presenti nel listone ignorati"
-                    if skipped else ""
+                    if skipped
+                    else ""
                 )
                 st.session_state[import_message_key] = (
                     f"Backup ripristinato: {restored['purchases']} acquisti e "
@@ -800,11 +892,15 @@ def _render_preparation(
     if selected_ids:
         st.session_state[f"fantasy_selected_player_{league['id']}"] = selected_ids[0]
     selected_id = st.session_state.get(f"fantasy_selected_player_{league['id']}")
-    selected_player = next((player for player in catalog if player.get("id") == selected_id), None)
+    selected_player = next(
+        (player for player in catalog if player.get("id") == selected_id), None
+    )
     if selected_player:
         _render_player_detail(selected_player, league, workspace, storage)
     else:
-        st.info("Seleziona un giocatore dalla tabella per vedere tutte le statistiche e le proiezioni.")
+        st.info(
+            "Seleziona un giocatore dalla tabella per vedere tutte le statistiche e le proiezioni."
+        )
 
     _render_what_if_simulator(league, catalog)
 
@@ -850,16 +946,16 @@ def _render_auction_room(
         owner_class = " owner" if manager.get("is_user") else ""
         cards.append(
             f'<div class="fantasy-manager-card{owner_class}"><span>'
-            f'{"TU" if manager.get("is_user") else "RIVALE"}</span>'
-            f'<strong>{escape(str(manager.get("name") or ""))}</strong>'
-            f'<small>{summary["roster_size"]}/{summary["target_size"]} giocatori</small>'
-            f'<b>{summary["remaining_budget"]:.0f} CR</b></div>'
+            f"{'TU' if manager.get('is_user') else 'RIVALE'}</span>"
+            f"<strong>{escape(str(manager.get('name') or ''))}</strong>"
+            f"<small>{summary['roster_size']}/{summary['target_size']} giocatori</small>"
+            f"<b>{summary['remaining_budget']:.0f} CR</b></div>"
         )
     st.markdown(
         f'<section class="fantasy-auction-hero"><div><span>LIVE AUCTION ROOM</span>'
-        f'<strong>Mercato adattivo</strong><small>{len(managers)} partecipanti · '
-        f'{total_purchases} aggiudicazioni registrate</small></div>'
-        f'<aside><small>PIU CREDITO TRA I RIVALI</small><b>{highest_opponent:.0f}</b></aside></section>'
+        f"<strong>Mercato adattivo</strong><small>{len(managers)} partecipanti · "
+        f"{total_purchases} aggiudicazioni registrate</small></div>"
+        f"<aside><small>PIU CREDITO TRA I RIVALI</small><b>{highest_opponent:.0f}</b></aside></section>"
         f'<div class="fantasy-manager-grid">{"".join(cards)}</div>',
         unsafe_allow_html=True,
     )
@@ -879,7 +975,9 @@ def _render_auction_room(
             name_columns = st.columns(2)
             manager_names = {
                 str(manager.get("id")): name_columns[index % 2].text_input(
-                    "La mia squadra" if manager.get("is_user") else f"Partecipante {index + 1}",
+                    "La mia squadra"
+                    if manager.get("is_user")
+                    else f"Partecipante {index + 1}",
                     value=str(manager.get("name") or ""),
                     key=f"auction_manager_name_{league['id']}_{manager.get('id')}",
                 )
@@ -920,7 +1018,9 @@ def _render_auction_room(
             disabled=maximum_simulated_players == 0,
             key=f"auction_simulation_count_{league['id']}",
         )
-        simulation_button_column.markdown("<div style='height:1.78rem'></div>", unsafe_allow_html=True)
+        simulation_button_column.markdown(
+            "<div style='height:1.78rem'></div>", unsafe_allow_html=True
+        )
         simulate_clicked = simulation_button_column.button(
             "Simula asta",
             type="primary",
@@ -947,7 +1047,9 @@ def _render_auction_room(
                 st.rerun()
 
         st.markdown("##### Rose degli avversari")
-        opponent_managers = [manager for manager in managers if not manager.get("is_user")]
+        opponent_managers = [
+            manager for manager in managers if not manager.get("is_user")
+        ]
         if opponent_managers:
             selected_opponent_id = st.selectbox(
                 "Scegli avversario",
@@ -1007,12 +1109,14 @@ def _render_opponents_dna(
     league: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> None:
     profiles = [
-        profile for profile in opponent_dna_profiles(league, catalog)
+        profile
+        for profile in opponent_dna_profiles(league, catalog)
         if not profile.get("is_user")
     ]
-    with st.expander("Avversari · FantaDNA", expanded=any(
-        profile.get("sample_size", 0) >= 5 for profile in profiles
-    )):
+    with st.expander(
+        "Avversari · FantaDNA",
+        expanded=any(profile.get("sample_size", 0) >= 5 for profile in profiles),
+    ):
         st.caption(
             "Profili calcolati soltanto dalle aggiudicazioni reali di questo fantacalcio. "
             "Con pochi acquisti i valori vengono riportati verso la media della lega."
@@ -1032,11 +1136,11 @@ def _render_opponents_dna(
         confidence = str(profile.get("confidence", "bassa"))
         st.markdown(
             f'<div class="fantasy-dna-header"><div><span>FANTADNA · CONFIDENZA {escape(confidence.upper())}</span>'
-            f'<strong>{escape(str(profile.get("manager_name")))}</strong>'
-            f'<small>{int(profile.get("sample_size", 0))} acquisti analizzati · '
-            f'{summary["remaining_budget"]:.0f} crediti residui · '
-            f'{summary["remaining_slots"]} slot mancanti</small></div>'
-            f'<b>{profile.get("aggression_score", 50):.0f}<small>/100 aggressività</small></b></div>',
+            f"<strong>{escape(str(profile.get('manager_name')))}</strong>"
+            f"<small>{int(profile.get('sample_size', 0))} acquisti analizzati · "
+            f"{summary['remaining_budget']:.0f} crediti residui · "
+            f"{summary['remaining_slots']} slot mancanti</small></div>"
+            f"<b>{profile.get('aggression_score', 50):.0f}<small>/100 aggressività</small></b></div>",
             unsafe_allow_html=True,
         )
 
@@ -1061,20 +1165,28 @@ def _render_opponents_dna(
 
         aggression, top_bias, concentration, patience = st.columns(4)
         aggression.metric(
-            "Aggressività", f'{profile["aggression_score"]:.0f}/100',
-            league_delta("aggression_score"), delta_color="off",
+            "Aggressività",
+            f"{profile['aggression_score']:.0f}/100",
+            league_delta("aggression_score"),
+            delta_color="off",
         )
         top_bias.metric(
-            "Propensione ai top", f'{profile["top_player_bias"]:.0f}/100',
-            league_delta("top_player_bias"), delta_color="off",
+            "Propensione ai top",
+            f"{profile['top_player_bias']:.0f}/100",
+            league_delta("top_player_bias"),
+            delta_color="off",
         )
         concentration.metric(
-            "Concentrazione budget", f'{profile["budget_concentration"]:.0f}/100',
-            league_delta("budget_concentration"), delta_color="off",
+            "Concentrazione budget",
+            f"{profile['budget_concentration']:.0f}/100",
+            league_delta("budget_concentration"),
+            delta_color="off",
         )
         patience.metric(
-            "Pazienza", f'{profile["patience_score"]:.0f}/100',
-            league_delta("patience_score"), delta_color="off",
+            "Pazienza",
+            f"{profile['patience_score']:.0f}/100",
+            league_delta("patience_score"),
+            delta_color="off",
         )
 
         st.markdown("##### Evidenze")
@@ -1109,7 +1221,12 @@ def _render_opponents_dna(
                 use_container_width=True,
                 column_config={
                     column: st.column_config.NumberColumn(format="%.0f%%")
-                    for column in ("Spesa osservata", "Spesa corretta", "Media lega", "Quota slot")
+                    for column in (
+                        "Spesa osservata",
+                        "Spesa corretta",
+                        "Media lega",
+                        "Quota slot",
+                    )
                 },
             )
         with phases_column:
@@ -1126,24 +1243,34 @@ def _render_opponents_dna(
 
         bonus, starter, reliability, potential, injuries = st.columns(5)
         bonus.metric(
-            "Bonus", f'{profile["bonus_preference"]:.0f}',
-            league_delta("bonus_preference"), delta_color="off",
+            "Bonus",
+            f"{profile['bonus_preference']:.0f}",
+            league_delta("bonus_preference"),
+            delta_color="off",
         )
         starter.metric(
-            "Titolarità", f'{profile["starter_preference"]:.0f}',
-            league_delta("starter_preference"), delta_color="off",
+            "Titolarità",
+            f"{profile['starter_preference']:.0f}",
+            league_delta("starter_preference"),
+            delta_color="off",
         )
         reliability.metric(
-            "Affidabilità", f'{profile["reliability_preference"]:.0f}',
-            league_delta("reliability_preference"), delta_color="off",
+            "Affidabilità",
+            f"{profile['reliability_preference']:.0f}",
+            league_delta("reliability_preference"),
+            delta_color="off",
         )
         potential.metric(
-            "Potenziale", f'{profile["potential_preference"]:.0f}',
-            league_delta("potential_preference"), delta_color="off",
+            "Potenziale",
+            f"{profile['potential_preference']:.0f}",
+            league_delta("potential_preference"),
+            delta_color="off",
         )
         injuries.metric(
-            "Basso rischio", f'{profile["low_injury_risk_preference"]:.0f}',
-            league_delta("low_injury_risk_preference"), delta_color="off",
+            "Basso rischio",
+            f"{profile['low_injury_risk_preference']:.0f}",
+            league_delta("low_injury_risk_preference"),
+            delta_color="off",
         )
         team_preferences = profile.get("team_preferences", [])
         if team_preferences:
@@ -1191,7 +1318,9 @@ def _render_auction_multiverse(
             "Ordine dell'asta",
             ["per_ruolo", "libera"],
             index=0 if league.get("auction_mode") == "per_ruolo" else 1,
-            format_func=lambda value: "Per ruolo" if value == "per_ruolo" else "Asta libera",
+            format_func=lambda value: (
+                "Per ruolo" if value == "per_ruolo" else "Asta libera"
+            ),
             key=f"multiverse_auction_mode_{league['id']}",
         )
         current_role = role_column.selectbox(
@@ -1234,9 +1363,9 @@ def _render_auction_multiverse(
             league["auction_mode"] = auction_mode
             league["auction_current_role"] = current_role
             league["risk_profile"] = risk_profile
-            league["auction_state_version"] = int(
-                league.get("auction_state_version") or 0
-            ) + 1
+            league["auction_state_version"] = (
+                int(league.get("auction_state_version") or 0) + 1
+            )
             league["updated_at"] = utc_now()
             touch_workspace(workspace)
             _save_workspace(workspace, storage)
@@ -1289,9 +1418,13 @@ def _render_auction_multiverse(
         median_strength.metric(
             "Forza mediana prevista", f"{result['median_roster_strength']:.1f}"
         )
-        prudent.metric("Scenario prudente · P10", f"{result['p10_roster_strength']:.1f}")
+        prudent.metric(
+            "Scenario prudente · P10", f"{result['p10_roster_strength']:.1f}"
+        )
         favorable, final_budget, fragile = st.columns(3)
-        favorable.metric("Scenario favorevole · P90", f"{result['p90_roster_strength']:.1f}")
+        favorable.metric(
+            "Scenario favorevole · P90", f"{result['p90_roster_strength']:.1f}"
+        )
         final_budget.metric(
             "Budget finale atteso", f"{result['expected_remaining_budget']:.1f}"
         )
@@ -1302,7 +1435,8 @@ def _render_auction_multiverse(
             str(fragile_role.get("role") or "—"),
             (
                 f"{fragile_role.get('completion_probability', 0):.0%} completamento"
-                if fragile_role else None
+                if fragile_role
+                else None
             ),
             delta_color="off",
         )
@@ -1369,7 +1503,9 @@ def _render_auction_multiverse(
                     },
                 )
             else:
-                st.info("Aggiungi giocatori alla watchlist per seguirli come obiettivi.")
+                st.info(
+                    "Aggiungi giocatori alla watchlist per seguirli come obiettivi."
+                )
         with common_column:
             st.markdown("##### Acquisti più frequenti")
             if common:
@@ -1437,16 +1573,21 @@ def _render_auction_tier_manager(
             assignments = league.get("auction_player_tiers", {})
             for tier in tiers:
                 color = str(tier.get("color") or "gray")
-                marker = AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[1]
-                hex_color = AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[2]
+                marker = AUCTION_TIER_PALETTE.get(color, AUCTION_TIER_PALETTE["gray"])[
+                    1
+                ]
+                hex_color = AUCTION_TIER_PALETTE.get(
+                    color, AUCTION_TIER_PALETTE["gray"]
+                )[2]
                 count = sum(
-                    1 for tier_id in assignments.values()
+                    1
+                    for tier_id in assignments.values()
                     if str(tier_id) == str(tier.get("id"))
                 )
                 cards.append(
                     f'<div class="fantasy-custom-tier" style="--tier-color:{hex_color}">'
-                    f'<span>{marker}</span><strong>{escape(str(tier.get("name") or ""))}</strong>'
-                    f'<small>{count} giocatori</small></div>'
+                    f"<span>{marker}</span><strong>{escape(str(tier.get('name') or ''))}</strong>"
+                    f"<small>{count} giocatori</small></div>"
                 )
             st.markdown(
                 f'<div class="fantasy-custom-tier-grid">{"".join(cards)}</div>',
@@ -1454,7 +1595,9 @@ def _render_auction_tier_manager(
             )
         with st.form(f"create_auction_tier_{league['id']}"):
             name_column, color_column = st.columns([1.4, 0.8])
-            tier_name = name_column.text_input("Nome fascia", placeholder="Es. Top assoluti")
+            tier_name = name_column.text_input(
+                "Nome fascia", placeholder="Es. Top assoluti"
+            )
             tier_color = color_column.selectbox(
                 "Colore",
                 list(AUCTION_TIER_PALETTE),
@@ -1480,7 +1623,8 @@ def _render_auction_tier_manager(
                 "Elimina una fascia",
                 [str(tier.get("id")) for tier in tiers],
                 format_func=lambda value: next(
-                    _tier_option_label(tier) for tier in tiers
+                    _tier_option_label(tier)
+                    for tier in tiers
                     if str(tier.get("id")) == value
                 ),
                 key=f"delete_auction_tier_select_{league['id']}",
@@ -1546,17 +1690,13 @@ def _render_list_catalog_editor(
         st.warning("Nessun giocatore corrisponde ai filtri selezionati.")
         return []
     indexed = frame.reset_index(drop=True)
-    purchased_ids = {
-        str(row.get("player_id")) for row in league.get("purchases", [])
-    }
+    purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
     custom_tiers = league.get("auction_tiers", [])
     no_tier = "— Nessuna fascia —"
     tier_label_by_id = {
         str(tier.get("id")): _tier_option_label(tier) for tier in custom_tiers
     }
-    tier_id_by_label = {
-        label: tier_id for tier_id, label in tier_label_by_id.items()
-    }
+    tier_id_by_label = {label: tier_id for tier_id, label in tier_label_by_id.items()}
     player_tiers = {
         str(player_id): auction_player_tier(league, str(player_id))
         for player_id in indexed["_id"]
@@ -1565,9 +1705,15 @@ def _render_list_catalog_editor(
     injury_statuses = _catalog_injury_statuses(list(catalog_by_id.values()))
 
     def player_metric(player_id: Any, field: str) -> float:
-        value = _number_or_none(
-            catalog_by_id.get(str(player_id), {}).get(field), 0.0
-        ) or 0.0
+        value = (
+            _number_or_none(catalog_by_id.get(str(player_id), {}).get(field), 0.0)
+            or 0.0
+        )
+        if field == "risk":
+            value = max(
+                value,
+                float(injury_statuses.get(str(player_id), {}).get("risk_floor") or 0),
+            )
         if 0 < value <= 1:
             value *= 100
         return round(max(0.0, min(100.0, value)), 1)
@@ -1575,6 +1721,7 @@ def _render_list_catalog_editor(
     display = pd.DataFrame(
         {
             "_player_id": indexed["_id"].astype(str),
+            "_analysis_detail": indexed["Origine dati"],
             "Scheda": False,
             "In rosa": [
                 str(player_id) in purchased_ids for player_id in indexed["_id"]
@@ -1587,13 +1734,15 @@ def _render_list_catalog_editor(
                 tier_label_by_id.get(
                     str(player_tiers[str(player_id)].get("id")), no_tier
                 )
-                if player_tiers[str(player_id)] else no_tier
+                if player_tiers[str(player_id)]
+                else no_tier
                 for player_id in indexed["_id"]
             ],
-            "Ruolo": indexed["Ruolo"].map(
-                {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
-            ).fillna(indexed["Ruolo"]),
+            "Ruolo": indexed["Ruolo"]
+            .map({"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"})
+            .fillna(indexed["Ruolo"]),
             "Giocatore": indexed["Giocatore"],
+            "Dati": indexed["Dati"],
             "Stop": [
                 injury_statuses.get(str(player_id), {}).get("indicator", "")
                 for player_id in indexed["_id"]
@@ -1619,15 +1768,13 @@ def _render_list_catalog_editor(
             ],
             "Titolarita": indexed["Titolarita %"],
             "Affidabilita": [
-                player_metric(player_id, "reliability")
-                for player_id in indexed["_id"]
+                player_metric(player_id, "reliability") for player_id in indexed["_id"]
             ],
             "Rischio infortuni": [
                 player_metric(player_id, "risk") for player_id in indexed["_id"]
             ],
             "Potenziale": [
-                player_metric(player_id, "potential")
-                for player_id in indexed["_id"]
+                player_metric(player_id, "potential") for player_id in indexed["_id"]
             ],
             "Indice": indexed["Indice"],
             "Fascia": indexed["Fascia"],
@@ -1676,6 +1823,7 @@ def _render_list_catalog_editor(
     column_defs: list[dict[str, Any]] = [
         {"field": "_player_id", "hide": True},
         {"field": "_injury_detail", "hide": True},
+        {"field": "_analysis_detail", "hide": True},
         {
             "field": "Scheda",
             "headerName": "Apri",
@@ -1709,6 +1857,12 @@ def _render_list_catalog_editor(
             "pinned": "left",
             "lockPinned": True,
             "suppressMovable": True,
+        },
+        {
+            "field": "Dati",
+            "width": 82,
+            "tooltipField": "_analysis_detail",
+            "cellStyle": {"color": "#62d8ff", "fontWeight": "700"},
         },
         {
             "field": "Stop",
@@ -1761,9 +1915,7 @@ def _render_list_catalog_editor(
                 "suppressHeaderMenuButton": True,
             },
             "columnDefs": column_defs,
-            "getRowId": JsCode(
-                "function(params) { return params.data._player_id; }"
-            ),
+            "getRowId": JsCode("function(params) { return params.data._player_id; }"),
             "rowClassRules": row_class_rules,
             "singleClickEdit": True,
             "stopEditingWhenCellsLoseFocus": True,
@@ -1824,7 +1976,8 @@ def _render_list_catalog_editor(
         current_tier = player_tiers.get(player_id)
         current_tier_label = (
             tier_label_by_id.get(str(current_tier.get("id")), no_tier)
-            if current_tier else no_tier
+            if current_tier
+            else no_tier
         )
         edited_tier_label = str(edited_row.get("Fascia personale") or no_tier)
         current_note = player_note(league, player_id)
@@ -1841,7 +1994,8 @@ def _render_list_catalog_editor(
         }
         if edited_tier_label != current_tier_label:
             change["tier_id"] = (
-                None if edited_tier_label == no_tier
+                None
+                if edited_tier_label == no_tier
                 else tier_id_by_label[edited_tier_label]
             )
         if edited_note != current_note:
@@ -1893,9 +2047,7 @@ def _render_auction_catalog_editor(
     tier_label_by_id = {
         str(tier.get("id")): _tier_option_label(tier) for tier in custom_tiers
     }
-    tier_id_by_label = {
-        label: tier_id for tier_id, label in tier_label_by_id.items()
-    }
+    tier_id_by_label = {label: tier_id for tier_id, label in tier_label_by_id.items()}
     assignments = {
         str(player_id): auction_player_assignment(league, str(player_id))
         for player_id in indexed["_id"]
@@ -1910,6 +2062,11 @@ def _render_auction_catalog_editor(
     def player_metric(player_id: Any, field: str) -> float:
         player = catalog_by_id.get(str(player_id), {})
         value = _number_or_none(player.get(field), 0.0) or 0.0
+        if field == "risk":
+            value = max(
+                value,
+                float(injury_statuses.get(str(player_id), {}).get("risk_floor") or 0),
+            )
         if 0 < value <= 1:
             value *= 100
         return round(max(0.0, min(100.0, value)), 1)
@@ -1920,33 +2077,44 @@ def _render_auction_catalog_editor(
             "_assigned": [
                 bool(assignments[str(player_id)]) for player_id in indexed["_id"]
             ],
+            "_analysis_detail": indexed["Origine dati"],
             "Scheda": False,
             "In rosa": [
                 "✓"
-                if assignments[str(player_id)] and assignments[str(player_id)].get("is_user")
+                if assignments[str(player_id)]
+                and assignments[str(player_id)].get("is_user")
                 else ""
                 for player_id in indexed["_id"]
             ],
-            "★": ["★" if str(player_id) in watchlist else "" for player_id in indexed["_id"]],
+            "★": [
+                "★" if str(player_id) in watchlist else ""
+                for player_id in indexed["_id"]
+            ],
             "Partecipante": [
                 assignments[str(player_id)]["manager_name"]
-                if assignments[str(player_id)] else unassigned
+                if assignments[str(player_id)]
+                else unassigned
                 for player_id in indexed["_id"]
             ],
             "Prezzo asta": [
                 float(assignments[str(player_id)]["purchase"].get("price") or 0)
-                if assignments[str(player_id)] else 0.0
+                if assignments[str(player_id)]
+                else 0.0
                 for player_id in indexed["_id"]
             ],
             "Fascia personale": [
-                tier_label_by_id.get(str(player_tiers[str(player_id)].get("id")), no_tier)
-                if player_tiers[str(player_id)] else no_tier
+                tier_label_by_id.get(
+                    str(player_tiers[str(player_id)].get("id")), no_tier
+                )
+                if player_tiers[str(player_id)]
+                else no_tier
                 for player_id in indexed["_id"]
             ],
-            "Ruolo": indexed["Ruolo"].map(
-                {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
-            ).fillna(indexed["Ruolo"]),
+            "Ruolo": indexed["Ruolo"]
+            .map({"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"})
+            .fillna(indexed["Ruolo"]),
             "Giocatore": indexed["Giocatore"],
+            "Dati": indexed["Dati"],
             "Stop": [
                 injury_statuses.get(str(player_id), {}).get("indicator", "")
                 for player_id in indexed["_id"]
@@ -1970,7 +2138,9 @@ def _render_auction_catalog_editor(
             "FM attesa": indexed["FM attesa"],
             "Gol attesi": indexed["Gol attesi"],
             "Assist attesi": indexed["Assist attesi"],
-            "Bonus": [player_metric(player_id, "bonus") for player_id in indexed["_id"]],
+            "Bonus": [
+                player_metric(player_id, "bonus") for player_id in indexed["_id"]
+            ],
             "Titolarita": indexed["Titolarita %"],
             "Affidabilita": [
                 player_metric(player_id, "reliability") for player_id in indexed["_id"]
@@ -2029,6 +2199,7 @@ def _render_auction_catalog_editor(
             {"field": "_player_id", "hide": True},
             {"field": "_assigned", "hide": True},
             {"field": "_injury_detail", "hide": True},
+            {"field": "_analysis_detail", "hide": True},
             {
                 "field": "Scheda",
                 "headerName": "Apri",
@@ -2079,6 +2250,12 @@ def _render_auction_catalog_editor(
                 "pinned": "left",
                 "lockPinned": True,
                 "suppressMovable": True,
+            },
+            {
+                "field": "Dati",
+                "width": 82,
+                "tooltipField": "_analysis_detail",
+                "cellStyle": {"color": "#62d8ff", "fontWeight": "700"},
             },
             {
                 "field": "Stop",
@@ -2229,35 +2406,44 @@ def _render_auction_catalog_editor(
         edited_name = str(edited_row.get("Partecipante") or unassigned)
         raw_price = edited_row.get("Prezzo asta")
         edited_price = float(raw_price) if pd.notna(raw_price) else 0.0
-        current_price = (
-            float(current["purchase"].get("price") or 0) if current else 0.0
-        )
+        current_price = float(current["purchase"].get("price") or 0) if current else 0.0
         current_tier = player_tiers[clean_id]
         current_tier_label = (
             tier_label_by_id.get(str(current_tier.get("id")), no_tier)
-            if current_tier else no_tier
+            if current_tier
+            else no_tier
         )
         edited_tier_label = str(edited_row.get("Fascia personale") or no_tier)
         owner_changed = edited_name != current_name
-        price_changed = current is not None and abs(edited_price - current_price) > 0.001
+        price_changed = (
+            current is not None and abs(edited_price - current_price) > 0.001
+        )
         tier_changed = edited_tier_label != current_tier_label
         current_note = player_note(league, clean_id)
         edited_note = str(edited_row.get("Note") or "").strip()
         note_changed = edited_note != current_note
-        if not owner_changed and not price_changed and not tier_changed and not note_changed:
+        if (
+            not owner_changed
+            and not price_changed
+            and not tier_changed
+            and not note_changed
+        ):
             continue
         player = by_id.get(clean_id)
         if not player:
             continue
         change = {
             "player": player,
-            "manager_id": None if edited_name == unassigned else manager_id_by_name[edited_name],
+            "manager_id": None
+            if edited_name == unassigned
+            else manager_id_by_name[edited_name],
             "price": edited_price,
             "update_assignment": owner_changed or price_changed,
         }
         if tier_changed:
             change["tier_id"] = (
-                None if edited_tier_label == no_tier
+                None
+                if edited_tier_label == no_tier
                 else tier_id_by_label[edited_tier_label]
             )
         if note_changed:
@@ -2311,7 +2497,12 @@ def _render_catalog_table(
     ]
     auction_columns = [
         column
-        for column in ("Spesa iniziale", "Spesa aggiornata", "Spesa strategica", "Comparabili")
+        for column in (
+            "Spesa iniziale",
+            "Spesa aggiornata",
+            "Spesa strategica",
+            "Comparabili",
+        )
         if column in indexed.columns
     ]
     compact_columns = compact_columns[:4] + auction_columns + compact_columns[4:]
@@ -2319,16 +2510,22 @@ def _render_catalog_table(
     display.insert(
         0,
         "Rosa",
-        indexed["_id"].map(lambda player_id: "✓" if player_id in (purchased_ids or set()) else ""),
+        indexed["_id"].map(
+            lambda player_id: "✓" if player_id in (purchased_ids or set()) else ""
+        ),
     )
     display.insert(
         1,
         "Watch",
-        indexed["_id"].map(lambda player_id: "★" if player_id in (watchlist or set()) else ""),
+        indexed["_id"].map(
+            lambda player_id: "★" if player_id in (watchlist or set()) else ""
+        ),
     )
-    display["Ruolo"] = display["Ruolo"].map(
-        {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
-    ).fillna(display["Ruolo"])
+    display["Ruolo"] = (
+        display["Ruolo"]
+        .map({"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"})
+        .fillna(display["Ruolo"])
+    )
     event = st.dataframe(
         display,
         hide_index=True,
@@ -2344,7 +2541,9 @@ def _render_catalog_table(
             "Ruolo": st.column_config.TextColumn(width="small"),
             "Giocatore": st.column_config.TextColumn(width="large"),
             "Squadra": st.column_config.TextColumn(width="small"),
-            "Quotazione": st.column_config.NumberColumn("Q", format="%.0f", width="small"),
+            "Quotazione": st.column_config.NumberColumn(
+                "Q", format="%.0f", width="small"
+            ),
             "Spesa iniziale": st.column_config.NumberColumn(
                 "Spesa iniziale", format="%.0f", width="small"
             ),
@@ -2359,9 +2558,15 @@ def _render_catalog_table(
             ),
             "FM attesa": st.column_config.NumberColumn(format="%.2f", width="small"),
             "Gol attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
-            "Assist attesi": st.column_config.NumberColumn(format="%.1f", width="small"),
+            "Assist attesi": st.column_config.NumberColumn(
+                format="%.1f", width="small"
+            ),
             "Titolarita %": st.column_config.ProgressColumn(
-                "Titolarita", min_value=0, max_value=100, format="%.0f%%", width="medium"
+                "Titolarita",
+                min_value=0,
+                max_value=100,
+                format="%.0f%%",
+                width="medium",
             ),
             "Indice": st.column_config.ProgressColumn(
                 "Score", min_value=0, max_value=100, format="%.0f", width="medium"
@@ -2396,13 +2601,16 @@ def _render_board_actions(
     version_key: str,
 ) -> None:
     if not selected_ids:
-        st.caption("Seleziona un giocatore dalla tabella per registrare l'aggiudicazione.")
+        st.caption(
+            "Seleziona un giocatore dalla tabella per registrare l'aggiudicazione."
+        )
         return
     by_id = {str(player.get("id")): player for player in catalog}
     list_mode = league.get("game_mode") == GAME_MODE_LIST
     purchased_ids = (
         {str(row.get("player_id")) for row in league.get("purchases", [])}
-        if list_mode else auction_taken_player_ids(league)
+        if list_mode
+        else auction_taken_player_ids(league)
     )
     selected_players = [
         by_id[player_id]
@@ -2410,18 +2618,22 @@ def _render_board_actions(
         if player_id in by_id and player_id not in purchased_ids
     ]
     already_owned = len(selected_ids) - len(selected_players)
-    total_quote = sum(_number_or_none(player.get("quote"), 0) or 0 for player in selected_players)
+    total_quote = sum(
+        _number_or_none(player.get("quote"), 0) or 0 for player in selected_players
+    )
     names = ", ".join(str(player.get("name")) for player in selected_players[:3])
     if len(selected_players) > 3:
         names += f" e altri {len(selected_players) - 3}"
     st.markdown(
         f'<div class="fantasy-selection-bar"><div><strong>{len(selected_players)} selezionati</strong>'
-        f'<span>{escape(names or "Solo giocatori gia in rosa")}</span></div>'
-        f'<b>{total_quote:.0f} crediti</b></div>',
+        f"<span>{escape(names or 'Solo giocatori gia in rosa')}</span></div>"
+        f"<b>{total_quote:.0f} crediti</b></div>",
         unsafe_allow_html=True,
     )
     if already_owned:
-        st.caption(f"{already_owned} giocatori selezionati sono gia presenti nella rosa e verranno ignorati.")
+        st.caption(
+            f"{already_owned} giocatori selezionati sono gia presenti nella rosa e verranno ignorati."
+        )
 
     price = None
     manager_id = None
@@ -2435,7 +2647,9 @@ def _render_board_actions(
             "Squadra che ha acquistato",
             [str(manager.get("id")) for manager in managers],
             format_func=lambda value: next(
-                str(manager.get("name")) for manager in managers if manager.get("id") == value
+                str(manager.get("name"))
+                for manager in managers
+                if manager.get("id") == value
             ),
             key=f"board_manager_{league['id']}_{player.get('id')}",
         )
@@ -2458,13 +2672,18 @@ def _render_board_actions(
             f"{estimate.get('comparables', 0)} acquisti comparabili"
         )
     elif not list_mode and len(selected_players) > 1:
-        st.info("In modalita asta seleziona un solo giocatore alla volta per indicare il prezzo battuto.")
+        st.info(
+            "In modalita asta seleziona un solo giocatore alla volta per indicare il prezzo battuto."
+        )
 
     add_column, watch_column, clear_column = st.columns([1.25, 1, 0.65])
-    add_disabled = not selected_players or (not list_mode and len(selected_players) != 1)
+    add_disabled = not selected_players or (
+        not list_mode and len(selected_players) != 1
+    )
     add_label = (
         f"Aggiungi {len(selected_players)} alla rosa"
-        if list_mode else "Registra acquisto"
+        if list_mode
+        else "Registra acquisto"
     )
     if add_column.button(
         add_label,
@@ -2488,11 +2707,15 @@ def _render_board_actions(
         else:
             touch_workspace(workspace)
             _save_workspace(workspace, storage)
-            st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
+            st.session_state[version_key] = (
+                int(st.session_state.get(version_key, 0)) + 1
+            )
             st.rerun()
 
     missing_watchlist = [
-        player for player in selected_players if str(player.get("id")) not in league.get("watchlist", [])
+        player
+        for player in selected_players
+        if str(player.get("id")) not in league.get("watchlist", [])
     ]
     if watch_column.button(
         f"Osserva selezionati ({len(missing_watchlist)})",
@@ -2527,18 +2750,22 @@ def _render_role_advisors(
         if (advice := role_balance_recommendation(league, catalog, role)) is not None
     ]
     if not advices:
-        st.caption("I consigli di completamento si attivano quando raggiungi almeno meta degli slot di un ruolo.")
+        st.caption(
+            "I consigli di completamento si attivano quando raggiungi almeno meta degli slot di un ruolo."
+        )
         return
 
     st.markdown(
         '<div class="fantasy-advisor-heading"><span>SCOUT INTELLIGENTE</span>'
-        '<strong>Cosa manca alla tua rosa</strong></div>',
+        "<strong>Cosa manca alla tua rosa</strong></div>",
         unsafe_allow_html=True,
     )
-    tabs = st.tabs([
-        f"{advice['role']} · {advice['count']}/{advice['target']}"
-        for advice in advices
-    ])
+    tabs = st.tabs(
+        [
+            f"{advice['role']} · {advice['count']}/{advice['target']}"
+            for advice in advices
+        ]
+    )
     for tab, advice in zip(tabs, advices):
         with tab:
             st.markdown(f"#### {advice['title']}")
@@ -2586,7 +2813,9 @@ def _render_role_advisors(
             )
             candidate = by_id[candidate_id]
             if league.get("game_mode") == GAME_MODE_LIST:
-                price_column.metric("Costo", f"{float(candidate.get('quote') or 0):.0f}")
+                price_column.metric(
+                    "Costo", f"{float(candidate.get('quote') or 0):.0f}"
+                )
                 price = float(candidate.get("quote") or 0)
             else:
                 summary = roster_summary(league)
@@ -2594,11 +2823,16 @@ def _render_role_advisors(
                     "Prezzo",
                     min_value=0.0,
                     max_value=float(max(summary["remaining_budget"], 1)),
-                    value=min(float(candidate.get("quote") or 1), float(summary["remaining_budget"])),
+                    value=min(
+                        float(candidate.get("quote") or 1),
+                        float(summary["remaining_budget"]),
+                    ),
                     key=f"advisor_price_{league['id']}_{advice['role']}_{candidate_id}",
                 )
             if action_column.button(
-                "Aggiungi alla rosa" if league.get("game_mode") == GAME_MODE_LIST else "Acquista",
+                "Aggiungi alla rosa"
+                if league.get("game_mode") == GAME_MODE_LIST
+                else "Acquista",
                 type="primary",
                 use_container_width=True,
                 key=f"advisor_add_{league['id']}_{advice['role']}",
@@ -2611,7 +2845,9 @@ def _render_role_advisors(
                     touch_workspace(workspace)
                     _save_workspace(workspace, storage)
                     version_key = f"catalog_board_version_{league['id']}"
-                    st.session_state[version_key] = int(st.session_state.get(version_key, 0)) + 1
+                    st.session_state[version_key] = (
+                        int(st.session_state.get(version_key, 0)) + 1
+                    )
                     st.rerun()
 
 
@@ -2648,14 +2884,16 @@ def _render_top_players_visual_lab(
         return
     with st.expander("✦ Player Intelligence Lab · esplora i migliori", expanded=False):
         st.caption(
-            "Tre letture avanzate del listone: costellazione dei bonus, frontiera qualita/prezzo "
-            "e impronta multidimensionale. Passa sul grafico per leggere tutti i valori."
+            "Due letture avanzate del listone: costellazione dei bonus e frontiera "
+            "tra fantamedia attesa e spesa aggiornata. Passa sul grafico per leggere tutti i valori."
         )
         role_column, metric_column, starter_column = st.columns([0.8, 1.2, 1])
         role_filter = role_column.selectbox(
             "Reparto",
             ["Tutti", "P", "D", "C", "A"],
-            format_func=lambda value: "Tutti i ruoli" if value == "Tutti" else ROLE_LABELS[value],
+            format_func=lambda value: (
+                "Tutti i ruoli" if value == "Tutti" else ROLE_LABELS[value]
+            ),
             key=f"visual_lab_role_{league['id']}",
         )
         metric_label = metric_column.selectbox(
@@ -2672,8 +2910,14 @@ def _render_top_players_visual_lab(
             key=f"visual_lab_starter_{league['id']}",
         )
 
+        price_board = auction_price_board(league, catalog)
         filtered = [
-            player
+            {
+                **player,
+                "_updated_spend": price_board.get(str(player.get("id") or ""), {}).get(
+                    "updated"
+                ),
+            }
             for player in catalog
             if (role_filter == "Tutti" or str(player.get("role")) == role_filter)
             and analytics_number(player.get("starter_probability")) >= minimum_starter
@@ -2691,8 +2935,8 @@ def _render_top_players_visual_lab(
         top_ids = {str(player.get("id")) for player in top_players}
         frame["Top selezionato"] = frame["_id"].isin(top_ids)
 
-        constellation_tab, frontier_tab, fingerprint_tab = st.tabs(
-            ["Costellazione bonus", "Frontiera del valore", "Impronta top player"]
+        constellation_tab, frontier_tab = st.tabs(
+            ["Costellazione bonus", "Frontiera del valore"]
         )
         with constellation_tab:
             _render_bonus_constellation(
@@ -2710,13 +2954,6 @@ def _render_top_players_visual_lab(
                 top_ids,
                 key=f"frontier_{league['id']}",
             )
-        with fingerprint_tab:
-            _render_parallel_fingerprint(
-                top_players,
-                metric_label,
-                metric_field,
-                key=f"fingerprint_{league['id']}",
-            )
 
 
 def _players_analytics_frame(players: list[dict[str, Any]]) -> pd.DataFrame:
@@ -2730,11 +2967,14 @@ def _players_analytics_frame(players: list[dict[str, Any]]) -> pd.DataFrame:
                 "Squadra": str(player.get("team") or ""),
                 "Ruolo": str(player.get("role") or ""),
                 "Quotazione": analytics_number(player.get("quote")),
+                "Spesa aggiornata": analytics_number(player.get("_updated_spend")),
                 "FM attesa": analytics_number(player.get("expected_fantasy_average")),
                 "Gol attesi": analytics_number(player.get("expected_goals")),
                 "Assist attesi": analytics_number(player.get("expected_assists")),
                 "Bonus attesi": analytics_number(derived.get("expected_bonus_points")),
-                "Bonus per presenza": analytics_number(derived.get("expected_bonus_per_appearance")),
+                "Bonus per presenza": analytics_number(
+                    derived.get("expected_bonus_per_appearance")
+                ),
                 "Propensione bonus": analytics_number(player.get("bonus")),
                 "Titolarita": analytics_number(player.get("starter_probability")),
                 "Affidabilita": analytics_number(player.get("reliability")),
@@ -2742,7 +2982,9 @@ def _players_analytics_frame(players: list[dict[str, Any]]) -> pd.DataFrame:
                 "Rischio": analytics_number(player.get("risk")),
                 "Valore": analytics_number(player.get("value")),
                 "Fanta Score": analytics_number(player.get("fantasy_score")),
-                "Presenze attese": max(analytics_number(player.get("expected_appearances")), 3),
+                "Presenze attese": max(
+                    analytics_number(player.get("expected_appearances")), 3
+                ),
             }
         )
     return pd.DataFrame(rows)
@@ -2755,7 +2997,11 @@ def _plotly_base_layout(*, height: int = 560) -> dict[str, Any]:
         "paper_bgcolor": "rgba(0,0,0,0)",
         "plot_bgcolor": "rgba(8,10,11,.3)",
         "font": {"family": "Inter, system-ui, sans-serif", "color": "#dce8e3"},
-        "hoverlabel": {"bgcolor": "#111718", "font_color": "#f4fbf7", "bordercolor": "#19e6b0"},
+        "hoverlabel": {
+            "bgcolor": "#111718",
+            "font_color": "#f4fbf7",
+            "bordercolor": "#19e6b0",
+        },
         "legend": {"orientation": "h", "y": 1.08, "x": 0},
     }
 
@@ -2825,12 +3071,17 @@ def _render_bonus_constellation(
     )
     figure.update_layout(
         **_plotly_base_layout(),
-        title={"text": f"<b>Costellazione dei top · {metric_label}</b><br><sup>In alto a destra vivono i profili piu completi nei bonus</sup>", "x": 0.01},
+        title={
+            "text": f"<b>Costellazione dei top · {metric_label}</b><br><sup>In alto a destra vivono i profili piu completi nei bonus</sup>",
+            "x": 0.01,
+        },
         coloraxis_colorbar={"title": metric_label, "thickness": 10},
     )
     figure.update_xaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
     figure.update_yaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
-    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+    st.plotly_chart(
+        figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key
+    )
 
 
 def _render_value_frontier(
@@ -2841,13 +3092,19 @@ def _render_value_frontier(
     *,
     key: str,
 ) -> None:
-    chart = frame[frame["Quotazione"] > 0].copy()
+    chart = frame[frame["Spesa aggiornata"] > 0].copy()
+    if chart.empty:
+        st.info(
+            "La spesa aggiornata e disponibile nella modalita asta, dopo aver "
+            "configurato partecipanti e budget."
+        )
+        return
     chart["Etichetta"] = chart.apply(
         lambda row: row["Giocatore"] if row["_id"] in top_ids else "", axis=1
     )
     figure = px.scatter(
         chart,
-        x="Quotazione",
+        x="Spesa aggiornata",
         y="FM attesa",
         size="Bonus attesi",
         color="Ruolo",
@@ -2866,76 +3123,46 @@ def _render_value_frontier(
         },
         size_max=32,
     )
-    frontier = pareto_frontier(players)
+    frontier = pareto_frontier(players, cost_field="_updated_spend")
     if frontier:
         figure.add_trace(
             go.Scatter(
-                x=[analytics_number(player.get("quote")) for player in frontier],
-                y=[analytics_number(player.get("expected_fantasy_average")) for player in frontier],
+                x=[
+                    analytics_number(player.get("_updated_spend"))
+                    for player in frontier
+                ],
+                y=[
+                    analytics_number(player.get("expected_fantasy_average"))
+                    for player in frontier
+                ],
                 mode="lines+markers",
                 name="Frontiera efficiente",
                 line={"color": "#ffb020", "width": 3, "shape": "spline"},
                 marker={"size": 8, "symbol": "diamond", "color": "#ffb020"},
                 customdata=[[str(player.get("name") or "")] for player in frontier],
-                hovertemplate="%{customdata[0]}<br>Q %{x:.0f}<br>FM %{y:.2f}<extra>Frontiera</extra>",
+                hovertemplate="%{customdata[0]}<br>Spesa aggiornata %{x:.0f}<br>FM %{y:.2f}<extra>Frontiera</extra>",
             )
         )
     figure.update_traces(
-        marker={"line": {"width": 1, "color": "rgba(244,251,247,.38)"}, "opacity": 0.78},
+        marker={
+            "line": {"width": 1, "color": "rgba(244,251,247,.38)"},
+            "opacity": 0.78,
+        },
         textposition="top center",
         selector={"mode": "markers+text"},
     )
     figure.update_layout(
         **_plotly_base_layout(),
-        title={"text": f"<b>Frontiera qualita/prezzo</b><br><sup>La linea ambra evidenzia chi offre piu FM senza pagare crediti inutili · top per {metric_label}</sup>", "x": 0.01},
+        title={
+            "text": f"<b>Frontiera FM attesa/spesa aggiornata</b><br><sup>La linea ambra evidenzia chi offre piu FM rispetto al costo aggiornato dell'asta · top per {metric_label}</sup>",
+            "x": 0.01,
+        },
     )
     figure.update_xaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
     figure.update_yaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
-    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
-
-
-def _render_parallel_fingerprint(
-    players: list[dict[str, Any]],
-    metric_label: str,
-    metric_field: str,
-    *,
-    key: str,
-) -> None:
-    if not players:
-        st.info("Non ci sono giocatori sufficienti per il confronto multidimensionale.")
-        return
-    names = [str(player.get("name") or "") for player in players]
-    values = [analytics_number(player.get(metric_field)) for player in players]
-    dimensions = [
-        dict(range=[0, max(9, max(analytics_number(p.get("expected_fantasy_average")) for p in players))], label="FM", values=[analytics_number(p.get("expected_fantasy_average")) for p in players]),
-        dict(range=[0, max(1, max(analytics_number(p.get("expected_goals")) for p in players))], label="Gol", values=[analytics_number(p.get("expected_goals")) for p in players]),
-        dict(range=[0, max(1, max(analytics_number(p.get("expected_assists")) for p in players))], label="Assist", values=[analytics_number(p.get("expected_assists")) for p in players]),
-        dict(range=[0, 100], label="Titolarita", values=[analytics_number(p.get("starter_probability")) for p in players]),
-        dict(range=[0, 100], label="Affidabilita", values=[analytics_number(p.get("reliability")) for p in players]),
-        dict(range=[0, 100], label="Potenziale", values=[analytics_number(p.get("potential")) for p in players]),
-        dict(range=[0, 100], label="Integrita", values=[100 - analytics_number(p.get("risk")) for p in players]),
-        dict(range=[0, 100], label="Valore", values=[analytics_number(p.get("value")) for p in players]),
-    ]
-    figure = go.Figure(
-        data=go.Parcoords(
-            line={
-                "color": values,
-                "colorscale": [[0, "#19322d"], [0.5, "#19e6b0"], [0.8, "#ffb020"], [1, "#f4538a"]],
-                "showscale": True,
-                "colorbar": {"title": metric_label, "thickness": 10},
-            },
-            dimensions=dimensions,
-            labelfont={"color": "#f4fbf7", "size": 12},
-            tickfont={"color": "#9dafaa", "size": 10},
-            rangefont={"color": "#9dafaa", "size": 9},
-        )
+    st.plotly_chart(
+        figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key
     )
-    figure.update_layout(
-        **_plotly_base_layout(height=590),
-        title={"text": f"<b>Impronta dei migliori {len(players)}</b><br><sup>Ogni linea e un giocatore: segui il profilo sulle otto dimensioni</sup>", "x": 0.01},
-    )
-    st.caption("Giocatori inclusi: " + " · ".join(names))
-    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
 
 
 def _render_player_detail(
@@ -2947,27 +3174,52 @@ def _render_player_detail(
     role = str(player.get("role", ""))
     catalog = workspace.get("catalog", [])
     derived = player_derived_stats(player)
-    role_names = {"P": "Portiere", "D": "Difensore", "C": "Centrocampista", "A": "Attaccante"}
+    injury_status = _catalog_injury_statuses([player]).get(
+        str(player.get("id") or ""), {}
+    )
+    displayed_injury_risk = max(
+        analytics_number(player.get("risk")),
+        analytics_number(injury_status.get("risk_floor")),
+    )
+    role_names = {
+        "P": "Portiere",
+        "D": "Difensore",
+        "C": "Centrocampista",
+        "A": "Attaccante",
+    }
     st.markdown(
         f"""
         <section class="fantasy-player-hero role-{role.lower()}">
             <div class="fantasy-player-role">{escape(role)}</div>
             <div class="fantasy-player-title">
-                <span>{escape(role_names.get(role, 'Calciatore'))} · {escape(str(player.get('team') or 'Svincolato'))}</span>
-                <h3>{escape(str(player.get('name') or ''))}</h3>
-                <p>{escape(str(player.get('status') or 'Stato non disponibile'))} · {escape(str(player.get('profile') or 'Profilo in analisi'))}</p>
+                <span>{escape(role_names.get(role, "Calciatore"))} · {escape(str(player.get("team") or "Svincolato"))}</span>
+                <h3>{escape(str(player.get("name") or ""))}</h3>
+                <p>{escape(str(player.get("status") or "Stato non disponibile"))} · {escape(str(player.get("profile") or "Profilo in analisi"))}</p>
             </div>
-            <div class="fantasy-player-score"><small>FANTA SCORE</small><strong>{_format_stat(player.get('fantasy_score'), 0)}</strong><span>{escape(str(player.get('tier') or '—'))}</span></div>
+            <div class="fantasy-player-score"><small>FANTA SCORE</small><strong>{_format_stat(player.get("fantasy_score"), 0)}</strong><span>{escape(str(player.get("tier") or "—"))}</span></div>
         </section>
         """,
         unsafe_allow_html=True,
     )
+    if player.get("analysis_estimated"):
+        comparables = ", ".join(
+            str(value) for value in player.get("analysis_comparables", []) if value
+        )
+        st.info(
+            "I valori attesi di questo nuovo giocatore sono stimati automaticamente "
+            "da quotazione, FVM e comparabili dello stesso ruolo"
+            + (f": {comparables}." if comparables else ".")
+        )
 
     quote, fvm, expected_fm, starter = st.columns(4)
     quote.metric("Quotazione", _format_stat(player.get("quote"), 0))
     fvm.metric("FVM / 1000", _format_stat(player.get("fvm"), 0))
-    expected_fm.metric("Fantamedia attesa", _format_stat(player.get("expected_fantasy_average"), 2))
-    starter.metric("Titolarita", _format_stat(player.get("starter_probability"), 0, "%"))
+    expected_fm.metric(
+        "Fantamedia attesa", _format_stat(player.get("expected_fantasy_average"), 2)
+    )
+    starter.metric(
+        "Titolarita", _format_stat(player.get("starter_probability"), 0, "%")
+    )
 
     watchlist = set(league.get("watchlist", []))
     is_watched = player.get("id") in watchlist
@@ -2996,67 +3248,93 @@ def _render_player_detail(
     with visual_tab:
         _render_player_visuals(player, catalog)
     with projection_tab:
-        _render_stat_grid([
-            ("Presenze attese", player.get("expected_appearances"), 0),
-            ("Disponibilita attesa", derived.get("expected_availability"), 0, "%"),
-            ("Gol attesi", player.get("expected_goals"), 1),
-            ("Assist attesi", player.get("expected_assists"), 1),
-            ("Partecipazioni gol", derived.get("expected_goal_involvements"), 1),
-            ("Punti bonus attesi", derived.get("expected_bonus_points"), 1),
-            ("Gol attesi / presenza", derived.get("expected_goals_per_appearance"), 2),
-            ("Assist attesi / presenza", derived.get("expected_assists_per_appearance"), 2),
-            ("Bonus attesi / presenza", derived.get("expected_bonus_per_appearance"), 2),
-            ("Fantamedia attesa", player.get("expected_fantasy_average"), 2),
-            ("Variazione FM", derived.get("fantasy_average_delta"), 2),
-            ("Titolarita", player.get("starter_probability"), 0, "%"),
-            ("Affidabilita", player.get("reliability"), 0),
-            ("Propensione bonus", player.get("bonus"), 0),
-            ("Potenziale", player.get("potential"), 0),
-            ("Rischio infortuni", player.get("risk"), 0),
-            ("Valore", player.get("value"), 0),
-            ("Fanta Score", player.get("fantasy_score"), 0),
-        ])
+        _render_stat_grid(
+            [
+                ("Presenze attese", player.get("expected_appearances"), 0),
+                ("Disponibilita attesa", derived.get("expected_availability"), 0, "%"),
+                ("Gol attesi", player.get("expected_goals"), 1),
+                ("Assist attesi", player.get("expected_assists"), 1),
+                ("Partecipazioni gol", derived.get("expected_goal_involvements"), 1),
+                ("Punti bonus attesi", derived.get("expected_bonus_points"), 1),
+                (
+                    "Gol attesi / presenza",
+                    derived.get("expected_goals_per_appearance"),
+                    2,
+                ),
+                (
+                    "Assist attesi / presenza",
+                    derived.get("expected_assists_per_appearance"),
+                    2,
+                ),
+                (
+                    "Bonus attesi / presenza",
+                    derived.get("expected_bonus_per_appearance"),
+                    2,
+                ),
+                ("Fantamedia attesa", player.get("expected_fantasy_average"), 2),
+                ("Variazione FM", derived.get("fantasy_average_delta"), 2),
+                ("Titolarita", player.get("starter_probability"), 0, "%"),
+                ("Affidabilita", player.get("reliability"), 0),
+                ("Propensione bonus", player.get("bonus"), 0),
+                ("Potenziale", player.get("potential"), 0),
+                ("Rischio infortuni", displayed_injury_risk, 0),
+                ("Valore", player.get("value"), 0),
+                ("Fanta Score", player.get("fantasy_score"), 0),
+            ]
+        )
     with season_tab:
-        _render_stat_grid([
-            ("Presenze", player.get("appearances_previous"), 0),
-            ("Media voto", player.get("average_rating_previous"), 2),
-            ("Fantamedia", player.get("fantasy_average_previous"), 2),
-            ("Gol", player.get("goals_previous"), 0),
-            ("Assist", player.get("assists_previous"), 0),
-            ("Partecipazioni gol", derived.get("previous_goal_involvements"), 0),
-            ("Punti bonus", derived.get("previous_bonus_points"), 0),
-            ("Gol / presenza", derived.get("goals_per_appearance"), 2),
-            ("Assist / presenza", derived.get("assists_per_appearance"), 2),
-            ("Bonus / presenza", derived.get("bonus_points_per_appearance"), 2),
-            ("Rigori segnati", player.get("penalties_scored"), 0),
-            ("Rigori tirati", player.get("penalties_taken"), 0),
-            ("Conversione rigori", derived.get("penalty_conversion"), 0, "%"),
-            ("Ammonizioni", player.get("yellow_cards"), 0),
-            ("Espulsioni", player.get("red_cards"), 0),
-            ("Cartellini / presenza", derived.get("cards_per_appearance"), 2),
-            ("Gol subiti", player.get("goals_conceded"), 0),
-            ("Gol subiti / presenza", derived.get("goals_conceded_per_appearance"), 2),
-            ("Rigori parati", player.get("penalties_saved"), 0),
-            ("Goal prevented", player.get("goals_prevented"), 2),
-        ])
+        _render_stat_grid(
+            [
+                ("Presenze", player.get("appearances_previous"), 0),
+                ("Media voto", player.get("average_rating_previous"), 2),
+                ("Fantamedia", player.get("fantasy_average_previous"), 2),
+                ("Gol", player.get("goals_previous"), 0),
+                ("Assist", player.get("assists_previous"), 0),
+                ("Partecipazioni gol", derived.get("previous_goal_involvements"), 0),
+                ("Punti bonus", derived.get("previous_bonus_points"), 0),
+                ("Gol / presenza", derived.get("goals_per_appearance"), 2),
+                ("Assist / presenza", derived.get("assists_per_appearance"), 2),
+                ("Bonus / presenza", derived.get("bonus_points_per_appearance"), 2),
+                ("Rigori segnati", player.get("penalties_scored"), 0),
+                ("Rigori tirati", player.get("penalties_taken"), 0),
+                ("Conversione rigori", derived.get("penalty_conversion"), 0, "%"),
+                ("Ammonizioni", player.get("yellow_cards"), 0),
+                ("Espulsioni", player.get("red_cards"), 0),
+                ("Cartellini / presenza", derived.get("cards_per_appearance"), 2),
+                ("Gol subiti", player.get("goals_conceded"), 0),
+                (
+                    "Gol subiti / presenza",
+                    derived.get("goals_conceded_per_appearance"),
+                    2,
+                ),
+                ("Rigori parati", player.get("penalties_saved"), 0),
+                ("Goal prevented", player.get("goals_prevented"), 2),
+            ]
+        )
     with advanced_tab:
         goals_minus_xg = player.get("goals_minus_xg")
         if goals_minus_xg is None and player.get("xg_previous") is not None:
-            goals_minus_xg = _number_or_none(player.get("goals_previous"), 0) - _number_or_none(player.get("xg_previous"), 0)
+            goals_minus_xg = _number_or_none(
+                player.get("goals_previous"), 0
+            ) - _number_or_none(player.get("xg_previous"), 0)
         assists_minus_xa = player.get("assists_minus_xa")
         if assists_minus_xa is None and player.get("xa_previous") is not None:
-            assists_minus_xa = _number_or_none(player.get("assists_previous"), 0) - _number_or_none(player.get("xa_previous"), 0)
-        _render_stat_grid([
-            ("xG", player.get("xg_previous"), 2),
-            ("xA", player.get("xa_previous"), 2),
-            ("xGI · xG + xA", derived.get("xgi_previous"), 2),
-            ("xG / presenza", derived.get("xg_per_appearance"), 2),
-            ("xA / presenza", derived.get("xa_per_appearance"), 2),
-            ("Gol - xG", goals_minus_xg, 2),
-            ("Assist - xA", assists_minus_xa, 2),
-            ("Goal prevented", player.get("goals_prevented"), 2),
-            ("Copertura dati", derived.get("data_coverage"), 0, "%"),
-        ])
+            assists_minus_xa = _number_or_none(
+                player.get("assists_previous"), 0
+            ) - _number_or_none(player.get("xa_previous"), 0)
+        _render_stat_grid(
+            [
+                ("xG", player.get("xg_previous"), 2),
+                ("xA", player.get("xa_previous"), 2),
+                ("xGI · xG + xA", derived.get("xgi_previous"), 2),
+                ("xG / presenza", derived.get("xg_per_appearance"), 2),
+                ("xA / presenza", derived.get("xa_per_appearance"), 2),
+                ("Gol - xG", goals_minus_xg, 2),
+                ("Assist - xA", assists_minus_xa, 2),
+                ("Goal prevented", player.get("goals_prevented"), 2),
+                ("Copertura dati", derived.get("data_coverage"), 0, "%"),
+            ]
+        )
         _render_role_percentile_strip(player, catalog)
         st.caption(
             "xG, xA e Goal prevented provengono dall'analisi [FotMob](https://www.fotmob.com/leagues/55/overview/serie-a). I tracking fisici "
@@ -3065,27 +3343,39 @@ def _render_player_detail(
         )
     with profile_tab:
         penalty_labels = {1: "Prima scelta", 2: "Seconda scelta"}
-        _render_stat_grid([
-            ("Ruolo Classic", player.get("role"), None),
-            ("Ruolo Mantra", player.get("mantra_role"), None),
-            ("Quotazione iniziale", player.get("initial_quote"), 0),
-            ("Quotazione attuale", player.get("quote"), 0),
-            ("Variazione quotazione", derived.get("current_quote_delta"), 0),
-            ("Quotazione prevista", player.get("predicted_quote"), 0),
-            ("Delta quotazione prevista", derived.get("predicted_quote_delta"), 0),
-            ("FVM / 1000", player.get("fvm"), 0),
-            ("FVM / credito", derived.get("fvm_per_credit"), 2),
-            ("FM attesa / credito", derived.get("fantasy_average_per_credit"), 3),
-            ("Bonus attesi / credito", derived.get("expected_bonus_per_credit"), 2),
-            ("Score / credito", derived.get("score_per_credit"), 2),
-            ("Rigorista", penalty_labels.get(_int_or_none(player.get("penalty_taker")), "No"), None),
-            ("Piazzati", penalty_labels.get(_int_or_none(player.get("set_pieces")), "No"), None),
-            ("Stato 26/27", player.get("status"), None),
-            ("Qualita dati", player.get("data_quality"), None),
-            ("Fascia", player.get("tier"), None),
-            ("Profilo", player.get("profile"), None),
-            ("Fonte", player.get("source"), None),
-        ])
+        _render_stat_grid(
+            [
+                ("Ruolo Classic", player.get("role"), None),
+                ("Ruolo Mantra", player.get("mantra_role"), None),
+                ("Quotazione iniziale", player.get("initial_quote"), 0),
+                ("Quotazione attuale", player.get("quote"), 0),
+                ("Variazione quotazione", derived.get("current_quote_delta"), 0),
+                ("Quotazione prevista", player.get("predicted_quote"), 0),
+                ("Delta quotazione prevista", derived.get("predicted_quote_delta"), 0),
+                ("FVM / 1000", player.get("fvm"), 0),
+                ("FVM / credito", derived.get("fvm_per_credit"), 2),
+                ("FM attesa / credito", derived.get("fantasy_average_per_credit"), 3),
+                ("Bonus attesi / credito", derived.get("expected_bonus_per_credit"), 2),
+                ("Score / credito", derived.get("score_per_credit"), 2),
+                (
+                    "Rigorista",
+                    penalty_labels.get(_int_or_none(player.get("penalty_taker")), "No"),
+                    None,
+                ),
+                (
+                    "Piazzati",
+                    penalty_labels.get(_int_or_none(player.get("set_pieces")), "No"),
+                    None,
+                ),
+                ("Stato 26/27", player.get("status"), None),
+                ("Qualita dati", player.get("data_quality"), None),
+                ("Origine analisi", player.get("analysis_source"), None),
+                ("Origine rischio", player.get("risk_source"), None),
+                ("Fascia", player.get("tier"), None),
+                ("Profilo", player.get("profile"), None),
+                ("Fonte", player.get("source"), None),
+            ]
+        )
 
 
 def _render_player_assignment_editor(
@@ -3107,7 +3397,9 @@ def _render_player_assignment_editor(
     current_tier = auction_player_tier(league, player_id)
     current_tier_id = str(current_tier.get("id")) if current_tier else ""
 
-    with st.expander("Gestisci acquisto · fantallenatore, prezzo e fascia", expanded=False):
+    with st.expander(
+        "Gestisci acquisto · fantallenatore, prezzo e fascia", expanded=False
+    ):
         st.caption(
             "Puoi correggere in qualsiasi momento chi ha comprato il giocatore, "
             "il prezzo pagato e la fascia personale."
@@ -3119,11 +3411,13 @@ def _render_player_assignment_editor(
             manager_options,
             index=(
                 manager_options.index(current_manager_id)
-                if current_manager_id in manager_options else 0
+                if current_manager_id in manager_options
+                else 0
             ),
             format_func=lambda value: (
                 "— Non assegnato —"
-                if not value else str(manager_by_id[value].get("name") or "")
+                if not value
+                else str(manager_by_id[value].get("name") or "")
             ),
             key=f"detail_owner_{league['id']}_{player_id}",
         )
@@ -3140,9 +3434,15 @@ def _render_player_assignment_editor(
         selected_tier_id = tier_column.selectbox(
             "Fascia personale",
             tier_options,
-            index=(tier_options.index(current_tier_id) if current_tier_id in tier_options else 0),
+            index=(
+                tier_options.index(current_tier_id)
+                if current_tier_id in tier_options
+                else 0
+            ),
             format_func=lambda value: (
-                "— Nessuna fascia —" if not value else _tier_option_label(tier_by_id[value])
+                "— Nessuna fascia —"
+                if not value
+                else _tier_option_label(tier_by_id[value])
             ),
             key=f"detail_tier_{league['id']}_{player_id}",
         )
@@ -3179,7 +3479,10 @@ def _render_player_assignment_editor(
                 _save_workspace(workspace, storage)
                 st.rerun()
 
-def _render_player_visuals(player: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
+
+def _render_player_visuals(
+    player: dict[str, Any], catalog: list[dict[str, Any]]
+) -> None:
     player_id = str(player.get("id") or player.get("name") or "player")
     radar_tab, peers_tab, evolution_tab = st.tabs(
         ["DNA nel ruolo", "Mappa dei concorrenti", "Storico → proiezione"]
@@ -3197,7 +3500,9 @@ def _render_player_radar(
 ) -> None:
     percentiles = role_percentiles(player, catalog)
     labels = [label for _, label, _ in PERCENTILE_METRICS]
-    values = [analytics_number(percentiles.get(field)) for field, _, _ in PERCENTILE_METRICS]
+    values = [
+        analytics_number(percentiles.get(field)) for field, _, _ in PERCENTILE_METRICS
+    ]
     labels_closed = [*labels, labels[0]]
     values_closed = [*values, values[0]]
     figure = go.Figure()
@@ -3219,23 +3524,39 @@ def _render_player_radar(
             fill="toself",
             fillcolor="rgba(25,230,176,.18)",
             line={"color": "#19e6b0", "width": 3},
-            marker={"size": 8, "color": "#f4fbf7", "line": {"color": "#19e6b0", "width": 2}},
+            marker={
+                "size": 8,
+                "color": "#f4fbf7",
+                "line": {"color": "#19e6b0", "width": 2},
+            },
             name=str(player.get("name") or "Giocatore"),
             hovertemplate="%{theta}: percentile %{r:.0f}<extra></extra>",
         )
     )
     figure.update_layout(
         **_plotly_base_layout(height=540),
-        title={"text": f"<b>DNA di {escape(str(player.get('name') or ''))}</b><br><sup>Percentile rispetto agli altri {ROLE_LABELS.get(str(player.get('role')), 'giocatori')}</sup>", "x": 0.01},
+        title={
+            "text": f"<b>DNA di {escape(str(player.get('name') or ''))}</b><br><sup>Percentile rispetto agli altri {ROLE_LABELS.get(str(player.get('role')), 'giocatori')}</sup>",
+            "x": 0.01,
+        },
         polar={
             "bgcolor": "rgba(8,10,11,.24)",
-            "radialaxis": {"range": [0, 100], "tickvals": [25, 50, 75, 100], "gridcolor": "rgba(244,251,247,.12)", "showline": False},
+            "radialaxis": {
+                "range": [0, 100],
+                "tickvals": [25, 50, 75, 100],
+                "gridcolor": "rgba(244,251,247,.12)",
+                "showline": False,
+            },
             "angularaxis": {"gridcolor": "rgba(244,251,247,.10)"},
         },
         showlegend=False,
     )
-    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
-    st.caption("Un valore 80 significa che il giocatore supera l'80% dei pari ruolo. Integrita e il rischio infortuni invertito.")
+    st.plotly_chart(
+        figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key
+    )
+    st.caption(
+        "Un valore 80 significa che il giocatore supera l'80% dei pari ruolo. Integrita e il rischio infortuni invertito."
+    )
 
 
 def _render_player_peer_map(
@@ -3249,9 +3570,12 @@ def _render_player_peer_map(
         return
     frame["Selezionato"] = frame["_id"].eq(str(player.get("id") or ""))
     frame["Etichetta"] = frame.apply(
-        lambda row: row["Giocatore"]
-        if row["Selezionato"] or row["Fanta Score"] >= frame["Fanta Score"].quantile(.92)
-        else "",
+        lambda row: (
+            row["Giocatore"]
+            if row["Selezionato"]
+            or row["Fanta Score"] >= frame["Fanta Score"].quantile(0.92)
+            else ""
+        ),
         axis=1,
     )
     figure = px.scatter(
@@ -3284,38 +3608,71 @@ def _render_player_peer_map(
                 mode="markers+text",
                 text=selected["Giocatore"],
                 textposition="bottom center",
-                marker={"size": 25, "symbol": "star", "color": "#f4fbf7", "line": {"color": "#f4538a", "width": 3}},
+                marker={
+                    "size": 25,
+                    "symbol": "star",
+                    "color": "#f4fbf7",
+                    "line": {"color": "#f4538a", "width": 3},
+                },
                 name="Giocatore selezionato",
                 hoverinfo="skip",
             )
         )
-    figure.add_vline(x=float(frame["Bonus per presenza"].median()), line_dash="dot", line_color="rgba(244,251,247,.22)")
-    figure.add_hline(y=float(frame["FM attesa"].median()), line_dash="dot", line_color="rgba(244,251,247,.22)")
+    figure.add_vline(
+        x=float(frame["Bonus per presenza"].median()),
+        line_dash="dot",
+        line_color="rgba(244,251,247,.22)",
+    )
+    figure.add_hline(
+        y=float(frame["FM attesa"].median()),
+        line_dash="dot",
+        line_color="rgba(244,251,247,.22)",
+    )
     figure.update_traces(textposition="top center", selector={"mode": "markers+text"})
     figure.update_layout(
         **_plotly_base_layout(),
-        title={"text": "<b>Mappa dei concorrenti diretti</b><br><sup>La stella e il giocatore selezionato; in alto a destra bonus e rendimento si incontrano</sup>", "x": 0.01},
+        title={
+            "text": "<b>Mappa dei concorrenti diretti</b><br><sup>La stella e il giocatore selezionato; in alto a destra bonus e rendimento si incontrano</sup>",
+            "x": 0.01,
+        },
         coloraxis_colorbar={"title": "Affidabilita", "thickness": 10},
     )
     figure.update_xaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
     figure.update_yaxes(gridcolor="rgba(244,251,247,.08)", zeroline=False)
-    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+    st.plotly_chart(
+        figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key
+    )
 
 
 def _render_player_dumbbell(player: dict[str, Any], *, key: str) -> None:
     metrics = [
-        ("Presenze", player.get("appearances_previous"), player.get("expected_appearances")),
+        (
+            "Presenze",
+            player.get("appearances_previous"),
+            player.get("expected_appearances"),
+        ),
         ("Gol", player.get("goals_previous"), player.get("expected_goals")),
         ("Assist", player.get("assists_previous"), player.get("expected_assists")),
-        ("Fantamedia", player.get("fantasy_average_previous"), player.get("expected_fantasy_average")),
+        (
+            "Fantamedia",
+            player.get("fantasy_average_previous"),
+            player.get("expected_fantasy_average"),
+        ),
     ]
     available = [
-        (label, analytics_optional_number(previous), analytics_optional_number(expected))
+        (
+            label,
+            analytics_optional_number(previous),
+            analytics_optional_number(expected),
+        )
         for label, previous, expected in metrics
-        if analytics_optional_number(previous) is not None and analytics_optional_number(expected) is not None
+        if analytics_optional_number(previous) is not None
+        and analytics_optional_number(expected) is not None
     ]
     if not available:
-        st.info("Non ci sono dati storici e previsionali sufficienti per questa evoluzione.")
+        st.info(
+            "Non ci sono dati storici e previsionali sufficienti per questa evoluzione."
+        )
         return
     figure = go.Figure()
     for index, (label, previous, expected) in enumerate(available):
@@ -3348,35 +3705,61 @@ def _render_player_dumbbell(player: dict[str, Any], *, key: str) -> None:
             mode="markers+text",
             text=[f"{expected:.1f}" for _, _, expected in available],
             textposition="middle right",
-            marker={"size": 17, "color": "#19e6b0", "line": {"width": 2, "color": "#f4fbf7"}},
+            marker={
+                "size": 17,
+                "color": "#19e6b0",
+                "line": {"width": 2, "color": "#f4fbf7"},
+            },
             name="Proiezione 26/27",
             hovertemplate="%{y}: %{x:.2f}<extra>Proiezione 26/27</extra>",
         )
     )
     figure.update_layout(
         **_plotly_base_layout(height=470),
-        title={"text": "<b>Traiettoria attesa</b><br><sup>Il collegamento mostra la distanza tra ultima stagione e proiezione</sup>", "x": 0.01},
+        title={
+            "text": "<b>Traiettoria attesa</b><br><sup>Il collegamento mostra la distanza tra ultima stagione e proiezione</sup>",
+            "x": 0.01,
+        },
         xaxis={"gridcolor": "rgba(244,251,247,.08)", "zeroline": False},
-        yaxis={"gridcolor": "rgba(244,251,247,.06)", "categoryorder": "array", "categoryarray": [label for label, _, _ in reversed(available)]},
+        yaxis={
+            "gridcolor": "rgba(244,251,247,.06)",
+            "categoryorder": "array",
+            "categoryarray": [label for label, _, _ in reversed(available)],
+        },
     )
-    st.plotly_chart(figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key)
+    st.plotly_chart(
+        figure, use_container_width=True, theme=None, config=PLOTLY_CONFIG, key=key
+    )
 
 
-def _render_role_percentile_strip(player: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
+def _render_role_percentile_strip(
+    player: dict[str, Any], catalog: list[dict[str, Any]]
+) -> None:
     percentiles = role_percentiles(player, catalog)
     cards = []
     for field, label, _ in PERCENTILE_METRICS:
         value = percentiles.get(field)
         if value is None:
             continue
-        tone = "elite" if value >= 80 else "good" if value >= 60 else "average" if value >= 40 else "weak"
+        tone = (
+            "elite"
+            if value >= 80
+            else "good"
+            if value >= 60
+            else "average"
+            if value >= 40
+            else "weak"
+        )
         cards.append(
             f'<div class="fantasy-percentile {tone}"><span>{escape(label)}</span>'
             f'<strong>P{value:.0f}</strong><i style="--value:{max(0, min(value, 100)):.0f}%"></i></div>'
         )
     if cards:
         st.markdown("#### Percentili nel ruolo")
-        st.markdown(f'<div class="fantasy-percentile-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="fantasy-percentile-grid">{"".join(cards)}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def _render_stat_grid(items: list[tuple]) -> None:
@@ -3386,12 +3769,15 @@ def _render_stat_grid(items: list[tuple]) -> None:
         suffix = item[3] if len(item) > 3 else ""
         display = (
             escape(str("—" if value is None or value == "" else value))
-            if decimals is None else _format_stat(value, decimals, suffix)
+            if decimals is None
+            else _format_stat(value, decimals, suffix)
         )
         cards.append(
             f'<div class="fantasy-stat-card"><span>{escape(label)}</span><strong>{display}</strong></div>'
         )
-    st.markdown(f'<div class="fantasy-stat-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="fantasy-stat-grid">{"".join(cards)}</div>', unsafe_allow_html=True
+    )
 
 
 def _format_stat(value: Any, decimals: int, suffix: str = "") -> str:
@@ -3420,14 +3806,26 @@ def _render_manual_player_form(
         with st.form("manual_catalog_player"):
             name = st.text_input("Nome giocatore")
             team = st.text_input("Squadra")
-            role = st.selectbox("Ruolo", list(ROLE_LABELS), format_func=lambda value: ROLE_LABELS[value])
-            quote = st.number_input("Quotazione", min_value=0.0, max_value=1000.0, value=1.0)
-            predicted_quote = st.number_input("Quotazione prevista", min_value=0.0, max_value=1000.0, value=1.0)
+            role = st.selectbox(
+                "Ruolo", list(ROLE_LABELS), format_func=lambda value: ROLE_LABELS[value]
+            )
+            quote = st.number_input(
+                "Quotazione", min_value=0.0, max_value=1000.0, value=1.0
+            )
+            predicted_quote = st.number_input(
+                "Quotazione prevista", min_value=0.0, max_value=1000.0, value=1.0
+            )
             col_goals, col_assists = st.columns(2)
-            expected_goals = col_goals.number_input("Gol attesi", min_value=0.0, max_value=100.0, value=0.0)
-            expected_assists = col_assists.number_input("Assist attesi", min_value=0.0, max_value=100.0, value=0.0)
+            expected_goals = col_goals.number_input(
+                "Gol attesi", min_value=0.0, max_value=100.0, value=0.0
+            )
+            expected_assists = col_assists.number_input(
+                "Assist attesi", min_value=0.0, max_value=100.0, value=0.0
+            )
             starter = st.slider("Probabilita titolare", 0, 100, 70)
-            add_player = st.form_submit_button("Aggiungi", type="primary", use_container_width=True)
+            add_player = st.form_submit_button(
+                "Aggiungi", type="primary", use_container_width=True
+            )
         if add_player:
             try:
                 player = make_player(
@@ -3443,7 +3841,9 @@ def _render_manual_player_form(
             except ValueError as error:
                 st.error(str(error))
             else:
-                workspace["catalog"] = merge_catalog(workspace.get("catalog", []), [player])
+                workspace["catalog"] = merge_catalog(
+                    workspace.get("catalog", []), [player]
+                )
                 touch_workspace(workspace)
                 _save_workspace(workspace, storage)
                 st.rerun()
@@ -3463,7 +3863,9 @@ def _render_watchlist_control(
     player_id = selector.selectbox(
         "Seleziona giocatore",
         visible_ids,
-        format_func=lambda value: f"{by_id[value]['name']} · {by_id[value].get('team', '-')} · {by_id[value]['role']}",
+        format_func=lambda value: (
+            f"{by_id[value]['name']} · {by_id[value].get('team', '-')} · {by_id[value]['role']}"
+        ),
         key="watchlist_player",
     )
     in_watchlist = player_id in league.get("watchlist", [])
@@ -3492,13 +3894,17 @@ def _render_auction(
     purchased_ids = {row.get("player_id") for row in league.get("purchases", [])}
     available = [player for player in catalog if player.get("id") not in purchased_ids]
     if available:
-        st.markdown("#### Aggiungi dal listone" if list_mode else "#### Registra un acquisto")
+        st.markdown(
+            "#### Aggiungi dal listone" if list_mode else "#### Registra un acquisto"
+        )
         by_id = {player["id"]: player for player in available}
         player_column, price_column, button_column = st.columns([2.2, 0.75, 0.7])
         selected_id = player_column.selectbox(
             "Giocatore",
             list(by_id),
-            format_func=lambda value: f"{by_id[value]['role']} · {by_id[value]['name']} · {by_id[value].get('team', '-')}",
+            format_func=lambda value: (
+                f"{by_id[value]['role']} · {by_id[value]['name']} · {by_id[value].get('team', '-')}"
+            ),
             key=f"auction_player_{league['id']}",
         )
         selected_player = by_id[selected_id]
@@ -3516,14 +3922,17 @@ def _render_auction(
                 key=f"auction_price_{league['id']}_{selected_id}",
             )
         if button_column.button(
-            "Aggiungi" if list_mode else "Acquista", type="primary", use_container_width=True
+            "Aggiungi" if list_mode else "Acquista",
+            type="primary",
+            use_container_width=True,
         ):
             try:
                 if list_mode:
                     add_purchase(league, selected_player, price)
                 else:
                     user_manager = next(
-                        manager for manager in auction_managers(league)
+                        manager
+                        for manager in auction_managers(league)
                         if manager.get("is_user")
                     )
                     record_auction_purchase(
@@ -3560,9 +3969,11 @@ def _render_role_plan(league: dict[str, Any], summary: dict[str, Any]) -> None:
         status = "complete" if count >= target else "open"
         cards.append(
             f'<div class="fantasy-role-card {status}"><span>{role}</span>'
-            f'<strong>{count}/{target}</strong><small>{escape(label)}</small></div>'
+            f"<strong>{count}/{target}</strong><small>{escape(label)}</small></div>"
         )
-    st.markdown(f'<div class="fantasy-role-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="fantasy-role-grid">{"".join(cards)}</div>', unsafe_allow_html=True
+    )
 
 
 def _render_quick_purchase(
@@ -3574,15 +3985,20 @@ def _render_quick_purchase(
             name = col_name.text_input("Nome")
             team = col_team.text_input("Squadra")
             role = col_role.selectbox("Ruolo", list(ROLE_LABELS))
-            price = col_price.number_input("Prezzo", min_value=0.0, max_value=1000.0, value=1.0)
+            price = col_price.number_input(
+                "Prezzo", min_value=0.0, max_value=1000.0, value=1.0
+            )
             submit = st.form_submit_button("Aggiungi alla rosa")
         if submit:
             try:
                 player = make_player(name=name, team=team, role=role, quote=price)
-                workspace["catalog"] = merge_catalog(workspace.get("catalog", []), [player])
+                workspace["catalog"] = merge_catalog(
+                    workspace.get("catalog", []), [player]
+                )
                 if league.get("game_mode") == GAME_MODE_AUCTION:
                     user_manager = next(
-                        manager for manager in auction_managers(league)
+                        manager
+                        for manager in auction_managers(league)
                         if manager.get("is_user")
                     )
                     record_auction_purchase(
@@ -3612,7 +4028,10 @@ def _render_roster_table(
             }
             for row in league.get("purchases", [])
         ),
-        key=lambda row: ("PDCA".find(str(row.get("role", ""))), str(row.get("name", ""))),
+        key=lambda row: (
+            "PDCA".find(str(row.get("role", ""))),
+            str(row.get("name", "")),
+        ),
     )
     if not purchases:
         return
@@ -3656,15 +4075,20 @@ def _render_roster_table(
     selected_id = remove_column.selectbox(
         "Correggi un acquisto",
         [row["player_id"] for row in purchases],
-        format_func=lambda value: next(row["name"] for row in purchases if row["player_id"] == value),
+        format_func=lambda value: next(
+            row["name"] for row in purchases if row["player_id"] == value
+        ),
         key=f"remove_purchase_select_{league['id']}",
     )
-    if action_column.button("Rimuovi", use_container_width=True, key=f"remove_purchase_{league['id']}"):
+    if action_column.button(
+        "Rimuovi", use_container_width=True, key=f"remove_purchase_{league['id']}"
+    ):
         if list_mode:
             remove_purchase(league, selected_id)
         else:
             user_manager = next(
-                manager for manager in auction_managers(league)
+                manager
+                for manager in auction_managers(league)
                 if manager.get("is_user")
             )
             remove_auction_purchase(league, str(user_manager.get("id")), selected_id)
@@ -3679,7 +4103,8 @@ def _render_what_if_simulator(
     list_mode = league.get("game_mode") == GAME_MODE_LIST
     unavailable_ids = (
         {str(row.get("player_id")) for row in league.get("purchases", [])}
-        if list_mode else auction_taken_player_ids(league)
+        if list_mode
+        else auction_taken_player_ids(league)
     )
     available = sorted(
         (player for player in catalog if str(player.get("id")) not in unavailable_ids),
@@ -3723,7 +4148,9 @@ def _render_what_if_simulator(
             "Costo ipotizzato",
             min_value=0.0,
             max_value=float(max(int(league.get("initial_budget") or 1), 1)),
-            value=min(suggested_price, float(max(int(league.get("initial_budget") or 1), 1))),
+            value=min(
+                suggested_price, float(max(int(league.get("initial_budget") or 1), 1))
+            ),
             step=1.0,
             disabled=list_mode,
             key=f"what_if_price_{league['id']}_{selected_id}",
@@ -3737,22 +4164,39 @@ def _render_what_if_simulator(
             f"-{simulation['price']:.0f}",
             delta_color="inverse",
         )
-        size.metric("Rosa", f"{after['roster_size']}", f"+{after['roster_size'] - before['roster_size']}")
-        goals.metric("Gol attesi rosa", f"{after['goals']:.1f}", f"+{after['goals'] - before['goals']:.1f}")
-        assists.metric("Assist attesi rosa", f"{after['assists']:.1f}", f"+{after['assists'] - before['assists']:.1f}")
+        size.metric(
+            "Rosa",
+            f"{after['roster_size']}",
+            f"+{after['roster_size'] - before['roster_size']}",
+        )
+        goals.metric(
+            "Gol attesi rosa",
+            f"{after['goals']:.1f}",
+            f"+{after['goals'] - before['goals']:.1f}",
+        )
+        assists.metric(
+            "Assist attesi rosa",
+            f"{after['assists']:.1f}",
+            f"+{after['assists'] - before['assists']:.1f}",
+        )
         fantasy_average.metric(
             "Somma FM attese",
             f"{after['fantasy_average_sum']:.2f}",
             f"+{after['fantasy_average_sum'] - before['fantasy_average_sum']:.2f}",
         )
-        tone = "ok" if simulation["valid"] and "positivo" in simulation["verdict"].lower() else "warn"
+        tone = (
+            "ok"
+            if simulation["valid"] and "positivo" in simulation["verdict"].lower()
+            else "warn"
+        )
         details = (
             f"Valore stimato {simulation['value_score']:.2f} punti indice per credito."
-            if simulation["valid"] else " · ".join(simulation["errors"])
+            if simulation["valid"]
+            else " · ".join(simulation["errors"])
         )
         st.markdown(
             f'<div class="fantasy-sim-verdict {tone}"><span>VERDETTO</span>'
-            f'<strong>{escape(str(simulation["verdict"]))}</strong><small>{escape(details)}</small></div>',
+            f"<strong>{escape(str(simulation['verdict']))}</strong><small>{escape(details)}</small></div>",
             unsafe_allow_html=True,
         )
 
@@ -3769,12 +4213,14 @@ def _render_decision_center(
     unread_count = sum(str(alert.get("id")) not in read_ids for alert in alerts)
     st.markdown(
         f'<section class="fantasy-decision-hero"><div><span>SaSa · MATCH INTELLIGENCE</span>'
-        f'<strong>Decision Center</strong><small>Formazione, calendario, simulazioni e segnali della tua rosa in un unico posto.</small>'
-        f'</div><aside><small>DA LEGGERE</small><b>{unread_count}</b></aside></section>',
+        f"<strong>Decision Center</strong><small>Formazione, calendario, simulazioni e segnali della tua rosa in un unico posto.</small>"
+        f"</div><aside><small>DA LEGGERE</small><b>{unread_count}</b></aside></section>",
         unsafe_allow_html=True,
     )
     if not league.get("purchases"):
-        st.info("Aggiungi almeno un giocatore alla rosa per attivare il Decision Center.")
+        st.info(
+            "Aggiungi almeno un giocatore alla rosa per attivare il Decision Center."
+        )
         return
     lineup_tab, calendar_tab, alert_tab = st.tabs(
         ["Assistente di giornata", "Calendario strategico", f"Avvisi · {unread_count}"]
@@ -3801,7 +4247,8 @@ def _render_matchday_assistant(
         value=upcoming_matchday,
         format_func=lambda value: (
             f"{value}ª giornata · {matchday_date(value).strftime('%d/%m/%Y')}"
-            if matchday_date(value) else f"{value}ª giornata"
+            if matchday_date(value)
+            else f"{value}ª giornata"
         ),
         key=f"decision_matchday_v22_{league['id']}",
     )
@@ -3816,8 +4263,14 @@ def _render_matchday_assistant(
     if not players:
         st.info("La rosa non contiene ancora giocatori sufficienti per una proposta.")
         return
-    goals_total = sum(float(_number_or_none(player.get("expected_goals"), 0) or 0) for player in players)
-    assists_total = sum(float(_number_or_none(player.get("expected_assists"), 0) or 0) for player in players)
+    goals_total = sum(
+        float(_number_or_none(player.get("expected_goals"), 0) or 0)
+        for player in players
+    )
+    assists_total = sum(
+        float(_number_or_none(player.get("expected_assists"), 0) or 0)
+        for player in players
+    )
     fantasy_average_sum = sum(
         float(_number_or_none(player.get("expected_fantasy_average"), 0) or 0)
         for player in players
@@ -3836,7 +4289,7 @@ def _render_matchday_assistant(
         )
     st.markdown(
         f'<div class="fantasy-matchday-label"><span>XI CONSIGLIATO</span>'
-        f'<strong>{escape(str(formation_label))} · Giornata {int(matchday)}</strong></div>',
+        f"<strong>{escape(str(formation_label))} · Giornata {int(matchday)}</strong></div>",
         unsafe_allow_html=True,
     )
     role_labels = {"A": "Attacco", "C": "Centrocampo", "D": "Difesa", "P": "Porta"}
@@ -3850,37 +4303,42 @@ def _render_matchday_assistant(
             tone = _fixture_tone(difficulty)
             venue = "vs" if fixture.get("venue") == "C" else "@"
             opponent = fixture.get("opponent") or "calendario n/d"
-            crown = "<i>★ BONUS</i>" if str(player.get("player_id")) == captain_id else ""
+            crown = (
+                "<i>★ BONUS</i>" if str(player.get("player_id")) == captain_id else ""
+            )
             appearance_probability = int(
                 _number_or_none(player.get("appearance_probability"), 0) or 0
             )
             availability_status = str(player.get("availability_status") or "model")
             availability_html = ""
-            if int(matchday) == upcoming_matchday or player.get("availability_unavailable"):
+            if int(matchday) == upcoming_matchday or player.get(
+                "availability_unavailable"
+            ):
                 availability_html = (
                     f'<em class="availability {escape(availability_status)}">'
-                    f'{escape(str(player.get("availability_label") or "Stima impiego"))} · '
-                    f'{appearance_probability}%</em>'
+                    f"{escape(str(player.get('availability_label') or 'Stima impiego'))} · "
+                    f"{appearance_probability}%</em>"
                 )
             cards.append(
                 f'<div class="fantasy-decision-player role-{role.lower()} {tone}">'
-                f'<span>{escape(role)} · {float(_number_or_none(player.get("decision_score"), 0) or 0):.0f}</span>'
-                f'<strong>{escape(str(player.get("name") or ""))}</strong>'
-                f'<small>{escape(str(player.get("team") or ""))} {venue} {escape(str(opponent))}'
-                f'{" · D " + f"{difficulty:.1f}" if difficulty is not None else ""}</small>'
-                f'{availability_html}{crown}</div>'
+                f"<span>{escape(role)} · {float(_number_or_none(player.get('decision_score'), 0) or 0):.0f}</span>"
+                f"<strong>{escape(str(player.get('name') or ''))}</strong>"
+                f"<small>{escape(str(player.get('team') or ''))} {venue} {escape(str(opponent))}"
+                f"{' · D ' + f'{difficulty:.1f}' if difficulty is not None else ''}</small>"
+                f"{availability_html}{crown}</div>"
             )
         if cards:
             role_rows.append(
                 f'<div class="fantasy-decision-line"><b>{role_labels[role]}</b>'
-                f'<div>{"".join(cards)}</div></div>'
+                f"<div>{''.join(cards)}</div></div>"
             )
     st.markdown(
         f'<section class="fantasy-decision-pitch">{"".join(role_rows)}</section>',
         unsafe_allow_html=True,
     )
     unavailable_players = [
-        player for player in recommendation.get("all_players", [])
+        player
+        for player in recommendation.get("all_players", [])
         if player.get("availability_unavailable")
     ]
     if unavailable_players:
@@ -3889,7 +4347,8 @@ def _render_matchday_assistant(
             unavailable_until = player.get("unavailable_until_matchday")
             duration = (
                 f"fino alla G{int(unavailable_until)}"
-                if unavailable_until else "rientro non ancora comunicato"
+                if unavailable_until
+                else "rientro non ancora comunicato"
             )
             source = str(player.get("availability_source") or "Fonte pubblicata")
             url = str(player.get("availability_url") or "")
@@ -3915,7 +4374,9 @@ def _render_matchday_assistant(
             ),
         )
         for player in all_players:
-            probability = int(_number_or_none(player.get("appearance_probability"), 0) or 0)
+            probability = int(
+                _number_or_none(player.get("appearance_probability"), 0) or 0
+            )
             if player.get("availability_unavailable"):
                 tone = "out"
             elif probability >= 80:
@@ -3927,18 +4388,16 @@ def _render_matchday_assistant(
             source = escape(str(player.get("availability_source") or "Modello SaSa"))
             url = str(player.get("availability_url") or "")
             if player.get("availability_has_news") and url.startswith("http"):
-                source = (
-                    f'<a href="{escape(url, quote=True)}" target="_blank">{source} ↗</a>'
-                )
+                source = f'<a href="{escape(url, quote=True)}" target="_blank">{source} ↗</a>'
             reason = escape(str(player.get("availability_reason") or ""))
             availability_cards.append(
                 f'<article class="fantasy-appearance-card {tone}">'
-                f'<header><span>{escape(str(player.get("role") or ""))} · '
-                f'{escape(str(player.get("team") or ""))}</span><b>{probability}%</b></header>'
-                f'<strong>{escape(str(player.get("name") or ""))}</strong>'
+                f"<header><span>{escape(str(player.get('role') or ''))} · "
+                f"{escape(str(player.get('team') or ''))}</span><b>{probability}%</b></header>"
+                f"<strong>{escape(str(player.get('name') or ''))}</strong>"
                 f'<div><i style="width:{probability}%"></i></div>'
-                f'<small>{escape(str(player.get("availability_label") or "Stima impiego"))} · '
-                f'{source}</small><p>{reason}</p></article>'
+                f"<small>{escape(str(player.get('availability_label') or 'Stima impiego'))} · "
+                f"{source}</small><p>{reason}</p></article>"
             )
         st.markdown(
             f'<section class="fantasy-appearance-grid">{"".join(availability_cards)}</section>',
@@ -3958,9 +4417,7 @@ def _render_matchday_assistant(
                 fixture = player.get("decision_fixture") or {}
                 probability_text = ""
                 if int(matchday) == upcoming_matchday:
-                    probability_text = (
-                        f" · {int(_number_or_none(player.get('appearance_probability'), 0) or 0)}% impiego"
-                    )
+                    probability_text = f" · {int(_number_or_none(player.get('appearance_probability'), 0) or 0)}% impiego"
                 st.caption(
                     f"{index}. {player.get('name')} · {player.get('role')} · "
                     f"{fixture.get('venue', '–')} {fixture.get('opponent', 'calendario n/d')}"
@@ -3972,10 +4429,13 @@ def _render_matchday_assistant(
         st.markdown("##### Perche questa formazione")
         favorable = sorted(
             (
-                player for player in players
+                player
+                for player in players
                 if (player.get("decision_fixture") or {}).get("difficulty") is not None
             ),
-            key=lambda player: float((player.get("decision_fixture") or {}).get("difficulty") or 5),
+            key=lambda player: float(
+                (player.get("decision_fixture") or {}).get("difficulty") or 5
+            ),
         )[:3]
         st.caption(
             "SaSa combina fantamedia attesa, titolarita, bonus, affidabilita, "
@@ -4027,7 +4487,8 @@ def _render_strategic_calendar(
         index=upcoming_matchday - 1,
         format_func=lambda value: (
             f"{value}ª giornata · {matchday_date(value).strftime('%d/%m/%Y')}"
-            if matchday_date(value) else f"{value}ª giornata"
+            if matchday_date(value)
+            else f"{value}ª giornata"
         ),
         key=f"calendar_start_v22_{league['id']}",
     )
@@ -4037,10 +4498,14 @@ def _render_strategic_calendar(
     )
     grouped: dict[str, list[str]] = {}
     for player in league.get("purchases", []):
-        grouped.setdefault(str(player.get("team") or ""), []).append(str(player.get("name") or ""))
+        grouped.setdefault(str(player.get("team") or ""), []).append(
+            str(player.get("name") or "")
+        )
     rows = []
     for team, names in sorted(grouped.items()):
-        outlook = fixture_outlook(team, catalog, start_matchday=int(start_matchday), limit=5)
+        outlook = fixture_outlook(
+            team, catalog, start_matchday=int(start_matchday), limit=5
+        )
         chips = []
         for fixture in outlook:
             difficulty = float(fixture.get("difficulty") or 3)
@@ -4048,12 +4513,12 @@ def _render_strategic_calendar(
             venue = "vs" if fixture.get("venue") == "C" else "@"
             chips.append(
                 f'<span class="{tone}"><small>G{fixture.get("matchday")}</small>'
-                f'<strong>{venue} {escape(str(fixture.get("opponent") or ""))}</strong>'
-                f'<b>{difficulty:.1f}</b></span>'
+                f"<strong>{venue} {escape(str(fixture.get('opponent') or ''))}</strong>"
+                f"<b>{difficulty:.1f}</b></span>"
             )
         rows.append(
             f'<div class="fantasy-calendar-row"><div><strong>{escape(team)}</strong>'
-            f'<small>{escape(" · ".join(names))}</small></div><section>{"".join(chips) or "<em>Calendario non disponibile</em>"}</section></div>'
+            f"<small>{escape(' · '.join(names))}</small></div><section>{''.join(chips) or '<em>Calendario non disponibile</em>'}</section></div>"
         )
     st.markdown(
         f'<div class="fantasy-calendar-board">{"".join(rows)}</div>',
@@ -4073,8 +4538,8 @@ def _render_strategic_calendar(
             with rotation_columns[index % len(rotation_columns)]:
                 st.markdown(
                     f'<div class="fantasy-rotation-card"><span>{escape(str(pair["role"]))} · COPPIA</span>'
-                    f'<strong>{escape(str(pair["first"].get("name")))} + {escape(str(pair["second"].get("name")))}</strong>'
-                    f'<small>Difficolta media della scelta migliore: {pair["average_difficulty"]:.2f}/5</small></div>',
+                    f"<strong>{escape(str(pair['first'].get('name')))} + {escape(str(pair['second'].get('name')))}</strong>"
+                    f"<small>Difficolta media della scelta migliore: {pair['average_difficulty']:.2f}/5</small></div>",
                     unsafe_allow_html=True,
                 )
 
@@ -4119,19 +4584,20 @@ def _render_alert_center(
         evidence_title = str(alert.get("evidence_title") or "").strip()
         evidence_html = (
             f'<div class="fantasy-alert-evidence"><em>NOTIZIA COLLEGATA</em>'
-            f'<b>{escape(evidence_title)}</b></div>'
-            if evidence_title else
-            '<div class="fantasy-alert-evidence no-news"><em>NESSUNA NOTIZIA VERIFICATA</em>'
-            '<b>Segnale generato dagli indicatori statistici, non da una news.</b></div>'
-            if severity in {"high", "medium"} and "Rischio fisico" in str(alert.get("title"))
+            f"<b>{escape(evidence_title)}</b></div>"
+            if evidence_title
+            else '<div class="fantasy-alert-evidence no-news"><em>NESSUNA NOTIZIA VERIFICATA</em>'
+            "<b>Segnale generato dagli indicatori statistici, non da una news.</b></div>"
+            if severity in {"high", "medium"}
+            and "Rischio fisico" in str(alert.get("title"))
             else ""
         )
         st.markdown(
             f'<article class="fantasy-alert-card {severity}{unread_class}"><span></span><div>'
-            f'<small>{"NUOVO · " if unread_class else ""}{source_html}</small>'
-            f'<strong>{escape(str(alert.get("title") or ""))}</strong>'
-            f'{evidence_html}<p><b>MOTIVO</b>{escape(str(alert.get("message") or ""))}</p>'
-            f'</div></article>',
+            f"<small>{'NUOVO · ' if unread_class else ''}{source_html}</small>"
+            f"<strong>{escape(str(alert.get('title') or ''))}</strong>"
+            f"{evidence_html}<p><b>MOTIVO</b>{escape(str(alert.get('message') or ''))}</p>"
+            f"</div></article>",
             unsafe_allow_html=True,
         )
     st.caption(
@@ -4149,7 +4615,9 @@ def _render_my_squad(
 ) -> None:
     summary = roster_summary(league)
     if not league.get("purchases"):
-        st.info("Aggiungi i giocatori da Studia il listone: qui compariranno rosa, analisi e formazione.")
+        st.info(
+            "Aggiungi i giocatori da Studia il listone: qui compariranno rosa, analisi e formazione."
+        )
         return
 
     _render_top_xi_editor(workspace, league, storage)
@@ -4207,9 +4675,9 @@ def _render_top_xi_editor(
     mode = "personalizzata" if league.get("preferred_xi_customized") else "automatica"
     st.markdown(
         f'<section class="fantasy-xi-hero"><div><span>TOP 11 · {mode.upper()}</span>'
-        f'<strong>Disegna la tua formazione sul campo</strong>'
-        f'<small>Scegli il modulo e ogni posizione. Di default inserisco i giocatori piu costosi compatibili.</small>'
-        f'</div><b>{current["count"]}/11</b></section>',
+        f"<strong>Disegna la tua formazione sul campo</strong>"
+        f"<small>Scegli il modulo e ogni posizione. Di default inserisco i giocatori piu costosi compatibili.</small>"
+        f"</div><b>{current['count']}/11</b></section>",
         unsafe_allow_html=True,
     )
     formation_options = list(FORMATIONS)
@@ -4230,7 +4698,11 @@ def _render_top_xi_editor(
     else:
         default_players = top_xi_for_formation(league, formation)
     defaults_by_role = {
-        role: [str(row.get("player_id")) for row in default_players if row.get("role") == role]
+        role: [
+            str(row.get("player_id"))
+            for row in default_players
+            if row.get("role") == role
+        ]
         for role in ROLE_LABELS
     }
     available_by_role = {
@@ -4245,15 +4717,13 @@ def _render_top_xi_editor(
         for role in ROLE_LABELS
     }
     selected_ids: list[str] = []
-    pitch_version = (
-        f"{len(purchases)}_{int(bool(league.get('preferred_xi_customized')))}_{formation}"
-    )
+    pitch_version = f"{len(purchases)}_{int(bool(league.get('preferred_xi_customized')))}_{formation}"
     role_titles = {"A": "ATTACCO", "C": "CENTROCAMPO", "D": "DIFESA", "P": "PORTA"}
     with st.container(key="top_xi_pitch"):
         st.markdown(
             f'<div class="fantasy-pitch-title"><div><span>STARTING XI</span>'
-            f'<small>{escape(str(league.get("name", "")))}</small></div>'
-            f'<strong>{escape(formation)}</strong></div>',
+            f"<small>{escape(str(league.get('name', '')))}</small></div>"
+            f"<strong>{escape(formation)}</strong></div>",
             unsafe_allow_html=True,
         )
         for role in ("A", "C", "D", "P"):
@@ -4267,7 +4737,8 @@ def _render_top_xi_editor(
                 with column:
                     default_id = (
                         defaults_by_role[role][slot_index]
-                        if slot_index < len(defaults_by_role[role]) else None
+                        if slot_index < len(defaults_by_role[role])
+                        else None
                     )
                     options = [
                         None,
@@ -4284,8 +4755,9 @@ def _render_top_xi_editor(
                         options,
                         index=options.index(default_id),
                         format_func=lambda player_id, slot=f"{role}{slot_index + 1}": (
-                            f"Scegli {slot}" if player_id is None else
-                            f"{by_id[player_id].get('name')} · {by_id[player_id].get('team')}"
+                            f"Scegli {slot}"
+                            if player_id is None
+                            else f"{by_id[player_id].get('name')} · {by_id[player_id].get('team')}"
                         ),
                         label_visibility="collapsed",
                         key=(
@@ -4307,13 +4779,15 @@ def _render_top_xi_editor(
                     else:
                         st.markdown(
                             f'<div class="fantasy-lineup-card empty role-{role.lower()}">'
-                            f'<span>{role}{slot_index + 1}</span><strong>POSTO LIBERO</strong></div>',
+                            f"<span>{role}{slot_index + 1}</span><strong>POSTO LIBERO</strong></div>",
                             unsafe_allow_html=True,
                         )
-        selected_cost = sum(float(by_id[player_id].get("price") or 0) for player_id in selected_ids)
+        selected_cost = sum(
+            float(by_id[player_id].get("price") or 0) for player_id in selected_ids
+        )
         st.markdown(
             f'<div class="fantasy-pitch-footer"><span>XI LAB · {len(selected_ids)}/11</span>'
-            f'<strong>{selected_cost:.0f} CREDITI IN CAMPO</strong></div>',
+            f"<strong>{selected_cost:.0f} CREDITI IN CAMPO</strong></div>",
             unsafe_allow_html=True,
         )
     save_column, reset_column = st.columns([1.35, 0.85])
@@ -4364,9 +4838,12 @@ def _lineup_player_card(
         _number_or_none((availability or {}).get("appearance_probability"), 0) or 0
     )
     tone = (
-        "out" if (availability or {}).get("availability_unavailable")
-        else "ready" if appearance >= 80
-        else "watch" if appearance >= 55
+        "out"
+        if (availability or {}).get("availability_unavailable")
+        else "ready"
+        if appearance >= 80
+        else "watch"
+        if appearance >= 55
         else "low"
     )
     reason = escape(
@@ -4374,15 +4851,16 @@ def _lineup_player_card(
     )
     appearance_badge = (
         f'<span class="fantasy-xi-appearance {tone}" title="{reason}">'
-        f'G{int(matchday or 0)} · {appearance}%</span>'
-        if availability else ""
+        f"G{int(matchday or 0)} · {appearance}%</span>"
+        if availability
+        else ""
     )
     return (
         f'<div class="fantasy-lineup-card role-{role}">'
         f'<div class="fantasy-lineup-shirt"><i>{escape(initials)}</i><span>{escape(position)}</span></div>'
         f'<div class="fantasy-lineup-copy"><small>{escape(str(player.get("team") or "—"))}</small>'
-        f'<strong>{escape(name)}</strong><div><span>Q {float(player.get("price") or 0):.0f}</span>'
-        f'<span>FM {fantasy_average}</span>{appearance_badge}</div></div></div>'
+        f"<strong>{escape(name)}</strong><div><span>Q {float(player.get('price') or 0):.0f}</span>"
+        f"<span>FM {fantasy_average}</span>{appearance_badge}</div></div></div>"
     )
 
 
@@ -4420,7 +4898,9 @@ def _render_top_xi_table(summary: dict[str, Any]) -> None:
             "Squadra": st.column_config.TextColumn(width="small"),
             "Costo": st.column_config.NumberColumn(format="%.0f", width="small"),
             "Gol attesi": st.column_config.NumberColumn(format="%.2f", width="small"),
-            "Assist attesi": st.column_config.NumberColumn(format="%.2f", width="small"),
+            "Assist attesi": st.column_config.NumberColumn(
+                format="%.2f", width="small"
+            ),
             "FM attesa": st.column_config.NumberColumn(format="%.2f", width="small"),
         },
     )
@@ -4428,7 +4908,9 @@ def _render_top_xi_table(summary: dict[str, Any]) -> None:
 
 def _render_squad_insights(league: dict[str, Any], summary: dict[str, Any]) -> None:
     missing_labels = [
-        f"{count} {ROLE_LABELS[role].lower()}" for role, count in summary["missing"].items() if count
+        f"{count} {ROLE_LABELS[role].lower()}"
+        for role, count in summary["missing"].items()
+        if count
     ]
     items = []
     if summary["complete"]:
@@ -4437,9 +4919,21 @@ def _render_squad_insights(league: dict[str, Any], summary: dict[str, Any]) -> N
         items.append(("warn", "Copertura da completare", ", ".join(missing_labels)))
     if league.get("modifier_enabled"):
         if summary["modifier_ready"]:
-            items.append(("ok", "Modificatore attivabile", "Hai almeno un portiere e quattro difensori."))
+            items.append(
+                (
+                    "ok",
+                    "Modificatore attivabile",
+                    "Hai almeno un portiere e quattro difensori.",
+                )
+            )
         else:
-            items.append(("warn", "Modificatore non pronto", "Servono un portiere e almeno quattro difensori."))
+            items.append(
+                (
+                    "warn",
+                    "Modificatore non pronto",
+                    "Servono un portiere e almeno quattro difensori.",
+                )
+            )
     if summary["remaining_slots"]:
         items.append(
             (
@@ -4452,7 +4946,9 @@ def _render_squad_insights(league: dict[str, Any], summary: dict[str, Any]) -> N
         f'<div class="fantasy-insight {kind}"><strong>{escape(title)}</strong><span>{escape(text)}</span></div>'
         for kind, title, text in items
     ]
-    st.markdown(f'<div class="fantasy-insights">{"".join(cards)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="fantasy-insights">{"".join(cards)}</div>', unsafe_allow_html=True
+    )
 
 
 def _render_captain_control(
@@ -4467,12 +4963,16 @@ def _render_captain_control(
         "Capitano",
         [None, *ids],
         index=index,
-        format_func=lambda value: "Non assegnato" if value is None else next(
-            row["name"] for row in purchases if row["player_id"] == value
+        format_func=lambda value: (
+            "Non assegnato"
+            if value is None
+            else next(row["name"] for row in purchases if row["player_id"] == value)
         ),
         key=f"captain_{league['id']}",
     )
-    if action.button("Salva capitano", use_container_width=True, key=f"save_captain_{league['id']}"):
+    if action.button(
+        "Salva capitano", use_container_width=True, key=f"save_captain_{league['id']}"
+    ):
         try:
             set_captain(league, selected)
         except ValueError as error:
@@ -4483,18 +4983,24 @@ def _render_captain_control(
             st.rerun()
 
 
-def _render_lineup(lineup: dict[str, Any], captain_player_id: str | None = None) -> None:
+def _render_lineup(
+    lineup: dict[str, Any], captain_player_id: str | None = None
+) -> None:
     st.markdown(f"#### Formazione consigliata · {lineup['formation']}")
     role_lines = []
     for role in ("A", "C", "D", "P"):
         names = " · ".join(
-            escape(str(player.get("name", ""))) + (" ©" if player.get("player_id") == captain_player_id else "")
+            escape(str(player.get("name", "")))
+            + (" ©" if player.get("player_id") == captain_player_id else "")
             for player in lineup["players"][role]
         )
         role_lines.append(
             f'<div class="fantasy-line"><span>{role}</span><div>{names}</div></div>'
         )
-    st.markdown(f'<div class="fantasy-pitch">{"".join(role_lines)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="fantasy-pitch">{"".join(role_lines)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> None:
@@ -4504,9 +5010,9 @@ def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> N
     )
     st.markdown(
         f'<section class="fantasy-swap-hero"><div><span>SASA · SWAP LAB</span>'
-        f'<strong>Upgrade a somma zero</strong><small>Ho analizzato tutti i '
-        f'{analysis.get("evaluated_players", 0)} giocatori della rosa e il listone completo.</small></div>'
-        f'<b>{len(analysis.get("trades", []))}</b></section>',
+        f"<strong>Upgrade a somma zero</strong><small>Ho analizzato tutti i "
+        f"{analysis.get('evaluated_players', 0)} giocatori della rosa e il listone completo.</small></div>"
+        f"<b>{len(analysis.get('trades', []))}</b></section>",
         unsafe_allow_html=True,
     )
     st.caption(
@@ -4524,17 +5030,17 @@ def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> N
         deltas = trade["deltas"]
         st.markdown(
             f'<article class="fantasy-swap-card"><header><span>PROPOSTA {index}</span>'
-            f'<b>+{trade["improvement"]:.1f} UPGRADE SCORE</b></header>'
+            f"<b>+{trade['improvement']:.1f} UPGRADE SCORE</b></header>"
             f'<div class="fantasy-swap-flow"><section><small>FUORI</small>{outgoing}</section>'
             f'<div class="fantasy-swap-arrow"><strong>→</strong>'
-            f'<span>{trade["outgoing_total"]:.0f} = {trade["incoming_total"]:.0f} CR</span></div>'
-            f'<section><small>DENTRO</small>{incoming}</section></div>'
+            f"<span>{trade['outgoing_total']:.0f} = {trade['incoming_total']:.0f} CR</span></div>"
+            f"<section><small>DENTRO</small>{incoming}</section></div>"
             f'<div class="fantasy-swap-deltas">'
-            f'<span>Gol {deltas["goals"]:+.1f}</span>'
-            f'<span>Assist {deltas["assists"]:+.1f}</span>'
-            f'<span>Somma FM {deltas["fantasy_average"]:+.2f}</span>'
-            f'<span>Rosa {trade["projected_spent"]:.0f}/{analysis["budget"]:.0f} CR</span></div>'
-            f'<p>{escape(str(trade["motivation"]))}</p></article>',
+            f"<span>Gol {deltas['goals']:+.1f}</span>"
+            f"<span>Assist {deltas['assists']:+.1f}</span>"
+            f"<span>Somma FM {deltas['fantasy_average']:+.2f}</span>"
+            f"<span>Rosa {trade['projected_spent']:.0f}/{analysis['budget']:.0f} CR</span></div>"
+            f"<p>{escape(str(trade['motivation']))}</p></article>",
             unsafe_allow_html=True,
         )
 
@@ -4546,7 +5052,7 @@ def _swap_player_chip(player: dict[str, Any], direction: str) -> str:
     quote = player.get("price") if direction == "out" else player.get("quote")
     return (
         f'<div class="fantasy-swap-player {direction}"><span>{role}</span>'
-        f'<div><strong>{name}</strong><small>{team} · Q {float(quote or 0):.0f}</small></div></div>'
+        f"<div><strong>{name}</strong><small>{team} · Q {float(quote or 0):.0f}</small></div></div>"
     )
 
 
@@ -4589,7 +5095,9 @@ def _render_sasa_analysis(
         and int(league.get("sasa_analysis_version") or 0) == SASA_ANALYSIS_VERSION
     )
     if league.get("sasa_analysis") and not analysis_is_current:
-        st.info("SaSa e stato aggiornato: avvia una nuova analisi per includere tutta la rosa.")
+        st.info(
+            "SaSa e stato aggiornato: avvia una nuova analisi per includere tutta la rosa."
+        )
     if analysis_is_current:
         with st.container(border=True):
             st.markdown(league["sasa_analysis"])
@@ -4635,28 +5143,34 @@ def _sasa_analysis_prompt(
             )
         )
     list_mode = league.get("game_mode") == GAME_MODE_LIST
-    participants = "non previsto (modalita listone)" if list_mode else league.get("participants")
+    participants = (
+        "non previsto (modalita listone)" if list_mode else league.get("participants")
+    )
     captain_id = league.get("captain_player_id")
     captain_name = next(
-        (row.get("name") for row in league.get("purchases", []) if row.get("player_id") == captain_id),
+        (
+            row.get("name")
+            for row in league.get("purchases", [])
+            if row.get("player_id") == captain_id
+        ),
         "non assegnato",
     )
     return f"""
 Ti chiami SaSa. Sei un assistente IA specializzato esclusivamente nel fantacalcio Classic italiano.
 Analizza in italiano questa squadra senza inventare dati mancanti e distingui sempre la Top 11 dal resto della rosa.
-Fanta: {league.get('name')} - stagione {league.get('season')} - modalita {'listone' if list_mode else 'asta'} - partecipanti {participants}.
-Budget iniziale: {league.get('initial_budget')}; spesi: {summary['spent']}; rimasti: {summary['remaining_budget']}.
-Capitano: {'regola attiva, ' + str(captain_name) if league.get('captain_enabled') else 'regola non attiva'}.
-Composizione rosa prevista: {league.get('roster_slots')}.
-Slot mancanti: {summary['missing']}.
-Top 11 selezionata ({xi_summary.get('count', 0)}/11):
-{chr(10).join(top_xi_lines) or 'non ancora disponibile'}
-Totali Top 11: gol attesi {xi_summary.get('expected_goals_total')}; assist attesi {xi_summary.get('expected_assists_total')}; somma fantamedie attese {xi_summary.get('expected_fantasy_average_sum')}.
+Fanta: {league.get("name")} - stagione {league.get("season")} - modalita {"listone" if list_mode else "asta"} - partecipanti {participants}.
+Budget iniziale: {league.get("initial_budget")}; spesi: {summary["spent"]}; rimasti: {summary["remaining_budget"]}.
+Capitano: {"regola attiva, " + str(captain_name) if league.get("captain_enabled") else "regola non attiva"}.
+Composizione rosa prevista: {league.get("roster_slots")}.
+Slot mancanti: {summary["missing"]}.
+Top 11 selezionata ({xi_summary.get("count", 0)}/11):
+{chr(10).join(top_xi_lines) or "non ancora disponibile"}
+Totali Top 11: gol attesi {xi_summary.get("expected_goals_total")}; assist attesi {xi_summary.get("expected_assists_total")}; somma fantamedie attese {xi_summary.get("expected_fantasy_average_sum")}.
 
-Rosa completa ({len(league.get('purchases', []))} giocatori; TOP 11 o PANCHINA indicato per ogni riga):
+Rosa completa ({len(league.get("purchases", []))} giocatori; TOP 11 o PANCHINA indicato per ogni riga):
 {chr(10).join(roster_lines)}
 
-ISTRUZIONE OBBLIGATORIA: l'oggetto principale e l'intera rosa, non soltanto la Top 11. Considera e cita tutti i {len(league.get('purchases', []))} giocatori senza ometterne nessuno. Usa la Top 11 come riferimento per gerarchie, equilibrio e possibili sostituzioni.
+ISTRUZIONE OBBLIGATORIA: l'oggetto principale e l'intera rosa, non soltanto la Top 11. Considera e cita tutti i {len(league.get("purchases", []))} giocatori senza ometterne nessuno. Usa la Top 11 come riferimento per gerarchie, equilibrio e possibili sostituzioni.
 
 Rispondi con queste sezioni:
 1. Voto della rosa completa su 10.
@@ -4668,7 +5182,9 @@ Sii concreto, non inventare dati e verifica prima di concludere che ogni nome de
 """.strip()
 
 
-def _save_workspace(workspace: dict[str, Any], storage: FantasyWorkspaceStorage) -> None:
+def _save_workspace(
+    workspace: dict[str, Any], storage: FantasyWorkspaceStorage
+) -> None:
     st.session_state[WORKSPACE_SESSION_KEY] = workspace
     st.session_state["fantasy_remote_save_attempted"] = storage.remote_available
     st.session_state["fantasy_remote_synced"] = storage.save(workspace)
@@ -4699,6 +5215,7 @@ def _render_sync_status(storage: FantasyWorkspaceStorage) -> None:
             "Persistenza cloud non configurata: su Streamlit i dati locali possono sparire dopo "
             "un riavvio. Configura SUPABASE_URL e SUPABASE_ANON_KEY nei secrets dell'app."
         )
+
 
 def render_fantasy_styles() -> None:
     st.markdown(

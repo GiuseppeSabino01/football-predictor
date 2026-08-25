@@ -67,15 +67,19 @@ def test_new_player_uses_official_classic_role_metadata() -> None:
 
 def test_official_update_preserves_analysis_fields() -> None:
     seed_player = load_seed_catalog()[0]
-    current = [{**seed_player, "expected_goals": 7.5, "profile": "profilo personalizzato"}]
-    official = [{
-        "id": seed_player["id"],
-        "name": seed_player["name"],
-        "team": seed_player["team"],
-        "role": seed_player["role"],
-        "quote": 42,
-        "fvm": 88,
-    }]
+    current = [
+        {**seed_player, "expected_goals": 7.5, "profile": "profilo personalizzato"}
+    ]
+    official = [
+        {
+            "id": seed_player["id"],
+            "name": seed_player["name"],
+            "team": seed_player["team"],
+            "role": seed_player["role"],
+            "quote": 42,
+            "fvm": 88,
+        }
+    ]
 
     merged = merge_catalog_updates(current, official)
     updated = next(player for player in merged if player["id"] == seed_player["id"])
@@ -88,14 +92,16 @@ def test_official_update_preserves_analysis_fields() -> None:
 
 def test_authoritative_catalog_removes_players_no_longer_official() -> None:
     seed_player = load_seed_catalog()[0]
-    official = [{
-        "id": seed_player["id"],
-        "name": seed_player["name"],
-        "team": seed_player["team"],
-        "role": seed_player["role"],
-        "quote": 11,
-        "fvm": 22,
-    }]
+    official = [
+        {
+            "id": seed_player["id"],
+            "name": seed_player["name"],
+            "team": seed_player["team"],
+            "role": seed_player["role"],
+            "quote": 11,
+            "fvm": 22,
+        }
+    ]
 
     merged = merge_catalog_updates([], official, authoritative=True)
 
@@ -108,7 +114,26 @@ def test_saved_corrupted_roles_are_repaired_from_analyzed_seed() -> None:
     corrupted = [{**player, "role": "P"} for player in seed]
 
     repaired = merge_catalog_updates(corrupted, [])
-    counts = {role: sum(player["role"] == role for player in repaired) for role in "PDCA"}
+    counts = {
+        role: sum(player["role"] == role for player in repaired) for role in "PDCA"
+    }
 
-    assert counts == {"P": 60, "D": 177, "C": 172, "A": 85}
+    assert counts == {"P": 60, "D": 176, "C": 172, "A": 85}
     assert catalog_fingerprint(seed) != catalog_fingerprint(corrupted)
+
+
+def test_confirmed_departure_is_removed_even_while_public_page_still_lists_it() -> None:
+    official = [
+        {
+            "id": "circati-old",
+            "name": "Circati",
+            "team": "PAR",
+            "role": "D",
+            "quote": 6,
+            "fvm": 18,
+        }
+    ]
+
+    merged = merge_catalog_updates([], official, authoritative=True)
+
+    assert merged == []

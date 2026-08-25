@@ -52,3 +52,20 @@ def test_pareto_frontier_keeps_only_successive_value_improvements():
     ]
 
     assert [row["name"] for row in pareto_frontier(players)] == ["A", "C"]
+
+
+def test_pareto_frontier_can_use_updated_auction_spend() -> None:
+    players = [
+        {"name": "A", "quote": 20, "updated_spend": 5, "expected_fantasy_average": 6.5},
+        {"name": "B", "quote": 5, "updated_spend": 8, "expected_fantasy_average": 6.2},
+        {
+            "name": "C",
+            "quote": 10,
+            "updated_spend": 10,
+            "expected_fantasy_average": 7.0,
+        },
+    ]
+
+    frontier = pareto_frontier(players, cost_field="updated_spend")
+
+    assert [row["name"] for row in frontier] == ["A", "C"]

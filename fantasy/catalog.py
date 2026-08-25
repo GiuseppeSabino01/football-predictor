@@ -11,7 +11,6 @@ import pandas as pd
 
 from fantasy.service import player_score
 
-
 CATALOG_COLUMNS = [
     "name",
     "team",
@@ -35,14 +34,42 @@ COLUMN_ALIASES = {
     "role": {"r", "ruolo", "role", "ruolo classic", "ruolo classico"},
     "quote": {"qt a", "qa", "quotazione", "quotazione attuale", "costo", "price"},
     "fvm": {"fvm", "fvm 1000", "fvm classic"},
-    "predicted_quote": {"quotazione prevista", "quotazione prevista fine anno", "qt prevista"},
-    "goals_previous": {"gol 25 26", "gol 2025 26", "gol scorso anno", "gol stagione precedente"},
+    "predicted_quote": {
+        "quotazione prevista",
+        "quotazione prevista fine anno",
+        "qt prevista",
+    },
+    "goals_previous": {
+        "gol 25 26",
+        "gol 2025 26",
+        "gol scorso anno",
+        "gol stagione precedente",
+    },
     "xg_previous": {"xg 25 26", "xg 2025 26", "xg scorso anno"},
-    "expected_goals": {"gol attesi", "gol attesi 26 27", "gol previsti", "expected goals"},
+    "expected_goals": {
+        "gol attesi",
+        "gol attesi 26 27",
+        "gol previsti",
+        "expected goals",
+    },
     "assists_previous": {"assist 25 26", "assist 2025 26", "assist scorso anno"},
-    "expected_assists": {"assist attesi", "assist attesi 26 27", "assist previsti", "expected assists"},
-    "expected_fantasy_average": {"fm attesa", "fantamedia attesa", "fantamedia prevista"},
-    "starter_probability": {"titolarita", "titolarita prevista", "probabilita titolare", "starter probability"},
+    "expected_assists": {
+        "assist attesi",
+        "assist attesi 26 27",
+        "assist previsti",
+        "expected assists",
+    },
+    "expected_fantasy_average": {
+        "fm attesa",
+        "fantamedia attesa",
+        "fantamedia prevista",
+    },
+    "starter_probability": {
+        "titolarita",
+        "titolarita prevista",
+        "probabilita titolare",
+        "starter probability",
+    },
 }
 
 
@@ -83,10 +110,17 @@ def normalize_catalog_dataframe(dataframe: pd.DataFrame) -> list[dict[str, Any]]
         if player_id in seen:
             continue
         seen.add(player_id)
-        player: dict[str, Any] = {"id": player_id, "name": name, "team": team, "role": role}
+        player: dict[str, Any] = {
+            "id": player_id,
+            "name": name,
+            "team": team,
+            "role": role,
+        }
         for field in CATALOG_COLUMNS[3:]:
             source_column = mapped.get(field)
-            player[field] = _optional_number(raw_row.get(source_column)) if source_column else None
+            player[field] = (
+                _optional_number(raw_row.get(source_column)) if source_column else None
+            )
         player["fantasy_score"] = player_score(player)
         players.append(player)
     if not players:
@@ -127,25 +161,42 @@ def make_player(
     return player
 
 
-def merge_catalog(existing: list[dict[str, Any]], incoming: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    merged = {str(player.get("id")): dict(player) for player in existing if player.get("id")}
+def merge_catalog(
+    existing: list[dict[str, Any]], incoming: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    merged = {
+        str(player.get("id")): dict(player) for player in existing if player.get("id")
+    }
     for player in incoming:
         player_id = str(player.get("id", ""))
         if not player_id:
             continue
         previous = merged.get(player_id, {})
         merged[player_id] = {**previous, **player}
-    return sorted(merged.values(), key=lambda player: (str(player.get("role", "")), str(player.get("name", ""))))
+    return sorted(
+        merged.values(),
+        key=lambda player: (str(player.get("role", "")), str(player.get("name", ""))),
+    )
 
 
 def catalog_dataframe(players: list[dict[str, Any]]) -> pd.DataFrame:
     rows = []
     for player in players:
+        comparables = ", ".join(
+            str(value) for value in player.get("analysis_comparables", []) if value
+        )
+        analysis_source = str(
+            player.get("analysis_source") or player.get("source") or ""
+        )
+        if comparables:
+            analysis_source = f"{analysis_source}. Comparabili: {comparables}"
         rows.append(
             {
                 "Giocatore": player.get("name", ""),
                 "Squadra": player.get("team", ""),
                 "Ruolo": player.get("role", ""),
+                "Dati": "STIMA" if player.get("analysis_estimated") else "ANALISI",
+                "Origine dati": analysis_source,
                 "Quotazione": player.get("quote"),
                 "FVM / 1000": player.get("fvm"),
                 "Quotazione prevista": player.get("predicted_quote"),
@@ -190,7 +241,10 @@ def _mapped_columns(columns: Any) -> dict[str, str]:
     mapped: dict[str, str] = {}
     for target, aliases in COLUMN_ALIASES.items():
         alias_values = {_normalize(alias) for alias in aliases}
-        exact = next((column for column, value in normalized.items() if value in alias_values), None)
+        exact = next(
+            (column for column, value in normalized.items() if value in alias_values),
+            None,
+        )
         if exact:
             mapped[target] = exact
     return mapped
@@ -200,7 +254,9 @@ def _read_csv(raw: bytes) -> pd.DataFrame:
     last_error: Exception | None = None
     for encoding in ("utf-8-sig", "utf-8", "latin-1"):
         try:
-            return pd.read_csv(io.BytesIO(raw), sep=None, engine="python", encoding=encoding)
+            return pd.read_csv(
+                io.BytesIO(raw), sep=None, engine="python", encoding=encoding
+            )
         except (UnicodeDecodeError, pd.errors.ParserError) as error:
             last_error = error
     raise ValueError(f"CSV non leggibile: {last_error}")
@@ -208,7 +264,9 @@ def _read_csv(raw: bytes) -> pd.DataFrame:
 
 def _normalize(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
-    text = "".join(character for character in text if not unicodedata.combining(character))
+    text = "".join(
+        character for character in text if not unicodedata.combining(character)
+    )
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 

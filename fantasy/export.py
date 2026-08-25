@@ -54,7 +54,12 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
 
     base_frame = catalog_dataframe(catalog)
     base_headers = [column for column in base_frame.columns if column != "_id"]
-    extra_headers = ["Propensione bonus", "Potenziale", "Profilo"]
+    extra_headers = [
+        "Propensione bonus",
+        "Potenziale",
+        "Profilo",
+        "Origine rischio",
+    ]
     headers = [
         "Giocatore",
         "ID giocatore",
@@ -126,6 +131,7 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
             "Propensione bonus": _percentage_metric(player.get("bonus")),
             "Potenziale": _percentage_metric(player.get("potential")),
             "Profilo": player.get("profile"),
+            "Origine rischio": player.get("risk_source"),
         }
         sheet.append([_excel_value(values.get(header)) for header in headers])
         if personal_tier_name:
@@ -241,9 +247,9 @@ def restore_listone_excel(
         "tier_assignments": sum(
             1 for row in matched_rows if _cell_text(row.get("Fascia personale"))
         ),
-        "notes": sum(
-            1 for row in matched_rows if _cell_text(row.get("Note personali"))
-        ) if restores_notes else 0,
+        "notes": sum(1 for row in matched_rows if _cell_text(row.get("Note personali")))
+        if restores_notes
+        else 0,
         "unmatched": unmatched,
     }
 
