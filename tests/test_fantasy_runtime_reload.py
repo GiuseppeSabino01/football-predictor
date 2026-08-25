@@ -25,3 +25,16 @@ def test_fantasy_reload_refreshes_injury_registry_before_ui() -> None:
     streamlit_app.fresh_fantasy_ui()
 
     assert hasattr(streamlit_app.fantasy_injuries, "fetch_injury_registry")
+
+
+def test_fantasy_reload_refreshes_catalog_before_ui() -> None:
+    delattr(streamlit_app.fantasy_catalog, "catalog_dataframe")
+
+    refreshed_ui = streamlit_app.fresh_fantasy_ui()
+
+    assert hasattr(streamlit_app.fantasy_catalog, "catalog_dataframe")
+    frame = streamlit_app.fantasy_catalog.catalog_dataframe(
+        [{"id": "test", "name": "Test", "team": "INT", "role": "C"}]
+    )
+    assert "Origine dati" in frame.columns
+    assert refreshed_ui.catalog_dataframe is streamlit_app.fantasy_catalog.catalog_dataframe
