@@ -40,6 +40,7 @@ from fantasy.decision_center import (
     simulate_purchase,
 )
 from fantasy.export import build_listone_excel, restore_listone_excel
+from fantasy.injuries import fetch_injury_registry
 from fantasy.official_catalog import (
     OFFICIAL_CATALOG_URL,
     catalog_fingerprint,
@@ -115,7 +116,7 @@ def _cached_listone_excel(
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.25 v26.2 · Note e stato infortuni")
+    st.caption("Fantacalcio · Build 2026.08.25 v26.3 · Registro infortuni completo")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -145,6 +146,14 @@ def render_fantasy_page(settings: Settings) -> None:
     _render_sync_status(storage)
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _cached_injury_registry() -> list[dict[str, Any]]:
+    try:
+        return fetch_injury_registry()
+    except requests.RequestException:
+        return []
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_fantasy_news() -> list[dict[str, Any]]:
     try:
@@ -155,8 +164,8 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
         )
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
-    except Exception:
-        return []
+    except requests.RequestException:
+        return _cached_injury_registry()
     news: list[dict[str, Any]] = []
     seen: set[str] = set()
     for link in soup.select("a[href]"):
@@ -235,7 +244,7 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
                 item["body"] = body
             if published:
                 item["published_at"] = published
-    return news
+    return [*news, *_cached_injury_registry()]
 
 
 def _catalog_injury_statuses(

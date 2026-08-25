@@ -458,6 +458,35 @@ def _related_news(
         return []
     ranked: list[tuple[int, dict[str, Any]]] = []
     for item in news_items:
+        evidence_name = str(item.get("player_name") or "").strip()
+        if evidence_name:
+            evidence_tokens = _name_tokens(evidence_name)
+            evidence_initials = {
+                token
+                for token in re.findall(
+                    r"[a-zà-ÿ]+", evidence_name.casefold()
+                )
+                if len(token) == 1
+            }
+            player_identity_words = re.findall(
+                r"[a-zà-ÿ]+", str(player.get("name") or "").casefold()
+            )
+            evidence_team = normalize_team(item.get("team"))
+            player_team = normalize_team(player.get("team"))
+            same_identity = bool(evidence_tokens) and (
+                evidence_tokens.issubset(player_tokens)
+                or player_tokens.issubset(evidence_tokens)
+            )
+            initials_match = all(
+                any(word.startswith(initial) for word in player_identity_words)
+                for initial in evidence_initials
+            )
+            if not same_identity or (
+                evidence_team and player_team and evidence_team != player_team
+            ) or not initials_match:
+                continue
+            ranked.append((100 + len(evidence_tokens), item))
+            continue
         searchable = " ".join(
             [
                 str(item.get("title") or ""),
@@ -574,11 +603,13 @@ ITALIAN_MONTHS = (
 def _explicit_return_month(text: str) -> str:
     months = "|".join(ITALIAN_MONTHS)
     match = re.search(
-        rf"(?:rientr\w*|torner\w*|ritorn\w*|recuper\w*)[^.]{{0,90}}?"
-        rf"(?:a|in|entro|per)\s+({months})",
+        rf"(?:rientr\w*|torn\w*|ritorn\w*|recuper\w*|convocabil\w*)"
+        rf"[^.]{{0,100}}?(?:a|in|entro|per|da|dalla)\s+"
+        rf"((?:(?:inizio|fine|metà|meta|seconda metà di|seconda meta di)\s+)?"
+        rf"(?:{months}))",
         text,
     )
-    return match.group(1) if match else ""
+    return match.group(1).replace("meta", "metà") if match else ""
 
 
 def _estimated_return_date(text: str, published_at: Any) -> str:
