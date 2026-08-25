@@ -105,6 +105,7 @@ AUCTION_TIER_PALETTE = {
     "gray": ("Grigio", "⚪", "#a7b0ad"),
 }
 CATALOG_AUTOSAVE_DEBOUNCE_MS = 1200
+OFFICIAL_CATALOG_SESSION_KEY = "fantasy_official_catalog_session_v2642"
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
@@ -319,7 +320,7 @@ def _load_workspace(storage: FantasyWorkspaceStorage) -> dict[str, Any]:
 
 
 def _cached_official_catalog() -> dict[str, Any]:
-    key = "fantasy_official_catalog_session"
+    key = OFFICIAL_CATALOG_SESSION_KEY
     if key not in st.session_state:
         st.session_state[key] = fetch_official_catalog()
     return st.session_state[key]
@@ -713,7 +714,7 @@ def _render_preparation(
     if refresh_column.button(
         "Aggiorna ora", use_container_width=True, key="refresh_official_catalog"
     ):
-        st.session_state.pop("fantasy_official_catalog_session", None)
+        st.session_state.pop(OFFICIAL_CATALOG_SESSION_KEY, None)
         st.rerun()
 
     _render_top_players_visual_lab(catalog, league)
