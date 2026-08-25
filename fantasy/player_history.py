@@ -5,13 +5,12 @@ import json
 import re
 import unicodedata
 from functools import lru_cache
+from math import isnan
 from pathlib import Path
 from typing import Any
 
 HISTORY_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "data"
-    / "player_history_5y_2026_27.json.gz"
+    Path(__file__).resolve().parents[1] / "data" / "player_history_5y_2026_27.json.gz"
 )
 
 
@@ -43,6 +42,11 @@ def attach_player_history(players: list[dict[str, Any]]) -> list[dict[str, Any]]
             matches = by_name.get(_normalize_name(player.get("name")), [])
             entry = matches[0] if len(matches) == 1 else None
         if not isinstance(entry, dict):
+            fallback = _previous_season_fallback(player)
+            if fallback:
+                player["history_5y"] = [fallback]
+                player["history_seasons"] = 1
+                player["history_source"] = str(player.get("source") or "Fantacalcio.it")
             continue
         seasons = [
             dict(item) for item in entry.get("seasons", []) if isinstance(item, dict)
@@ -58,9 +62,40 @@ def attach_player_history(players: list[dict[str, Any]]) -> list[dict[str, Any]]
     return players
 
 
+def _previous_season_fallback(player: dict[str, Any]) -> dict[str, Any] | None:
+    appearances = _optional_number(player.get("appearances_previous"))
+    if appearances is None:
+        return None
+    return {
+        "year": 2025,
+        "season": "2025-26",
+        "competition": "Serie A",
+        "team": str(player.get("team") or ""),
+        "league": "ita.1",
+        "league_matches": 38,
+        "appearances": appearances,
+        "starts": None,
+        "goals": _optional_number(player.get("goals_previous")),
+        "assists": _optional_number(player.get("assists_previous")),
+        "yellow_cards": _optional_number(player.get("yellow_cards")),
+        "red_cards": _optional_number(player.get("red_cards")),
+        "goals_conceded": _optional_number(player.get("goals_conceded")),
+    }
+
+
 def _normalize_name(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(
         character for character in text if not unicodedata.combining(character)
     )
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def _optional_number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if isnan(result) else result

@@ -1,4 +1,5 @@
 from fantasy.catalog_estimates import enrich_missing_analysis, recalibrate_injury_risk
+from fantasy.player_history import attach_player_history
 
 
 def _reference(name: str, quote: float, fvm: float, risk: float = 20) -> dict:
@@ -176,3 +177,22 @@ def test_single_meaningful_season_uses_low_sample_risk() -> None:
     assert result is not None and 25 <= result <= 35
     assert newcomer["risk_history_seasons"] == 1
     assert "campione ridotto" in newcomer["risk_source"]
+
+
+def test_previous_real_season_is_used_when_five_year_history_is_unavailable() -> None:
+    player = {
+        "id": "fallback",
+        "name": "Storico ridotto",
+        "team": "INT",
+        "role": "C",
+        "source": "Fantacalcio.it",
+        "appearances_previous": 28,
+        "goals_previous": 4,
+        "assists_previous": 3,
+    }
+
+    attach_player_history([player])
+
+    assert player["history_seasons"] == 1
+    assert player["history_5y"][0]["appearances"] == 28
+    assert player["history_source"] == "Fantacalcio.it"
