@@ -19,6 +19,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+import fantasy.decision_center as fantasy_decision_center
 import fantasy.export as fantasy_export
 import fantasy.service as fantasy_service
 import fantasy.storage as fantasy_storage
@@ -66,6 +67,7 @@ def fresh_prediction_service():
 def fresh_fantasy_ui():
     """Ricarica i moduli Fantacalcio nell'ordine delle loro dipendenze."""
     importlib.reload(fantasy_service)
+    importlib.reload(fantasy_decision_center)
     importlib.reload(fantasy_storage)
     importlib.reload(fantasy_export)
     importlib.reload(fantasy_ui)
@@ -81,7 +83,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.25 · Serie A v4 · Fantacalcio v26")
+    st.caption("Build 2026.08.25 · Serie A v4 · Fantacalcio v26.1")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
