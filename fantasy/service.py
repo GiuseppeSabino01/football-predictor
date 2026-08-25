@@ -128,6 +128,7 @@ def create_league(
         "auction_tiers": _new_auction_tiers(),
         "auction_tiers_initialized": True,
         "auction_player_tiers": {},
+        "player_notes": {},
         "watchlist": [],
         "analysis": "",
         "preferred_xi": [],
@@ -927,6 +928,8 @@ def update_auction_assignments(
             _apply_auction_assignment(draft, player, clean_manager_id, price)
         if "tier_id" in change:
             _apply_auction_player_tier(draft, player_id, change.get("tier_id"))
+        if "note" in change:
+            _apply_player_note(draft, player_id, change.get("note"))
     league.clear()
     league.update(draft)
 
@@ -960,6 +963,8 @@ def update_list_assignments(
             remove_purchase(draft, player_id)
         if "tier_id" in change:
             _apply_auction_player_tier(draft, player_id, change.get("tier_id"))
+        if "note" in change:
+            _apply_player_note(draft, player_id, change.get("note"))
     league.clear()
     league.update(draft)
 
@@ -1054,6 +1059,25 @@ def _apply_auction_player_tier(
         assignments[str(player_id)] = clean_tier_id
     else:
         assignments.pop(str(player_id), None)
+    league["updated_at"] = utc_now()
+
+
+def player_note(league: dict[str, Any], player_id: str) -> str:
+    """Return the personal note associated with a player."""
+    return str(league.get("player_notes", {}).get(str(player_id)) or "")
+
+
+def _apply_player_note(
+    league: dict[str, Any], player_id: str, value: Any
+) -> None:
+    notes = league.setdefault("player_notes", {})
+    clean_note = " ".join(str(value or "").strip().split())
+    if len(clean_note) > 500:
+        raise ValueError("La nota non puo superare 500 caratteri.")
+    if clean_note:
+        notes[str(player_id)] = clean_note
+    else:
+        notes.pop(str(player_id), None)
     league["updated_at"] = utc_now()
 
 
@@ -1852,10 +1876,13 @@ def _normalize_league(league: dict[str, Any]) -> None:
         league["auction_sale_events"] = []
     league.setdefault("auction_tiers", [])
     league.setdefault("auction_player_tiers", {})
+    league.setdefault("player_notes", {})
     if not isinstance(league["auction_tiers"], list):
         league["auction_tiers"] = []
     if not isinstance(league["auction_player_tiers"], dict):
         league["auction_player_tiers"] = {}
+    if not isinstance(league["player_notes"], dict):
+        league["player_notes"] = {}
     if not league.get("auction_tiers_initialized"):
         if not league["auction_tiers"]:
             league["auction_tiers"] = _new_auction_tiers()
@@ -1871,6 +1898,11 @@ def _normalize_league(league: dict[str, Any]) -> None:
         str(player_id): str(tier_id)
         for player_id, tier_id in league["auction_player_tiers"].items()
         if str(tier_id) in valid_tier_ids
+    }
+    league["player_notes"] = {
+        str(player_id): " ".join(str(note or "").strip().split())[:500]
+        for player_id, note in league["player_notes"].items()
+        if str(player_id) and str(note or "").strip()
     }
     league.setdefault("watchlist", [])
     league.setdefault("analysis", "")

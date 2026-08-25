@@ -5,6 +5,7 @@ from fantasy.decision_center import (
     build_roster_alerts,
     fixture_outlook,
     fixtures_for_team,
+    injury_return_label,
     player_availability,
     recommend_lineup,
     season_next_matchday,
@@ -109,6 +110,36 @@ def test_published_injury_excludes_player_until_announced_round():
     assert signal["availability_unavailable"] is True
     assert signal["appearance_probability"] <= 8
     assert signal["unavailable_until_matchday"] == 4
+
+
+def test_injury_return_label_prefers_announced_matchday() -> None:
+    assert injury_return_label({"return_matchday": 12}) == (
+        "Rientro previsto alla 12ª giornata"
+    )
+
+
+def test_injury_return_label_uses_published_duration() -> None:
+    candidate = player(70, "P", "NAP")
+    candidate["name"] = "Meret"
+    signal = player_availability(
+        candidate,
+        [{
+            "title": "Meret infortunato",
+            "body": "Meret ha rimediato un infortunio: stop di due mesi.",
+            "url": "https://www.fantacalcio.it/news/meret-stop.html",
+            "source": "Fantacalcio.it",
+            "verified": True,
+            "status": "injured",
+            "published_at": "2026-08-20T12:00:00+00:00",
+        }],
+        matchday=2,
+        next_matchday_number=2,
+    )
+
+    assert signal["estimated_return_date"] == "2026-10-19"
+    assert injury_return_label(signal, today=date(2026, 8, 25)) == (
+        "Rientro stimato tra circa 2 mesi (ottobre)"
+    )
 
 
 def test_probable_bench_changes_only_the_immediately_next_round():

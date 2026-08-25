@@ -18,6 +18,7 @@ from fantasy.service import (
     list_trade_analysis,
     new_workspace,
     normalize_workspace,
+    player_note,
     record_auction_purchase,
     remove_purchase,
     reset_preferred_xi,
@@ -29,8 +30,8 @@ from fantasy.service import (
     top_xi_formation,
     top_xi_summary,
     update_auction_assignments,
-    update_list_assignments,
     update_league_settings,
+    update_list_assignments,
 )
 
 
@@ -133,6 +134,33 @@ def test_list_board_updates_roster_and_personal_tier_atomically() -> None:
     assert league["purchases"] == []
     assert auction_player_tier(league, player["id"])["name"] == "Top"
 
+
+def test_player_note_is_saved_and_removed_from_the_list_board() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Listone con note",
+        participants=None,
+        game_mode=GAME_MODE_LIST,
+    )
+    player = make_player(name="Meret", team="NAP", role="P", quote=18)
+
+    update_list_assignments(
+        league,
+        [{
+            "player": player,
+            "in_roster": False,
+            "note": "Da prendere insieme a Milinkovic",
+        }],
+    )
+
+    assert player_note(league, player["id"]) == "Da prendere insieme a Milinkovic"
+
+    update_list_assignments(
+        league,
+        [{"player": player, "in_roster": False, "note": ""}],
+    )
+    assert player_note(league, player["id"]) == ""
 
 def test_custom_slots_cannot_drop_below_current_roster() -> None:
     workspace = new_workspace()

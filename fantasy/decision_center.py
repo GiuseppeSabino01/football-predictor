@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from hashlib import sha1
 import re
+from datetime import UTC, date, datetime, timedelta
+from hashlib import sha1
 from typing import Any, Iterable
 
 from fantasy.service import FORMATIONS, ROLE_LABELS, roster_summary
-
 
 FIXTURE_SOURCE_URL = (
     "https://www.legaseriea.it/serie-a/news/"
@@ -526,6 +525,73 @@ def _explicit_return_matchday(text: str) -> int | None:
     return max(1, min(38, int(match.group(1))))
 
 
+ITALIAN_MONTHS = (
+    "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+    "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
+)
+
+
+def _explicit_return_month(text: str) -> str:
+    months = "|".join(ITALIAN_MONTHS)
+    match = re.search(
+        rf"(?:rientr\w*|torner\w*|ritorn\w*|recuper\w*)[^.]{{0,90}}?"
+        rf"(?:a|in|entro|per)\s+({months})",
+        text,
+    )
+    return match.group(1) if match else ""
+
+
+def _estimated_return_date(text: str, published_at: Any) -> str:
+    number_words = {"una": 1, "uno": 1, "due": 2, "tre": 3, "quattro": 4}
+    match = re.search(
+        r"(?:stop|fuori|out|indisponibil\w*|tempi[^.]{0,30})[^.]{0,90}?"
+        r"(\d{1,2}|una|uno|due|tre|quattro)\s*(settimane?|mesi?)",
+        text,
+    )
+    if not match or not published_at:
+        return ""
+    raw_amount = match.group(1)
+    amount = int(raw_amount) if raw_amount.isdigit() else number_words[raw_amount]
+    days = amount * (7 if match.group(2).startswith("settiman") else 30)
+    try:
+        published = datetime.fromisoformat(str(published_at)).date()
+    except ValueError:
+        return ""
+    return (published + timedelta(days=days)).isoformat()
+
+
+def injury_return_label(signal: dict[str, Any], *, today: date | None = None) -> str:
+    """Turn published return evidence into a concise Italian list-board label."""
+    return_matchday = int(number(signal.get("return_matchday"))) or None
+    if return_matchday:
+        return f"Rientro previsto alla {return_matchday}ª giornata"
+    month = str(signal.get("return_month") or "").strip().casefold()
+    if month:
+        return f"Ipotesi rientro: {month}"
+    raw_date = str(signal.get("estimated_return_date") or "")
+    if raw_date:
+        try:
+            target = date.fromisoformat(raw_date[:10])
+        except ValueError:
+            target = None
+        if target:
+            remaining = (target - (today or datetime.now(UTC).date())).days
+            month_label = ITALIAN_MONTHS[target.month - 1]
+            if remaining > 45:
+                months = max(2, round(remaining / 30))
+                return f"Rientro stimato tra circa {months} mesi ({month_label})"
+            if remaining > 10:
+                weeks = max(2, round(remaining / 7))
+                return f"Rientro stimato tra circa {weeks} settimane ({month_label})"
+            if remaining >= 0:
+                return f"Rientro stimato entro {month_label}"
+            return "Rientro in verifica"
+    unavailable_until = int(number(signal.get("unavailable_until_matchday"))) or None
+    if unavailable_until:
+        return f"Indisponibile fino alla {unavailable_until}ª giornata"
+    return "Rientro da definire"
+
+
 def _percentage(value: Any, fallback: float) -> float:
     if value is None or value == "":
         return _clamp(fallback)
@@ -620,6 +686,8 @@ def player_availability(
         "availability_unavailable": False,
         "unavailable_until_matchday": None,
         "return_matchday": None,
+        "return_month": "",
+        "estimated_return_date": "",
         "availability_has_news": False,
         "appearance_model_components": model_components,
     }
@@ -655,6 +723,10 @@ def player_availability(
         return_matchday = int(number(item.get("return_matchday"))) or None
         unavailable_until = unavailable_until or _explicit_unavailable_until(context)
         return_matchday = return_matchday or _explicit_return_matchday(context)
+        return_month = _explicit_return_month(context)
+        estimated_return_date = _estimated_return_date(
+            context, item.get("published_at")
+        )
         if return_matchday and unavailable_until is None:
             unavailable_until = max(return_matchday - 1, 0)
         source = str(item.get("source") or "Fonte pubblicata")
@@ -667,6 +739,8 @@ def player_availability(
             "availability_news_title": title,
             "unavailable_until_matchday": unavailable_until,
             "return_matchday": return_matchday,
+            "return_month": return_month,
+            "estimated_return_date": estimated_return_date,
         }
         explicit_probability = item.get("appearance_probability")
         if explicit_probability is not None:

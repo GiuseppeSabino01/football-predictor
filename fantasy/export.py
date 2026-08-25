@@ -19,6 +19,7 @@ from fantasy.service import (
     auction_player_assignment,
     auction_player_tier,
     create_auction_tier,
+    player_note,
     update_auction_assignments,
     update_list_assignments,
 )
@@ -60,6 +61,7 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
         "Squadra",
         "Ruolo",
         "Fascia personale",
+        "Note personali",
         "In rosa",
         "Fantaallenatore",
         "Crediti",
@@ -116,6 +118,7 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
             "Squadra": base_row.get("Squadra"),
             "Ruolo": base_row.get("Ruolo"),
             "Fascia personale": personal_tier_name,
+            "Note personali": player_note(league, player_id),
             "In rosa": in_roster,
             "Fantaallenatore": manager_name,
             "Crediti": credits,
@@ -215,6 +218,9 @@ def restore_listone_excel(
     draft["auction_tiers"] = []
     draft["auction_player_tiers"] = {}
     draft["auction_tiers_initialized"] = True
+    restores_notes = "Note personali" in headers
+    if restores_notes:
+        draft["player_notes"] = {}
     tier_ids: dict[str, str] = {}
     for tier_name, color in tier_definitions:
         tier = create_auction_tier(draft, tier_name, color)
@@ -235,6 +241,9 @@ def restore_listone_excel(
         "tier_assignments": sum(
             1 for row in matched_rows if _cell_text(row.get("Fascia personale"))
         ),
+        "notes": sum(
+            1 for row in matched_rows if _cell_text(row.get("Note personali"))
+        ) if restores_notes else 0,
         "unmatched": unmatched,
     }
 
@@ -403,6 +412,7 @@ def _restore_auction_rows(
     for row in rows:
         manager_name = _cell_text(row.get("Fantaallenatore"))
         tier_name = _cell_text(row.get("Fascia personale"))
+        note = _cell_text(row.get("Note personali"))
         change: dict[str, Any] = {"player": row["_player"]}
         if manager_name:
             credits = _parse_credits(row.get("Crediti"))
@@ -422,7 +432,9 @@ def _restore_auction_rows(
             change["update_assignment"] = False
         if tier_name:
             change["tier_id"] = tier_ids[_restore_key(tier_name)]
-        if manager_name or tier_name:
+        if "Note personali" in row:
+            change["note"] = note
+        if manager_name or tier_name or "Note personali" in row:
             changes.append(change)
     update_auction_assignments(league, changes)
     return purchases
@@ -445,6 +457,8 @@ def _restore_list_rows(
         }
         if tier_name:
             change["tier_id"] = tier_ids[_restore_key(tier_name)]
+        if "Note personali" in row:
+            change["note"] = _cell_text(row.get("Note personali"))
         changes.append(change)
         purchases += int(in_roster)
     update_list_assignments(league, changes)
@@ -490,6 +504,7 @@ def _style_listone_sheet(sheet: Any) -> None:
         "Squadra": 12,
         "Ruolo": 9,
         "Fascia personale": 22,
+        "Note personali": 42,
         "In rosa": 11,
         "Fantaallenatore": 22,
         "Crediti": 11,

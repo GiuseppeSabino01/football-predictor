@@ -10,6 +10,7 @@ from fantasy.service import (
     auction_player_tier,
     create_league,
     new_workspace,
+    player_note,
     record_auction_purchase,
     rename_auction_manager,
     update_auction_assignments,
@@ -32,7 +33,12 @@ def test_listone_excel_contains_personal_tiers_and_roster_data() -> None:
     tier = next(item for item in league["auction_tiers"] if item["name"] == "Semi-top")
     update_list_assignments(
         league,
-        [{"player": player, "in_roster": True, "tier_id": tier["id"]}],
+        [{
+            "player": player,
+            "in_roster": True,
+            "tier_id": tier["id"],
+            "note": "Priorita alta",
+        }],
     )
 
     workbook = load_workbook(BytesIO(build_listone_excel([player], league)))
@@ -43,6 +49,7 @@ def test_listone_excel_contains_personal_tiers_and_roster_data() -> None:
     assert workbook.sheetnames == ["Listone", "Fasce personali"]
     assert values["Giocatore"] == "Dimarco"
     assert values["Fascia personale"] == "Semi-top"
+    assert values["Note personali"] == "Priorita alta"
     assert values["In rosa"] == "Sì"
     assert values["Crediti"] == 32
     assert values["Propensione bonus"] == 72
@@ -96,7 +103,12 @@ def test_auction_excel_roundtrip_restores_tiers_managers_and_prices() -> None:
     tier = next(item for item in source["auction_tiers"] if item["name"] == "Semi-top")
     update_auction_assignments(
         source,
-        [{"player": players[1], "update_assignment": False, "tier_id": tier["id"]}],
+        [{
+            "player": players[1],
+            "update_assignment": False,
+            "tier_id": tier["id"],
+            "note": "Coppia con Dumfries",
+        }],
     )
     raw = build_listone_excel(players, source)
 
@@ -119,6 +131,7 @@ def test_auction_excel_roundtrip_restores_tiers_managers_and_prices() -> None:
         "matched": 3,
         "purchases": 2,
         "tier_assignments": 1,
+        "notes": 1,
         "unmatched": [],
     }
     assert sommer and sommer["is_user"] is True
@@ -127,6 +140,7 @@ def test_auction_excel_roundtrip_restores_tiers_managers_and_prices() -> None:
     assert dimarco["purchase"]["price"] == 27
     assert auction_player_assignment(target, str(players[2]["id"])) is None
     assert auction_player_tier(target, str(players[1]["id"]))["name"] == "Semi-top"
+    assert player_note(target, str(players[1]["id"])) == "Coppia con Dumfries"
 
 
 def test_list_mode_excel_roundtrip_supports_legacy_files_without_player_id() -> None:
@@ -151,6 +165,10 @@ def test_list_mode_excel_roundtrip_supports_legacy_files_without_player_id() -> 
         cell.column for cell in sheet[1] if cell.value == "ID giocatore"
     )
     sheet.delete_cols(id_column)
+    note_column = next(
+        cell.column for cell in sheet[1] if cell.value == "Note personali"
+    )
+    sheet.delete_cols(note_column)
     legacy_output = BytesIO()
     workbook.save(legacy_output)
 
@@ -163,9 +181,14 @@ def test_list_mode_excel_roundtrip_supports_legacy_files_without_player_id() -> 
         game_mode="list",
         roster_slots={"P": 0, "D": 1, "C": 0, "A": 0},
     )
+    update_list_assignments(
+        target,
+        [{"player": player, "in_roster": False, "note": "Nota gia presente"}],
+    )
 
     result = restore_listone_excel(legacy_output.getvalue(), [player], target)
 
     assert result["purchases"] == 1
     assert target["purchases"][0]["player_id"] == player["id"]
     assert auction_player_tier(target, str(player["id"]))["name"] == "Top"
+    assert player_note(target, str(player["id"])) == "Nota gia presente"

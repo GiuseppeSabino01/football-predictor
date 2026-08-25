@@ -32,6 +32,7 @@ from fantasy.decision_center import (
     best_rotation_pairs,
     build_roster_alerts,
     fixture_outlook,
+    injury_return_label,
     matchday_date,
     player_availability,
     recommend_lineup,
@@ -66,6 +67,7 @@ from fantasy.service import (
     find_league,
     list_trade_analysis,
     opponent_dna_profiles,
+    player_note,
     record_auction_purchase,
     remove_auction_purchase,
     remove_purchase,
@@ -113,7 +115,7 @@ def _cached_listone_excel(
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
-    st.caption("Fantacalcio · Build 2026.08.24 v25 · Backup Excel bidirezionale")
+    st.caption("Fantacalcio · Build 2026.08.25 v26 · Note e stato infortuni")
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
     workspace = _sync_official_catalog(workspace, storage)
@@ -234,6 +236,34 @@ def _cached_fantasy_news() -> list[dict[str, Any]]:
             if published:
                 item["published_at"] = published
     return news
+
+
+def _catalog_injury_statuses(
+    players: list[dict[str, Any]],
+) -> dict[str, dict[str, str]]:
+    """Expose only published injury signals on the player board."""
+    news_items = _cached_fantasy_news()
+    upcoming = season_next_matchday()
+    statuses: dict[str, dict[str, str]] = {}
+    for player in players:
+        signal = player_availability(
+            player,
+            news_items,
+            matchday=upcoming,
+            next_matchday_number=upcoming,
+        )
+        if not signal.get("availability_has_news") or signal.get(
+            "availability_status"
+        ) not in {"injured", "returning"}:
+            continue
+        source = str(signal.get("availability_source") or "Fonte pubblicata")
+        detail = str(signal.get("availability_reason") or "Infortunio segnalato")
+        statuses[str(player.get("id") or "")] = {
+            "indicator": "🩼",
+            "return": injury_return_label(signal),
+            "detail": f"{detail} · Fonte: {source}",
+        }
+    return statuses
 
 
 def _load_workspace(storage: FantasyWorkspaceStorage) -> dict[str, Any]:
@@ -672,7 +702,7 @@ def _render_preparation(
         + (
             '<span>Assegna ogni giocatore, correggi il prezzo o scegli Non assegnato per rimuoverlo</span></div>'
             if not list_mode else
-            '<span>Gestisci direttamente rosa e fascia personale; Apri mostra la scheda completa</span></div>'
+            '<span>Gestisci rosa, fascia e note; 🩼 segnala un infortunio con il rientro pubblicato</span></div>'
         )
         + f'<b>{len(frame)}</b></div>',
         unsafe_allow_html=True,
@@ -698,7 +728,7 @@ def _render_preparation(
     )
     with upload_column.popover("Carica listone Excel", use_container_width=True):
         st.caption(
-            "Ripristina fasce personali, fantaallenatori e crediti dal backup. "
+            "Ripristina note, fasce personali, fantaallenatori e crediti dal backup. "
             "Le assegnazioni attuali della lega selezionata saranno sostituite."
         )
         uploaded_listone = st.file_uploader(
@@ -732,7 +762,8 @@ def _render_preparation(
                 )
                 st.session_state[import_message_key] = (
                     f"Backup ripristinato: {restored['purchases']} acquisti e "
-                    f"{restored['tier_assignments']} fasce{skipped_note}."
+                    f"{restored['tier_assignments']} fasce e "
+                    f"{restored['notes']} note{skipped_note}."
                 )
                 st.rerun()
     if list_mode:
@@ -1522,6 +1553,7 @@ def _render_list_catalog_editor(
         for player_id in indexed["_id"]
     }
     catalog_by_id = {str(player.get("id")): player for player in catalog}
+    injury_statuses = _catalog_injury_statuses(list(catalog_by_id.values()))
 
     def player_metric(player_id: Any, field: str) -> float:
         value = _number_or_none(
@@ -1553,6 +1585,21 @@ def _render_list_catalog_editor(
                 {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
             ).fillna(indexed["Ruolo"]),
             "Giocatore": indexed["Giocatore"],
+            "Stop": [
+                injury_statuses.get(str(player_id), {}).get("indicator", "")
+                for player_id in indexed["_id"]
+            ],
+            "Rientro previsto": [
+                injury_statuses.get(str(player_id), {}).get("return", "")
+                for player_id in indexed["_id"]
+            ],
+            "_injury_detail": [
+                injury_statuses.get(str(player_id), {}).get("detail", "")
+                for player_id in indexed["_id"]
+            ],
+            "Note": [
+                player_note(league, str(player_id)) for player_id in indexed["_id"]
+            ],
             "Squadra": indexed["Squadra"],
             "Q": indexed["Quotazione"],
             "FM attesa": indexed["FM attesa"],
@@ -1619,6 +1666,7 @@ def _render_list_catalog_editor(
     ]
     column_defs: list[dict[str, Any]] = [
         {"field": "_player_id", "hide": True},
+        {"field": "_injury_detail", "hide": True},
         {
             "field": "Scheda",
             "headerName": "Apri",
@@ -1652,6 +1700,29 @@ def _render_list_catalog_editor(
             "pinned": "left",
             "lockPinned": True,
             "suppressMovable": True,
+        },
+        {
+            "field": "Stop",
+            "headerName": "🩼",
+            "width": 58,
+            "pinned": "left",
+            "tooltipField": "_injury_detail",
+            "cellStyle": {"color": "#ff8db4", "fontSize": "1.15rem"},
+        },
+        {
+            "field": "Rientro previsto",
+            "minWidth": 225,
+            "tooltipField": "_injury_detail",
+        },
+        {
+            "field": "Note",
+            "headerName": "Note personali",
+            "editable": True,
+            "cellEditor": "agLargeTextCellEditor",
+            "cellEditorPopup": True,
+            "cellEditorParams": {"maxLength": 500, "rows": 4, "cols": 45},
+            "minWidth": 260,
+            "tooltipField": "Note",
         },
         {"field": "Squadra", "width": 86},
         {"field": "Q", "width": 65, "type": "numericColumn"},
@@ -1747,7 +1818,13 @@ def _render_list_catalog_editor(
             if current_tier else no_tier
         )
         edited_tier_label = str(edited_row.get("Fascia personale") or no_tier)
-        if edited_owned == current_owned and edited_tier_label == current_tier_label:
+        current_note = player_note(league, player_id)
+        edited_note = str(edited_row.get("Note") or "").strip()
+        if (
+            edited_owned == current_owned
+            and edited_tier_label == current_tier_label
+            and edited_note == current_note
+        ):
             continue
         change: dict[str, Any] = {
             "player": player,
@@ -1758,6 +1835,8 @@ def _render_list_catalog_editor(
                 None if edited_tier_label == no_tier
                 else tier_id_by_label[edited_tier_label]
             )
+        if edited_note != current_note:
+            change["note"] = edited_note
         changes.append(change)
     selected_ids = [
         str(row.get("_player_id"))
@@ -1817,6 +1896,7 @@ def _render_auction_catalog_editor(
         for player_id in indexed["_id"]
     }
     catalog_by_id = {str(player.get("id")): player for player in catalog}
+    injury_statuses = _catalog_injury_statuses(list(catalog_by_id.values()))
 
     def player_metric(player_id: Any, field: str) -> float:
         player = catalog_by_id.get(str(player_id), {})
@@ -1858,6 +1938,21 @@ def _render_auction_catalog_editor(
                 {"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"}
             ).fillna(indexed["Ruolo"]),
             "Giocatore": indexed["Giocatore"],
+            "Stop": [
+                injury_statuses.get(str(player_id), {}).get("indicator", "")
+                for player_id in indexed["_id"]
+            ],
+            "Rientro previsto": [
+                injury_statuses.get(str(player_id), {}).get("return", "")
+                for player_id in indexed["_id"]
+            ],
+            "_injury_detail": [
+                injury_statuses.get(str(player_id), {}).get("detail", "")
+                for player_id in indexed["_id"]
+            ],
+            "Note": [
+                player_note(league, str(player_id)) for player_id in indexed["_id"]
+            ],
             "Squadra": indexed["Squadra"],
             "Q": indexed["Quotazione"],
             "Spesa iniziale": indexed["Spesa iniziale"],
@@ -1924,6 +2019,7 @@ def _render_auction_catalog_editor(
         "columnDefs": [
             {"field": "_player_id", "hide": True},
             {"field": "_assigned", "hide": True},
+            {"field": "_injury_detail", "hide": True},
             {
                 "field": "Scheda",
                 "headerName": "Apri",
@@ -1974,6 +2070,29 @@ def _render_auction_catalog_editor(
                 "pinned": "left",
                 "lockPinned": True,
                 "suppressMovable": True,
+            },
+            {
+                "field": "Stop",
+                "headerName": "🩼",
+                "width": 58,
+                "pinned": "left",
+                "tooltipField": "_injury_detail",
+                "cellStyle": {"color": "#ff8db4", "fontSize": "1.15rem"},
+            },
+            {
+                "field": "Rientro previsto",
+                "minWidth": 225,
+                "tooltipField": "_injury_detail",
+            },
+            {
+                "field": "Note",
+                "headerName": "Note personali",
+                "editable": True,
+                "cellEditor": "agLargeTextCellEditor",
+                "cellEditorPopup": True,
+                "cellEditorParams": {"maxLength": 500, "rows": 4, "cols": 45},
+                "minWidth": 260,
+                "tooltipField": "Note",
             },
             {"field": "Squadra", "width": 86},
             {"field": "Q", "width": 65, "type": "numericColumn"},
@@ -2113,7 +2232,10 @@ def _render_auction_catalog_editor(
         owner_changed = edited_name != current_name
         price_changed = current is not None and abs(edited_price - current_price) > 0.001
         tier_changed = edited_tier_label != current_tier_label
-        if not owner_changed and not price_changed and not tier_changed:
+        current_note = player_note(league, clean_id)
+        edited_note = str(edited_row.get("Note") or "").strip()
+        note_changed = edited_note != current_note
+        if not owner_changed and not price_changed and not tier_changed and not note_changed:
             continue
         player = by_id.get(clean_id)
         if not player:
@@ -2129,6 +2251,8 @@ def _render_auction_catalog_editor(
                 None if edited_tier_label == no_tier
                 else tier_id_by_label[edited_tier_label]
             )
+        if note_changed:
+            change["note"] = edited_note
         changes.append(change)
 
     selected_ids = [
