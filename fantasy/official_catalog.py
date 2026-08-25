@@ -19,13 +19,39 @@ from fantasy.catalog_estimates import enrich_missing_analysis, recalibrate_injur
 from fantasy.service import player_score
 
 OFFICIAL_CATALOG_URL = "https://www.fantacalcio.it/quotazioni-fantacalcio"
+OFFICIAL_TRANSFERS_URL = (
+    "https://www.fantacalcio.it/calciomercato/trasferimenti-ufficiali"
+)
 SEED_CATALOG_PATH = (
     Path(__file__).resolve().parents[1] / "data" / "fantacalcio_seed_2026_27.csv"
 )
 MINIMUM_VALID_PLAYERS = 400
 # The public quotation page can briefly retain transferred players after the
-# active list has changed. Keep confirmed departures out during that lag.
-CONFIRMED_LIST_EXCLUSIONS = {("circati", "PAR")}
+# active list has changed. These confirmed cases remain as a fallback if the
+# official transfer registry is temporarily unreachable.
+CONFIRMED_LIST_EXCLUSIONS = {("circati", "PAR"), ("lukaku", "NAP")}
+TEAM_CODE_BY_NAME = {
+    "atalanta": "ATA",
+    "bologna": "BOL",
+    "cagliari": "CAG",
+    "como": "COM",
+    "fiorentina": "FIO",
+    "frosinone": "FRO",
+    "genoa": "GEN",
+    "inter": "INT",
+    "juventus": "JUV",
+    "lazio": "LAZ",
+    "lecce": "LEC",
+    "milan": "MIL",
+    "monza": "MON",
+    "napoli": "NAP",
+    "parma": "PAR",
+    "roma": "ROM",
+    "sassuolo": "SAS",
+    "torino": "TOR",
+    "udinese": "UDI",
+    "venezia": "VEN",
+}
 
 
 @lru_cache(maxsize=1)
@@ -76,6 +102,13 @@ def fetch_official_catalog(timeout: int = 18) -> dict:
         if not _valid_role_distribution(players):
             players = parse_official_html(html, load_seed_catalog())
             method = "Pagina ufficiale"
+        transfers = _download_official_transfers(session, headers, timeout)
+        removed_count = 0
+        moved_count = 0
+        if _valid_transfer_registry(transfers):
+            players, removed_count, moved_count = apply_official_transfers(
+                players, transfers
+            )
         if not _valid_role_distribution(players):
             counts = _role_counts(players)
             raise ValueError(f"Listone incompleto o ruoli non validi: {counts}")
@@ -85,7 +118,12 @@ def fetch_official_catalog(timeout: int = 18) -> dict:
             "source": "Fantacalcio.it",
             "source_url": OFFICIAL_CATALOG_URL,
             "remote_ok": True,
-            "message": f"{method} aggiornato correttamente",
+            "message": (
+                f"{method} aggiornato correttamente · trasferimenti ufficiali: "
+                f"{removed_count} uscite, {moved_count} cambi interni"
+            ),
+            "removed_players": removed_count,
+            "moved_players": moved_count,
         }
     except Exception as error:
         return {
@@ -182,6 +220,77 @@ def parse_official_html(
     return players
 
 
+def parse_official_transfers_html(html: str) -> list[dict]:
+    """Read confirmed departures from Fantacalcio's official transfer board."""
+    soup = BeautifulSoup(html, "html.parser")
+    transfers: list[dict] = []
+    for card in soup.select(".team-card"):
+        team_node = card.select_one(":scope > header .team-name")
+        source_name = _text(team_node.get_text(" ", strip=True) if team_node else "")
+        source_code = TEAM_CODE_BY_NAME.get(_normalize_name(source_name), "")
+        if not source_code:
+            continue
+        for row in card.select(":scope > .card-content > .left li.transfer"):
+            if not row.select_one(".status.ufficiale"):
+                continue
+            name_node = row.select_one(".header .name")
+            destination_node = row.select_one(".team-joined .name")
+            name = _text(name_node.get_text(" ", strip=True) if name_node else "")
+            destination = _text(
+                destination_node.get_text(" ", strip=True) if destination_node else ""
+            )
+            if not name or not destination:
+                continue
+            transfers.append(
+                {
+                    "name": name,
+                    "source_team": source_name,
+                    "source_code": source_code,
+                    "destination_team": destination,
+                    "destination_code": TEAM_CODE_BY_NAME.get(
+                        _normalize_name(destination), ""
+                    ),
+                    "official": True,
+                    "source_url": OFFICIAL_TRANSFERS_URL,
+                }
+            )
+    return transfers
+
+
+def apply_official_transfers(
+    players: list[dict], transfers: list[dict]
+) -> tuple[list[dict], int, int]:
+    """Remove confirmed exits and update confirmed moves within Serie A."""
+    by_player = {
+        (_normalize_name(item.get("name")), str(item.get("source_code") or "")): item
+        for item in transfers
+        if item.get("official")
+    }
+    result: list[dict] = []
+    removed = 0
+    moved = 0
+    for original in players:
+        player = deepcopy(original)
+        transfer = by_player.get(
+            (
+                _normalize_name(player.get("name")),
+                str(player.get("team") or "").upper(),
+            )
+        )
+        if transfer is None:
+            result.append(player)
+            continue
+        destination_code = str(transfer.get("destination_code") or "")
+        if not destination_code:
+            removed += 1
+            continue
+        if destination_code != str(player.get("team") or "").upper():
+            player["team"] = destination_code
+            moved += 1
+        result.append(player)
+    return result, removed, moved
+
+
 def merge_catalog_updates(
     current_players: list[dict] | None,
     official_players: list[dict] | None,
@@ -249,6 +358,30 @@ def _download_excel_catalog(
         return []
     dataframe = pd.read_excel(io.BytesIO(response.content))
     return normalize_catalog_dataframe(dataframe)
+
+
+def _download_official_transfers(
+    session: requests.Session,
+    headers: dict[str, str],
+    timeout: int,
+) -> list[dict]:
+    try:
+        response = session.get(
+            OFFICIAL_TRANSFERS_URL,
+            headers={**headers, "Referer": OFFICIAL_CATALOG_URL},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return parse_official_transfers_html(response.text)
+    except requests.RequestException:
+        return []
+
+
+def _valid_transfer_registry(transfers: list[dict]) -> bool:
+    source_teams = {
+        str(item.get("source_code") or "") for item in transfers if item.get("official")
+    }
+    return len(transfers) >= 40 and len(source_teams) >= 15
 
 
 def _merge_preserving_analysis(base: list[dict], current: list[dict]) -> list[dict]:

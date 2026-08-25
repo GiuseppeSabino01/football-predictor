@@ -51,7 +51,14 @@ st.set_page_config(page_title="Football Betting Predictor", layout="wide")
 SESSION_SCHEMA_VERSION = "fantasy-v1"
 PREDICTION_MODEL_VERSION = "serie-a-empirical-v4-runtime-reload"
 APP_ACCENT_COLORS = ["#19e6b0", "#ffb020", "#f4538a"]
-VIEW_OPTIONS = ["Home", "Road To New York", "Fantacalcio", "GiGi", "Predict manuale", "Config"]
+VIEW_OPTIONS = [
+    "Home",
+    "Road To New York",
+    "Fantacalcio",
+    "GiGi",
+    "Predict manuale",
+    "Config",
+]
 WORLD_CUP_START = date(2026, 6, 11)
 
 
@@ -87,13 +94,15 @@ def fresh_fantasy_ui():
 def require_login() -> bool:
     app_password = settings().app_password
     if not app_password:
-        st.warning("APP_PASSWORD non configurata. Aggiungila nel file .env o nei secrets Streamlit.")
+        st.warning(
+            "APP_PASSWORD non configurata. Aggiungila nel file .env o nei secrets Streamlit."
+        )
         return True
     if st.session_state.get("logged_in"):
         return True
 
     render_login_header()
-    st.caption("Build 2026.08.25 · Serie A v4 · Fantacalcio v26.4.1")
+    st.caption("Build 2026.08.25 · Serie A v4 · Fantacalcio v26.4.2")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:
@@ -113,8 +122,12 @@ def load_predictions(
     service = fresh_prediction_service()
     signature = inspect.signature(service.predictions_for_date)
     if "competition_keys" in signature.parameters:
-        return service.predictions_for_date(target_date, competition_keys=competition_keys)
-    return service.predictions_for_date(target_date, worldcup_only="worldcup" in competition_keys)
+        return service.predictions_for_date(
+            target_date, competition_keys=competition_keys
+        )
+    return service.predictions_for_date(
+        target_date, worldcup_only="worldcup" in competition_keys
+    )
 
 
 def main() -> None:
@@ -1460,9 +1473,14 @@ def render_config() -> None:
             </div>
             """
         )
-    st.markdown(f'<div class="status-grid">{"".join(status_cards)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="status-grid">{"".join(status_cards)}</div>',
+        unsafe_allow_html=True,
+    )
     st.write(f"Modello Gemini: `{cfg.gemini_model}`")
-    st.info("Le chiavi non vengono mostrate. Se qualcosa risulta mancante, controlla .env o Streamlit secrets.")
+    st.info(
+        "Le chiavi non vengono mostrate. Se qualcosa risulta mancante, controlla .env o Streamlit secrets."
+    )
 
 
 def render_manual_prediction() -> None:
@@ -1471,7 +1489,9 @@ def render_manual_prediction() -> None:
     away = right.text_input("Squadra trasferta", value="Brazil")
     competition = st.text_input("Competizione", value="Manuale")
     if st.button("Calcola pronostico"):
-        st.session_state["manual_prediction"] = fresh_prediction_service().predict_single(home, away, competition)
+        st.session_state["manual_prediction"] = (
+            fresh_prediction_service().predict_single(home, away, competition)
+        )
     if "manual_prediction" in st.session_state:
         render_prediction_card(st.session_state["manual_prediction"])
 
@@ -1489,7 +1509,8 @@ def render_jarvis_page() -> None:
         (
             message["content"]
             for message in reversed(messages)
-            if message["role"] == "assistant" and not message["content"].startswith("Warning:")
+            if message["role"] == "assistant"
+            and not message["content"].startswith("Warning:")
         ),
         "",
     )
@@ -1502,7 +1523,9 @@ def render_jarvis_page() -> None:
         render_gigi_side_panel(prediction, messages)
 
 
-def render_gigi_side_panel(prediction: MatchPrediction, messages: list[dict[str, str]]) -> None:
+def render_gigi_side_panel(
+    prediction: MatchPrediction, messages: list[dict[str, str]]
+) -> None:
     with st.container(border=True):
         st.markdown("### GiGi")
         st.caption(f"Contesto: {prediction.match.label}")
@@ -1529,7 +1552,9 @@ def render_gigi_side_panel(prediction: MatchPrediction, messages: list[dict[str,
         render_gigi_audio_input(prediction)
 
         with st.form("gigi_text_form", clear_on_submit=True):
-            question = st.text_area("Scrivi", placeholder="Es. chi pensi che vincera?", height=92)
+            question = st.text_area(
+                "Scrivi", placeholder="Es. chi pensi che vincera?", height=92
+            )
             submitted = st.form_submit_button("Invia a GiGi")
         if submitted and question.strip():
             ask_jarvis_text(prediction, question)
@@ -1542,9 +1567,13 @@ def render_gigi_audio_input(prediction: MatchPrediction) -> None:
 
     st.markdown("**Voce**")
     audio_key = f"gigi_audio_{prediction.match.id}_{len(st.session_state.get('jarvis_messages', []))}"
-    audio_value = st.audio_input("Parla con GiGi", key=audio_key, label_visibility="collapsed")
+    audio_value = st.audio_input(
+        "Parla con GiGi", key=audio_key, label_visibility="collapsed"
+    )
     if audio_value is None:
-        st.caption("Premi il microfono, parla, poi termina: GiGi riceve l'audio automaticamente.")
+        st.caption(
+            "Premi il microfono, parla, poi termina: GiGi riceve l'audio automaticamente."
+        )
         return
 
     audio_bytes = audio_value.getvalue()
@@ -1556,7 +1585,9 @@ def render_gigi_audio_input(prediction: MatchPrediction) -> None:
         st.caption("Audio gia inviato.")
         return
     st.session_state[processed_key] = audio_hash
-    ask_jarvis_audio(prediction, audio_bytes, getattr(audio_value, "type", None) or "audio/wav")
+    ask_jarvis_audio(
+        prediction, audio_bytes, getattr(audio_value, "type", None) or "audio/wav"
+    )
 
 
 def render_jarvis_open_button(prediction: MatchPrediction, prediction_key: str) -> None:
@@ -1581,11 +1612,15 @@ def ask_jarvis_text(prediction: MatchPrediction, question: str) -> None:
     messages.append({"role": "assistant", "content": reply.answer})
     for warning in reply.warnings:
         messages.append({"role": "assistant", "content": f"Warning: {warning}"})
-    st.session_state["jarvis_speech_nonce"] = st.session_state.get("jarvis_speech_nonce", 0) + 1
+    st.session_state["jarvis_speech_nonce"] = (
+        st.session_state.get("jarvis_speech_nonce", 0) + 1
+    )
     st.rerun()
 
 
-def ask_jarvis_audio(prediction: MatchPrediction, audio_bytes: bytes, mime_type: str) -> None:
+def ask_jarvis_audio(
+    prediction: MatchPrediction, audio_bytes: bytes, mime_type: str
+) -> None:
     messages = st.session_state.setdefault("jarvis_messages", [])
     messages.append({"role": "user", "content": "Domanda vocale registrata."})
     assistant = JarvisAssistant(GeminiClient(settings()))
@@ -1594,7 +1629,9 @@ def ask_jarvis_audio(prediction: MatchPrediction, audio_bytes: bytes, mime_type:
     messages.append({"role": "assistant", "content": reply.answer})
     for warning in reply.warnings:
         messages.append({"role": "assistant", "content": f"Warning: {warning}"})
-    st.session_state["jarvis_speech_nonce"] = st.session_state.get("jarvis_speech_nonce", 0) + 1
+    st.session_state["jarvis_speech_nonce"] = (
+        st.session_state.get("jarvis_speech_nonce", 0) + 1
+    )
     st.rerun()
 
 
@@ -1882,7 +1919,9 @@ def render_road_to_new_york() -> None:
             help="Statistiche e' veloce e non consuma token. LLM usa Gemini per stimare i risultati.",
         )
         use_llm = simulation_engine == "LLM"
-        if control_a.button("Ricalcola simulazione", type="primary", key="road_recalculate"):
+        if control_a.button(
+            "Ricalcola simulazione", type="primary", key="road_recalculate"
+        ):
             spinner_text = (
                 "Simulo gironi, migliori terze e bracket con Gemini..."
                 if use_llm
@@ -1908,7 +1947,9 @@ def render_road_to_new_york() -> None:
                 key="road_selected_run",
             )
             if control_d.button("Carica versione", key="road_load_version"):
-                st.session_state["road_payload"] = row_by_id[str(selected_run)]["payload"]
+                st.session_state["road_payload"] = row_by_id[str(selected_run)][
+                    "payload"
+                ]
                 st.rerun()
         else:
             control_c.caption("Nessuna simulazione salvata.")
@@ -1998,13 +2039,20 @@ def render_road_history_average(history: list[dict[str, Any]]) -> None:
     champion_rows = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:4]
     finalist_rows = sorted(finalists.items(), key=lambda item: (-item[1], item[0]))[:4]
     cards = []
-    for title, rows in (("Previsione media campione", champion_rows), ("Presenza in finale", finalist_rows)):
+    for title, rows in (
+        ("Previsione media campione", champion_rows),
+        ("Presenza in finale", finalist_rows),
+    ):
         values = "".join(
             f"<div><b>{escape(team)}</b> - {count}/{valid_payloads}</div>"
             for team, count in rows
         )
-        cards.append(f'<div class="road-history-card"><b>{escape(title)}</b>{values}</div>')
-    st.markdown(f'<div class="road-history-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+        cards.append(
+            f'<div class="road-history-card"><b>{escape(title)}</b>{values}</div>'
+        )
+    st.markdown(
+        f'<div class="road-history-grid">{"".join(cards)}</div>', unsafe_allow_html=True
+    )
 
 
 def render_road_groups(payload: dict[str, Any], service: WorldCupSimulator) -> None:
@@ -2019,7 +2067,9 @@ def render_road_groups(payload: dict[str, Any], service: WorldCupSimulator) -> N
         group_payload = groups.get(group)
         if group_payload:
             cards.append(_road_group_card(group, group_payload))
-    st.markdown(f'<div class="road-group-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="road-group-grid">{"".join(cards)}</div>', unsafe_allow_html=True
+    )
 
     with st.expander("Modifica manuale risultati gironi", expanded=False):
         render_road_manual_editor(payload, service)
@@ -2060,7 +2110,7 @@ def _road_group_card(group: str, group_payload: dict[str, Any]) -> str:
         label = f"{row.get('home_team')} vs {row.get('away_team')}"
         matches.append(
             '<div class="road-mini-match">'
-            f'<span>{escape(label)}</span>'
+            f"<span>{escape(label)}</span>"
             f'<span class="road-mini-match-score">{escape(str(row.get("score_90", "-")))}</span>'
             "</div>"
         )
@@ -2076,12 +2126,16 @@ def _road_group_card(group: str, group_payload: dict[str, Any]) -> str:
     )
 
 
-def render_road_manual_editor(payload: dict[str, Any], service: WorldCupSimulator) -> None:
+def render_road_manual_editor(
+    payload: dict[str, Any], service: WorldCupSimulator
+) -> None:
     rows = _road_manual_rows(payload)
     if not rows:
         st.info("Nessuna partita modificabile.")
         return
-    st.caption("Modifica i gol dei gironi: il bracket viene ricostruito e salvato come nuova versione.")
+    st.caption(
+        "Modifica i gol dei gironi: il bracket viene ricostruito e salvato come nuova versione."
+    )
     edited = st.data_editor(
         pd.DataFrame(rows),
         hide_index=True,
@@ -2089,7 +2143,9 @@ def render_road_manual_editor(payload: dict[str, Any], service: WorldCupSimulato
         disabled=["match_id", "Data", "Gruppo", "Partita", "Casa", "Trasferta"],
         key=f"road_manual_editor_{payload.get('run_id', 'draft')}",
     )
-    if st.button("Applica modifiche e ricalcola bracket", key="road_apply_manual", type="primary"):
+    if st.button(
+        "Applica modifiche e ricalcola bracket", key="road_apply_manual", type="primary"
+    ):
         overrides = _road_overrides_from_editor(edited)
         st.session_state["road_manual_overrides"] = overrides
         use_llm = st.session_state.get("road_simulation_engine", "Statistiche") == "LLM"
@@ -2149,11 +2205,21 @@ def render_road_bracket(payload: dict[str, Any]) -> None:
         by_round.get("Sedicesimi", []) + by_round.get("Trentaduesimi", []),
         key=lambda item: int(item.get("match_no", 0)),
     )
-    r16 = sorted(by_round.get("Ottavi", []), key=lambda item: int(item.get("match_no", 0)))
-    qf = sorted(by_round.get("Quarti", []), key=lambda item: int(item.get("match_no", 0)))
-    sf = sorted(by_round.get("Semifinale", []), key=lambda item: int(item.get("match_no", 0)))
-    final = sorted(by_round.get("Finale", []), key=lambda item: int(item.get("match_no", 0)))
-    third = sorted(by_round.get("Terzo posto", []), key=lambda item: int(item.get("match_no", 0)))
+    r16 = sorted(
+        by_round.get("Ottavi", []), key=lambda item: int(item.get("match_no", 0))
+    )
+    qf = sorted(
+        by_round.get("Quarti", []), key=lambda item: int(item.get("match_no", 0))
+    )
+    sf = sorted(
+        by_round.get("Semifinale", []), key=lambda item: int(item.get("match_no", 0))
+    )
+    final = sorted(
+        by_round.get("Finale", []), key=lambda item: int(item.get("match_no", 0))
+    )
+    third = sorted(
+        by_round.get("Terzo posto", []), key=lambda item: int(item.get("match_no", 0))
+    )
     r32_by_no = {int(match.get("match_no", 0)): match for match in r32}
     r16_by_no = {int(match.get("match_no", 0)): match for match in r16}
     qf_by_no = {int(match.get("match_no", 0)): match for match in qf}
@@ -2189,10 +2255,14 @@ def render_road_bracket(payload: dict[str, Any]) -> None:
     )
 
 
-def _road_matches_in_order(index: dict[int, dict[str, Any]], order: list[int]) -> list[dict[str, Any]]:
+def _road_matches_in_order(
+    index: dict[int, dict[str, Any]], order: list[int]
+) -> list[dict[str, Any]]:
     ordered = [index[match_no] for match_no in order if match_no in index]
     used = set(order)
-    ordered.extend(match for match_no, match in sorted(index.items()) if match_no not in used)
+    ordered.extend(
+        match for match_no, match in sorted(index.items()) if match_no not in used
+    )
     return ordered
 
 
@@ -2265,7 +2335,9 @@ def _road_bracket_canvas(
         (1510, 6, "Sedicesimi"),
     ]
     for x, y, label in labels:
-        cards.append(f'<div class="road-node-label" style="left:{x}px; top:{y}px;">{escape(label)}</div>')
+        cards.append(
+            f'<div class="road-node-label" style="left:{x}px; top:{y}px;">{escape(label)}</div>'
+        )
 
     left_edges = [
         (74, 89),
@@ -2302,11 +2374,15 @@ def _road_bracket_canvas(
         (102, 104),
     ]
     for source, target in left_edges:
-        segment = _road_connector_line(positions, source, target, card_w, card_h, side="left")
+        segment = _road_connector_line(
+            positions, source, target, card_w, card_h, side="left"
+        )
         if segment:
             lines.append(segment)
     for source, target in right_edges:
-        segment = _road_connector_line(positions, source, target, card_w, card_h, side="right")
+        segment = _road_connector_line(
+            positions, source, target, card_w, card_h, side="right"
+        )
         if segment:
             lines.append(segment)
 
@@ -2314,7 +2390,7 @@ def _road_bracket_canvas(
         '<div class="road-bracket-classic">'
         '<div class="road-bracket-canvas">'
         f'<svg viewBox="0 0 1680 965" preserveAspectRatio="none">{"".join(lines)}</svg>'
-        f'{"".join(cards)}'
+        f"{''.join(cards)}"
         "</div>"
         "</div>"
     )
@@ -2346,7 +2422,9 @@ def _road_connector_line(
     return f'<polyline class="road-bracket-line" fill="none" points="{points}" />'
 
 
-def _road_round_column(round_name: str, rows: list[dict[str, Any]], side: str, depth: int) -> str:
+def _road_round_column(
+    round_name: str, rows: list[dict[str, Any]], side: str, depth: int
+) -> str:
     cards = _road_pair_cards(rows)
     title = escape(round_name)
     return (
@@ -2380,7 +2458,9 @@ def _road_match_card(match: dict[str, Any]) -> str:
     source_b = str(match.get("source_b") or "")
     source_line = ""
     if source_a or source_b:
-        source_line = f'<div class="road-source">{escape(source_a)} + {escape(source_b)}</div>'
+        source_line = (
+            f'<div class="road-source">{escape(source_a)} + {escape(source_b)}</div>'
+        )
     details = [f"{escape(resolution)}"]
     if score_aet != "-":
         details.append(f"dts {escape(score_aet)}")
@@ -2458,7 +2538,9 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
                 PREDICTION_MODEL_VERSION,
             )
         except TypeError as exc:
-            st.error("Errore di compatibilita nel servizio predizioni. Riavvia l'app Streamlit dopo il deploy.")
+            st.error(
+                "Errore di compatibilita nel servizio predizioni. Riavvia l'app Streamlit dopo il deploy."
+            )
             st.code(str(exc))
             return
 
@@ -2468,13 +2550,18 @@ def render_predictions(target_date: date, competition_keys: tuple[str, ...]) -> 
                 st.warning(error)
 
     if not predictions:
-        st.info("Nessuna partita trovata per questa data nelle competizioni configurate.")
+        st.info(
+            "Nessuna partita trovata per questa data nelle competizioni configurate."
+        )
         if "worldcup" in competition_keys:
             st.caption("Per i Mondiali prova dall'11 giugno 2026 in avanti.")
         return
 
     competition_label = _selected_competitions_label(competition_keys)
-    render_section_heading(f"Pronostici del {target_date.isoformat()}", f"{len(predictions)} match | {competition_label}")
+    render_section_heading(
+        f"Pronostici del {target_date.isoformat()}",
+        f"{len(predictions)} match | {competition_label}",
+    )
     for prediction in predictions:
         render_prediction_card(prediction)
 
@@ -2490,7 +2577,10 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
 
     match = prediction.match
     with st.container(border=True):
-        top = max((pick for pick in prediction.picks if pick.market == "1X2"), key=lambda p: p.average_probability)
+        top = max(
+            (pick for pick in prediction.picks if pick.market == "1X2"),
+            key=lambda p: p.average_probability,
+        )
         render_match_header(prediction, top)
         render_gemini_probability_button(base_prediction, prediction, prediction_key)
         render_jarvis_open_button(prediction, prediction_key)
@@ -2534,7 +2624,9 @@ def render_prediction_card(prediction: MatchPrediction) -> None:
                     if not rows:
                         continue
                     st.markdown(f"**{title}**")
-                    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+                    st.dataframe(
+                        pd.DataFrame(rows), hide_index=True, use_container_width=True
+                    )
 
         if prediction.warnings:
             with st.expander("Warning"):
@@ -2615,7 +2707,7 @@ def render_probability_strip(picks: list[MarketPick]) -> str:
         '<div class="prob-strip">'
         f'<div class="prob-track">{"".join(segments)}</div>'
         f'<div class="prob-legend">{"".join(labels)}</div>'
-        '</div>'
+        "</div>"
     )
 
 
@@ -2752,19 +2844,33 @@ def render_gemini_probability_button(
     displayed_prediction: MatchPrediction,
     prediction_key: str,
 ) -> None:
-    has_model_probability = any(pick.llm_probability is not None for pick in displayed_prediction.picks)
-    button_label = "Ricalcola probabilita" if has_model_probability else "Calcola probabilita"
+    has_model_probability = any(
+        pick.llm_probability is not None for pick in displayed_prediction.picks
+    )
+    button_label = (
+        "Ricalcola probabilita" if has_model_probability else "Calcola probabilita"
+    )
     col_button, col_hint = st.columns([1.1, 3])
     if col_button.button(button_label, key=f"gemini_{prediction_key}"):
         service = fresh_prediction_service()
         prediction_to_enrich = deepcopy(base_prediction)
-        with st.spinner(f"Calcolo probabilita per {prediction_to_enrich.match.label}..."):
-            enriched_prediction = service.enrich_prediction_with_gemini(prediction_to_enrich)
-        if not service.save_cached_gemini_prediction(prediction_key, enriched_prediction) and any(
+        with st.spinner(
+            f"Calcolo probabilita per {prediction_to_enrich.match.label}..."
+        ):
+            enriched_prediction = service.enrich_prediction_with_gemini(
+                prediction_to_enrich
+            )
+        if not service.save_cached_gemini_prediction(
+            prediction_key, enriched_prediction
+        ) and any(
             pick.llm_probability is not None for pick in enriched_prediction.picks
         ):
-            enriched_prediction.warnings.append("Analisi Gemini calcolata ma non salvata.")
-        st.session_state.setdefault("llm_predictions", {})[prediction_key] = enriched_prediction
+            enriched_prediction.warnings.append(
+                "Analisi Gemini calcolata ma non salvata."
+            )
+        st.session_state.setdefault("llm_predictions", {})[prediction_key] = (
+            enriched_prediction
+        )
         st.rerun()
     if has_model_probability:
         col_hint.caption("Analisi salvata.")
@@ -2785,15 +2891,21 @@ def _prediction_cache_key(prediction: MatchPrediction) -> str:
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
-def load_saved_gemini_prediction(base_prediction: MatchPrediction, prediction_key: str) -> MatchPrediction | None:
+def load_saved_gemini_prediction(
+    base_prediction: MatchPrediction, prediction_key: str
+) -> MatchPrediction | None:
     cached_prediction = st.session_state.get("llm_predictions", {}).get(prediction_key)
     if cached_prediction:
         return cached_prediction
 
     service = fresh_prediction_service()
-    saved_prediction = service.load_cached_gemini_prediction(prediction_key, base_prediction)
+    saved_prediction = service.load_cached_gemini_prediction(
+        prediction_key, base_prediction
+    )
     if saved_prediction:
-        st.session_state.setdefault("llm_predictions", {})[prediction_key] = saved_prediction
+        st.session_state.setdefault("llm_predictions", {})[prediction_key] = (
+            saved_prediction
+        )
     return saved_prediction
 
 
@@ -2803,7 +2915,9 @@ def _without_gemini_output(prediction: MatchPrediction) -> MatchPrediction:
         pick.llm_probability = None
     clean.llm_summary = None
     clean.news_signals = []
-    clean.warnings = [warning for warning in clean.warnings if "gemini" not in warning.lower()]
+    clean.warnings = [
+        warning for warning in clean.warnings if "gemini" not in warning.lower()
+    ]
     one_x_two = [pick for pick in clean.picks if pick.market == "1X2"]
     if one_x_two:
         top = max(one_x_two, key=lambda pick: pick.probability)
@@ -2854,12 +2968,11 @@ def render_manual_odds_inputs(prediction: MatchPrediction) -> dict[str, float]:
     return manual
 
 
-def render_market_table(picks: list[MarketPick], manual_odds: dict[str, float] | None = None) -> None:
+def render_market_table(
+    picks: list[MarketPick], manual_odds: dict[str, float] | None = None
+) -> None:
     manual_odds = manual_odds or {}
-    rows = [
-        _market_row(pick, manual_odds)
-        for pick in picks
-    ]
+    rows = [_market_row(pick, manual_odds) for pick in picks]
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
@@ -2873,14 +2986,22 @@ def _market_row(pick: MarketPick, manual_odds: dict[str, float]) -> dict[str, ob
     return {
         "Mercato": pick.market,
         "Selezione": pick.selection,
-        "Probabilita statistica": f"{pick.probability:.1%}" if pick.probability else "-",
-        "Probabilita modello": f"{pick.llm_probability:.1%}" if pick.llm_probability is not None else "-",
-        "Media probabilita": f"{average_probability:.1%}" if average_probability else "-",
+        "Probabilita statistica": f"{pick.probability:.1%}"
+        if pick.probability
+        else "-",
+        "Probabilita modello": f"{pick.llm_probability:.1%}"
+        if pick.llm_probability is not None
+        else "-",
+        "Media probabilita": f"{average_probability:.1%}"
+        if average_probability
+        else "-",
         "Quota media": _display_number(fair_odd(average_probability)),
         "Quota bookmaker": _display_number(bookmaker_odd),
         "Value": f"{computed_value:+.3f}" if computed_value is not None else "-",
         "Segnale medio": _model_signal(average_probability, pick.market),
-        "Value betting": recommendation(average_probability, bookmaker_odd) if bookmaker_odd else "Quota mancante",
+        "Value betting": recommendation(average_probability, bookmaker_odd)
+        if bookmaker_odd
+        else "Quota mancante",
         "Conf.": pick.confidence,
     }
 

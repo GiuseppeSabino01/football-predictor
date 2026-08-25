@@ -117,7 +117,7 @@ def _cached_listone_excel(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.25 v26.4.1 · Hot reload stabile"
+        "Fantacalcio · Build 2026.08.25 v26.4.2 · Trasferimenti ufficiali sincronizzati"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -1703,12 +1703,6 @@ def _render_list_catalog_editor(
     }
     catalog_by_id = {str(player.get("id")): player for player in catalog}
     injury_statuses = _catalog_injury_statuses(list(catalog_by_id.values()))
-    analysis_details = indexed.get(
-        "Origine dati", pd.Series("Fonte catalogo", index=indexed.index)
-    )
-    analysis_labels = indexed.get(
-        "Dati", pd.Series("ANALISI", index=indexed.index)
-    )
 
     def player_metric(player_id: Any, field: str) -> float:
         value = (
@@ -1727,7 +1721,6 @@ def _render_list_catalog_editor(
     display = pd.DataFrame(
         {
             "_player_id": indexed["_id"].astype(str),
-            "_analysis_detail": analysis_details,
             "Scheda": False,
             "In rosa": [
                 str(player_id) in purchased_ids for player_id in indexed["_id"]
@@ -1748,7 +1741,6 @@ def _render_list_catalog_editor(
             .map({"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"})
             .fillna(indexed["Ruolo"]),
             "Giocatore": indexed["Giocatore"],
-            "Dati": analysis_labels,
             "Stop": [
                 injury_statuses.get(str(player_id), {}).get("indicator", "")
                 for player_id in indexed["_id"]
@@ -1829,7 +1821,6 @@ def _render_list_catalog_editor(
     column_defs: list[dict[str, Any]] = [
         {"field": "_player_id", "hide": True},
         {"field": "_injury_detail", "hide": True},
-        {"field": "_analysis_detail", "hide": True},
         {
             "field": "Scheda",
             "headerName": "Apri",
@@ -1863,12 +1854,6 @@ def _render_list_catalog_editor(
             "pinned": "left",
             "lockPinned": True,
             "suppressMovable": True,
-        },
-        {
-            "field": "Dati",
-            "width": 82,
-            "tooltipField": "_analysis_detail",
-            "cellStyle": {"color": "#62d8ff", "fontWeight": "700"},
         },
         {
             "field": "Stop",
@@ -2064,12 +2049,6 @@ def _render_auction_catalog_editor(
     }
     catalog_by_id = {str(player.get("id")): player for player in catalog}
     injury_statuses = _catalog_injury_statuses(list(catalog_by_id.values()))
-    analysis_details = indexed.get(
-        "Origine dati", pd.Series("Fonte catalogo", index=indexed.index)
-    )
-    analysis_labels = indexed.get(
-        "Dati", pd.Series("ANALISI", index=indexed.index)
-    )
 
     def player_metric(player_id: Any, field: str) -> float:
         player = catalog_by_id.get(str(player_id), {})
@@ -2089,7 +2068,6 @@ def _render_auction_catalog_editor(
             "_assigned": [
                 bool(assignments[str(player_id)]) for player_id in indexed["_id"]
             ],
-            "_analysis_detail": analysis_details,
             "Scheda": False,
             "In rosa": [
                 "✓"
@@ -2126,7 +2104,6 @@ def _render_auction_catalog_editor(
             .map({"P": "🟨 P", "D": "🟩 D", "C": "🟦 C", "A": "🟥 A"})
             .fillna(indexed["Ruolo"]),
             "Giocatore": indexed["Giocatore"],
-            "Dati": analysis_labels,
             "Stop": [
                 injury_statuses.get(str(player_id), {}).get("indicator", "")
                 for player_id in indexed["_id"]
@@ -2211,7 +2188,6 @@ def _render_auction_catalog_editor(
             {"field": "_player_id", "hide": True},
             {"field": "_assigned", "hide": True},
             {"field": "_injury_detail", "hide": True},
-            {"field": "_analysis_detail", "hide": True},
             {
                 "field": "Scheda",
                 "headerName": "Apri",
@@ -2262,12 +2238,6 @@ def _render_auction_catalog_editor(
                 "pinned": "left",
                 "lockPinned": True,
                 "suppressMovable": True,
-            },
-            {
-                "field": "Dati",
-                "width": 82,
-                "tooltipField": "_analysis_detail",
-                "cellStyle": {"color": "#62d8ff", "fontWeight": "700"},
             },
             {
                 "field": "Stop",

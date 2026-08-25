@@ -1,8 +1,10 @@
 from fantasy.official_catalog import (
+    apply_official_transfers,
     catalog_fingerprint,
     load_seed_catalog,
     merge_catalog_updates,
     parse_official_html,
+    parse_official_transfers_html,
 )
 
 
@@ -118,7 +120,7 @@ def test_saved_corrupted_roles_are_repaired_from_analyzed_seed() -> None:
         role: sum(player["role"] == role for player in repaired) for role in "PDCA"
     }
 
-    assert counts == {"P": 60, "D": 176, "C": 172, "A": 85}
+    assert counts == {"P": 60, "D": 176, "C": 172, "A": 84}
     assert catalog_fingerprint(seed) != catalog_fingerprint(corrupted)
 
 
@@ -137,3 +139,35 @@ def test_confirmed_departure_is_removed_even_while_public_page_still_lists_it() 
     merged = merge_catalog_updates([], official, authoritative=True)
 
     assert merged == []
+
+
+def test_official_transfer_registry_removes_exits_and_updates_internal_moves() -> None:
+    html = """
+    <div class="card team-card">
+      <header><a class="team-name">Napoli</a></header>
+      <div class="card-content"><div class="left"><ul>
+        <li class="transfer">
+          <div class="header"><span class="name">Lukaku</span></div>
+          <div class="status ufficiale">UFFICIALE</div>
+          <div class="team-joined"><span class="name">Fenerbahce</span></div>
+        </li>
+        <li class="transfer">
+          <div class="header"><span class="name">Prova</span></div>
+          <div class="status ufficiale">UFFICIALE</div>
+          <div class="team-joined"><span class="name">Roma</span></div>
+        </li>
+      </ul></div></div>
+    </div>
+    """
+    transfers = parse_official_transfers_html(html)
+    players = [
+        {"id": "lukaku", "name": "Lukaku", "team": "NAP", "role": "A"},
+        {"id": "prova", "name": "Prova", "team": "NAP", "role": "C"},
+    ]
+
+    updated, removed, moved = apply_official_transfers(players, transfers)
+
+    assert [player["name"] for player in updated] == ["Prova"]
+    assert updated[0]["team"] == "ROM"
+    assert removed == 1
+    assert moved == 1
