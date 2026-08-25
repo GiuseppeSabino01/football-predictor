@@ -108,6 +108,17 @@ CATALOG_AUTOSAVE_DEBOUNCE_MS = 1200
 OFFICIAL_CATALOG_SESSION_KEY = "fantasy_official_catalog_session_v2650"
 
 
+def _auction_assigned_row_class_rule(unassigned: str) -> JsCode:
+    """Dim an auction row as soon as its participant cell is edited."""
+    encoded_unassigned = json.dumps(unassigned, ensure_ascii=False)
+    return JsCode(
+        f"""function(params) {{
+            return params.data
+                && params.data['Partecipante'] !== {encoded_unassigned};
+        }}"""
+    )
+
+
 @st.cache_data(show_spinner=False, max_entries=8)
 def _cached_listone_excel(
     catalog: list[dict[str, Any]], league: dict[str, Any]
@@ -118,7 +129,7 @@ def _cached_listone_excel(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.25 v26.5.0 · Storico reale fino a cinque stagioni"
+        "Fantacalcio · Build 2026.08.25 v26.5.1 · Giocatori assegnati attenuati"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -2043,9 +2054,6 @@ def _render_auction_catalog_editor(
     display = pd.DataFrame(
         {
             "_player_id": indexed["_id"].astype(str),
-            "_assigned": [
-                bool(assignments[str(player_id)]) for player_id in indexed["_id"]
-            ],
             "Scheda": False,
             "In rosa": [
                 "✓"
@@ -2130,8 +2138,9 @@ def _render_auction_catalog_editor(
     for tier in custom_tiers:
         color = str(tier.get("color") or "gray")
         tier_labels_by_color.setdefault(color, []).append(_tier_option_label(tier))
+    encoded_unassigned = json.dumps(unassigned, ensure_ascii=False)
     row_class_rules: dict[str, Any] = {
-        "fantasy-player-assigned": "data._assigned === true",
+        "fantasy-player-assigned": _auction_assigned_row_class_rule(unassigned),
     }
     tier_row_css: dict[str, dict[str, str]] = {}
     for color, labels in tier_labels_by_color.items():
@@ -2141,7 +2150,8 @@ def _render_auction_catalog_editor(
         encoded_labels = json.dumps(labels, ensure_ascii=False)
         row_class_rules[class_name] = JsCode(
             f"""function(params) {{
-                return params.data && params.data._assigned !== true
+                return params.data
+                    && params.data['Partecipante'] === {encoded_unassigned}
                     && {encoded_labels}.includes(params.data['Fascia personale']);
             }}"""
         )
@@ -2164,7 +2174,6 @@ def _render_auction_catalog_editor(
         },
         "columnDefs": [
             {"field": "_player_id", "hide": True},
-            {"field": "_assigned", "hide": True},
             {"field": "_injury_detail", "hide": True},
             {
                 "field": "Scheda",
@@ -2349,6 +2358,10 @@ def _render_auction_catalog_editor(
             },
             ".fantasy-player-assigned .ag-cell": {
                 "color": "#5b6661 !important",
+            },
+            ".fantasy-player-assigned .ag-cell[col-id='Giocatore']": {
+                "text-decoration": "line-through !important",
+                "text-decoration-thickness": "1px !important",
             },
         },
     )
