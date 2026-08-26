@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from copy import deepcopy
 from datetime import datetime, timezone
+from heapq import heappush, heapreplace
 from itertools import combinations
 from typing import Any
 from uuid import uuid4
@@ -36,6 +37,8 @@ FORMATIONS = {
 }
 AUCTION_TRADE_MIN_USER_GAIN = 4.0
 AUCTION_TRADE_MIN_OPPONENT_GAIN = 1.5
+AUCTION_ROLE_BUDGET_SHARES = {"P": 0.06, "D": 0.16, "C": 0.30, "A": 0.48}
+AUCTION_CROSS_ROLE_ELASTICITY = 0.60
 
 
 def utc_now() -> str:
@@ -1120,15 +1123,45 @@ def auction_price_board(
     highest_opponent_credit = max(opponent_credits, default=budget)
     remaining_slots = int(user_summary["remaining_slots"] if user_summary else 0)
     own_credit = float(user_summary["remaining_budget"] if user_summary else budget)
-    affordable = max(own_credit - max(remaining_slots - 1, 0), 0)
+    min_bid = max(_number(league.get("min_bid")), 1.0)
+    affordable = max(
+        own_credit - min_bid * max(remaining_slots - 1, 0),
+        0.0,
+    )
+    role_slots = {
+        role: int(league.get("roster_slots", DEFAULT_ROSTER_SLOTS).get(role, 0))
+        for role in ROLE_LABELS
+    }
+    role_pressure = {
+        role: _auction_cross_role_budget_pressure(
+            role,
+            user_summary,
+            role_slots,
+            budget,
+        )
+        for role in ROLE_LABELS
+    }
 
     board: dict[str, dict[str, Any]] = {}
     for player in catalog:
         player_id = str(player.get("id"))
+        role = str(player.get("role") or "").upper()
         initial = baseline_by_id[player_id]
         comparable_ratios = groups.get(_auction_comparable_group(player), [])
         market_factor = _robust_average(comparable_ratios) if comparable_ratios else 1.0
-        updated = max(1.0, round(initial * market_factor)) if initial > 0 else 0.0
+        cross_role_factor, other_departments_delta = role_pressure.get(
+            role, (1.0, 0.0)
+        )
+        updated = (
+            max(1.0, round(initial * market_factor * cross_role_factor))
+            if initial > 0
+            else 0.0
+        )
+        role_is_open = bool(
+            user_summary and user_summary.get("missing", {}).get(role, 0) > 0
+        )
+        if role_is_open:
+            updated = min(updated, affordable)
         strategic = min(updated, highest_opponent_credit + 1, affordable)
         board[player_id] = {
             "initial": initial,
@@ -1137,8 +1170,55 @@ def auction_price_board(
             "comparables": len(comparable_ratios),
             "group": _auction_comparable_group(player)[1],
             "highest_opponent_credit": highest_opponent_credit,
+            "cross_role_factor": cross_role_factor,
+            "other_departments_delta": other_departments_delta,
+            "affordable": affordable,
         }
     return board
+
+
+def _auction_cross_role_budget_pressure(
+    target_role: str,
+    user_summary: dict[str, Any] | None,
+    role_slots: dict[str, int],
+    budget: float,
+) -> tuple[float, float]:
+    """Adjust one role from savings or overspend accumulated in other roles."""
+    if not user_summary or budget <= 0 or role_slots.get(target_role, 0) <= 0:
+        return 1.0, 0.0
+    active_roles = [role for role in ROLE_LABELS if role_slots.get(role, 0) > 0]
+    share_total = sum(AUCTION_ROLE_BUDGET_SHARES[role] for role in active_roles)
+    if share_total <= 0:
+        return 1.0, 0.0
+    allocations = {
+        role: budget * AUCTION_ROLE_BUDGET_SHARES[role] / share_total
+        for role in active_roles
+    }
+    role_counts = user_summary.get("role_counts", {})
+    actual_other_spent = sum(
+        _number(purchase.get("price"))
+        for purchase in user_summary.get("purchases", [])
+        if str(purchase.get("role") or "").upper() != target_role
+    )
+    expected_other_spent = sum(
+        allocations[role]
+        * min(
+            _number(role_counts.get(role)) / max(role_slots.get(role, 0), 1),
+            1.0,
+        )
+        for role in active_roles
+        if role != target_role
+    )
+    other_departments_delta = expected_other_spent - actual_other_spent
+    target_allocation = allocations.get(target_role, 0.0)
+    if target_allocation <= 0:
+        return 1.0, other_departments_delta
+    available_ratio = max(
+        (target_allocation + other_departments_delta) / target_allocation,
+        0.0,
+    )
+    factor = 1.0 + (available_ratio - 1.0) * AUCTION_CROSS_ROLE_ELASTICITY
+    return max(0.75, min(factor, 1.30)), other_departments_delta
 
 
 def _new_auction_managers(count: int) -> list[dict[str, Any]]:
@@ -1521,7 +1601,7 @@ def auction_trade_analysis(
     league: dict[str, Any],
     catalog: list[dict[str, Any]],
     *,
-    limit: int = 5,
+    limit: int = 10,
 ) -> dict[str, Any]:
     """Find realistic 1x1, 2x2 and 3x3 trades that benefit both managers."""
     result: dict[str, Any] = {
@@ -1529,6 +1609,7 @@ def auction_trade_analysis(
         "reason": "",
         "evaluated_opponents": 0,
         "evaluated_players": 0,
+        "fallback": False,
         "trades": [],
     }
     if league.get("game_mode") != GAME_MODE_AUCTION:
@@ -1574,6 +1655,10 @@ def auction_trade_analysis(
     result["evaluated_players"] = sum(len(roster) for roster in all_rosters)
 
     proposals: list[dict[str, Any]] = []
+    fallback_limit = max(int(limit), 10)
+    fallback_capacity = max(fallback_limit * 20, 100)
+    fallback_heap: list[tuple[float, int, dict[str, Any]]] = []
+    fallback_index = 0
     for opponent, opponent_roster in opponent_rosters:
         opponent_profile = _auction_trade_team_profile(
             opponent_roster, slots, benchmarks
@@ -1633,12 +1718,6 @@ def auction_trade_analysis(
                     opponent_improvement = 100 * (
                         outgoing_opponent_utility - incoming_opponent_utility
                     ) / max(incoming_opponent_utility, 1.0)
-                    if (
-                        user_improvement < AUCTION_TRADE_MIN_USER_GAIN
-                        or opponent_improvement < AUCTION_TRADE_MIN_OPPONENT_GAIN
-                    ):
-                        continue
-
                     fairness = round(100 * (1 - value_gap), 1)
                     user_role = _auction_trade_gain_role(outgoing, incoming)
                     opponent_role = _auction_trade_gain_role(incoming, outgoing)
@@ -1655,8 +1734,11 @@ def auction_trade_analysis(
                         ),
                     }
                     opponent_name = str(opponent.get("name") or "Avversario")
-                    proposals.append(
-                        {
+                    meets_threshold = (
+                        user_improvement >= AUCTION_TRADE_MIN_USER_GAIN
+                        and opponent_improvement >= AUCTION_TRADE_MIN_OPPONENT_GAIN
+                    )
+                    proposal = {
                             "opponent_id": str(opponent.get("id") or ""),
                             "opponent_name": opponent_name,
                             "outgoing": list(outgoing),
@@ -1667,6 +1749,7 @@ def auction_trade_analysis(
                             ),
                             "fairness": fairness,
                             "value_gap": round(value_gap * 100, 1),
+                            "meets_threshold": meets_threshold,
                             "user_role": user_role,
                             "opponent_role": opponent_role,
                             "deltas": deltas,
@@ -1684,7 +1767,24 @@ def auction_trade_analysis(
                                 + max(fairness - 80, 0) * 0.10
                             ),
                         }
-                    )
+                    if meets_threshold:
+                        proposals.append(proposal)
+                    else:
+                        fallback_index += 1
+                        fallback_item = (
+                            float(proposal["ranking"]),
+                            fallback_index,
+                            proposal,
+                        )
+                        if len(fallback_heap) < fallback_capacity:
+                            heappush(fallback_heap, fallback_item)
+                        elif fallback_item[0] > fallback_heap[0][0]:
+                            heapreplace(fallback_heap, fallback_item)
+
+    using_fallback = not proposals and bool(fallback_heap)
+    if using_fallback:
+        proposals = [item[2] for item in fallback_heap]
+        result["fallback"] = True
 
     proposals.sort(
         key=lambda item: (
@@ -1714,12 +1814,17 @@ def auction_trade_analysis(
         clean_proposal = dict(proposal)
         clean_proposal.pop("ranking", None)
         selected.append(clean_proposal)
-        if len(selected) >= max(int(limit), 1):
+        if len(selected) >= (fallback_limit if using_fallback else max(int(limit), 1)):
             break
 
     result["ready"] = True
     result["trades"] = selected
-    if not selected:
+    if using_fallback:
+        result["reason"] = (
+            "Nessuno scambio supera tutte le soglie: mostro i migliori candidati "
+            "equilibrati, ordinati per utilita per entrambe le squadre."
+        )
+    elif not selected:
         result["reason"] = (
             "Nessuno scambio supera insieme i controlli di miglioramento, "
             "convenienza per l'avversario ed equilibrio dei valori."

@@ -163,7 +163,7 @@ def _cached_auction_trade_analysis(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.26 v26.6.0 · Trade Finder per l'asta"
+        "Fantacalcio · Build 2026.08.26 v26.6.1 · Prezzi dinamici e Trade Finder"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -5042,7 +5042,7 @@ def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> N
 def _render_auction_trade_lab(
     league: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> None:
-    analysis = _cached_auction_trade_analysis(league, catalog, 5)
+    analysis = _cached_auction_trade_analysis(league, catalog, 10)
     st.markdown(
         f'<section class="fantasy-swap-hero"><div><span>SASA · TRADE FINDER</span>'
         f"<strong>Scambi vantaggiosi, ma credibili</strong><small>Ho incrociato "
@@ -5053,13 +5053,15 @@ def _render_auction_trade_lab(
     )
     st.caption(
         "Il motore valuta scambi 1×1, 2×2 e 3×3, gli slot scoperti, la qualità dei "
-        "reparti e il valore tecnico dei giocatori. Mostra una proposta soltanto "
-        "se migliora la tua rosa, aiuta anche l'avversario e resta equilibrata."
+        "reparti e il valore tecnico dei giocatori. Se nessuna proposta supera tutte "
+        "le soglie, mostra comunque i 10 candidati piu interessanti ed equilibrati."
     )
     trades = analysis.get("trades", [])
     if not trades:
         st.info(str(analysis.get("reason") or "Nessuno scambio realistico trovato."))
         return
+    if analysis.get("fallback"):
+        st.warning(str(analysis.get("reason") or "Proposte migliori sotto soglia."))
 
     for index, trade in enumerate(trades, start=1):
         outgoing = "".join(
@@ -5072,10 +5074,12 @@ def _render_auction_trade_lab(
         )
         deltas = trade["deltas"]
         opponent_name = escape(str(trade["opponent_name"]))
+        threshold_label = " · SOTTO SOGLIA" if not trade.get("meets_threshold", True) else ""
         st.markdown(
             f'<article class="fantasy-swap-card"><header><span>PROPOSTA {index} · '
-            f"{opponent_name}</span><b>+{trade['user_improvement']:.1f}% PER TE · "
-            f"+{trade['opponent_improvement']:.1f}% PER {opponent_name}</b></header>"
+            f"{opponent_name}{threshold_label}</span>"
+            f"<b>{trade['user_improvement']:+.1f}% PER TE · "
+            f"{trade['opponent_improvement']:+.1f}% PER {opponent_name}</b></header>"
             f'<div class="fantasy-swap-flow"><section><small>TU CEDI</small>{outgoing}</section>'
             f'<div class="fantasy-swap-arrow"><strong>⇄</strong>'
             f"<span>Equità {trade['fairness']:.0f}/100</span></div>"

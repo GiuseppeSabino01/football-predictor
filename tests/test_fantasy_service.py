@@ -580,6 +580,44 @@ def test_auction_trade_analysis_can_balance_value_with_three_for_three() -> None
     assert analysis["trades"][0]["fairness"] >= 80
 
 
+def test_auction_trade_analysis_returns_best_balanced_fallbacks() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Scambi sotto soglia",
+        initial_budget=500,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 0, "D": 0, "C": 1, "A": 0},
+    )
+    managers = auction_managers(league)
+    own = make_player(name="Mediano mio", team="ROM", role="C", quote=15)
+    rival = make_player(name="Mediano rivale", team="MIL", role="C", quote=15)
+    for player in (own, rival):
+        player.update(
+            {
+                "fvm": 70,
+                "expected_fantasy_average": 6.5,
+                "expected_goals": 2,
+                "expected_assists": 3,
+                "starter_probability": 80,
+                "reliability": 80,
+                "risk": 20,
+            }
+        )
+    record_auction_purchase(league, managers[0]["id"], own, 25)
+    record_auction_purchase(league, managers[1]["id"], rival, 25)
+
+    analysis = auction_trade_analysis(league, [own, rival], limit=10)
+
+    assert analysis["ready"] is True
+    assert analysis["fallback"] is True
+    assert len(analysis["trades"]) == 1
+    assert analysis["trades"][0]["meets_threshold"] is False
+    assert analysis["trades"][0]["fairness"] == 100
+    assert "migliori candidati" in analysis["reason"]
+
+
 def test_auction_tracks_every_manager_and_updates_comparable_prices() -> None:
     workspace = new_workspace()
     league = create_league(
@@ -605,6 +643,46 @@ def test_auction_tracks_every_manager_and_updates_comparable_prices() -> None:
     assert prices[douvikas["id"]]["comparables"] == 1
     assert prices[douvikas["id"]]["updated"] != prices[douvikas["id"]]["initial"]
     assert prices[perrone["id"]]["comparables"] == 0
+
+
+def test_auction_prices_follow_budget_saved_or_spent_in_other_roles() -> None:
+    def build_league(other_roles_spent: tuple[int, int, int]) -> dict:
+        workspace = new_workspace()
+        league = create_league(
+            workspace,
+            "Pressione tra reparti",
+            initial_budget=500,
+            participants=2,
+            game_mode=GAME_MODE_AUCTION,
+            roster_slots={"P": 1, "D": 1, "C": 1, "A": 2},
+        )
+        user_id = auction_managers(league)[0]["id"]
+        for role, price in zip(("P", "D", "C"), other_roles_spent, strict=True):
+            player = make_player(
+                name=f"Acquisto {role}", team="TEST", role=role, quote=1
+            )
+            record_auction_purchase(league, user_id, player, price)
+        return league
+
+    high_spend = build_league((20, 100, 180))
+    low_spend = build_league((10, 50, 120))
+    malen = make_player(name="Malen", team="ROM", role="A", quote=34)
+    thuram = make_player(name="Thuram", team="INT", role="A", quote=30)
+    malen["fvm"] = 414
+    thuram["fvm"] = 264
+
+    malen_price = auction_price_board(high_spend, [malen])[malen["id"]]
+    thuram_price = auction_price_board(low_spend, [thuram])[thuram["id"]]
+
+    assert malen_price["initial"] == 207
+    assert malen_price["updated"] == 186
+    assert malen_price["cross_role_factor"] == pytest.approx(0.90)
+    assert malen_price["other_departments_delta"] == pytest.approx(-40)
+    assert malen_price["updated"] <= malen_price["affordable"]
+    assert thuram_price["initial"] == 132
+    assert thuram_price["updated"] == 158
+    assert thuram_price["cross_role_factor"] == pytest.approx(1.20)
+    assert thuram_price["other_departments_delta"] == pytest.approx(80)
 
 
 def test_custom_auction_tiers_are_isolated_and_do_not_drive_market_prices() -> None:
