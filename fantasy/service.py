@@ -34,6 +34,8 @@ FORMATIONS = {
     "3-5-2": {"P": 1, "D": 3, "C": 5, "A": 2},
     "5-3-2": {"P": 1, "D": 5, "C": 3, "A": 2},
 }
+AUCTION_TRADE_MIN_USER_GAIN = 4.0
+AUCTION_TRADE_MIN_OPPONENT_GAIN = 1.5
 
 
 def utc_now() -> str:
@@ -1513,6 +1515,473 @@ def list_trade_analysis(
     if not selected:
         result["reason"] = "Non ho trovato cambi a costo identico che migliorino la rosa."
     return result
+
+
+def auction_trade_analysis(
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    *,
+    limit: int = 5,
+) -> dict[str, Any]:
+    """Find realistic 1x1, 2x2 and 3x3 trades that benefit both managers."""
+    result: dict[str, Any] = {
+        "ready": False,
+        "reason": "",
+        "evaluated_opponents": 0,
+        "evaluated_players": 0,
+        "trades": [],
+    }
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        result["reason"] = "Il Trade Finder e disponibile per i fantacalci ad asta."
+        return result
+
+    managers = auction_managers(league)
+    user_manager = next((row for row in managers if row.get("is_user")), None)
+    if not user_manager:
+        result["reason"] = "Non trovo la tua squadra tra i partecipanti."
+        return result
+
+    catalog_by_id = {str(player.get("id") or ""): player for player in catalog}
+    user_roster = _auction_trade_roster(
+        league.get("purchases", []), catalog_by_id
+    )
+    if not user_roster:
+        result["reason"] = "Assegna almeno un giocatore alla tua squadra."
+        return result
+
+    opponent_rosters = [
+        (
+            manager,
+            _auction_trade_roster(manager.get("purchases", []), catalog_by_id),
+        )
+        for manager in managers
+        if not manager.get("is_user") and manager.get("purchases")
+    ]
+    if not opponent_rosters:
+        result["reason"] = "Inserisci le rose degli avversari per valutare gli scambi."
+        return result
+
+    all_rosters = [user_roster, *(roster for _, roster in opponent_rosters)]
+    benchmarks = _auction_trade_benchmarks(all_rosters)
+    slots = {
+        role: int(league.get("roster_slots", DEFAULT_ROSTER_SLOTS).get(role, 0))
+        for role in ROLE_LABELS
+    }
+    budget = float(league.get("initial_budget") or 0)
+    user_profile = _auction_trade_team_profile(user_roster, slots, benchmarks)
+    user_packages = _auction_trade_packages(user_roster, budget)
+    result["evaluated_opponents"] = len(opponent_rosters)
+    result["evaluated_players"] = sum(len(roster) for roster in all_rosters)
+
+    proposals: list[dict[str, Any]] = []
+    for opponent, opponent_roster in opponent_rosters:
+        opponent_profile = _auction_trade_team_profile(
+            opponent_roster, slots, benchmarks
+        )
+        opponent_packages = _auction_trade_packages(opponent_roster, budget)
+        for package_size in (1, 2, 3):
+            own_candidates = user_packages.get(package_size, [])
+            rival_candidates = opponent_packages.get(package_size, [])
+            candidate_limit = {1: None, 2: 180, 3: 120}[package_size]
+            if candidate_limit is not None:
+                own_candidates = _auction_trade_candidate_packages(
+                    own_candidates,
+                    user_profile,
+                    budget,
+                    limit=candidate_limit,
+                )
+                rival_candidates = _auction_trade_candidate_packages(
+                    rival_candidates,
+                    opponent_profile,
+                    budget,
+                    limit=candidate_limit,
+                )
+            for outgoing, outgoing_value in own_candidates:
+                if not _auction_trade_roster_is_legal(
+                    user_profile["counts"], outgoing, (), slots
+                ):
+                    continue
+                outgoing_user_utility = _auction_trade_package_utility(
+                    outgoing, user_profile, budget
+                )
+                outgoing_opponent_utility = _auction_trade_package_utility(
+                    outgoing, opponent_profile, budget
+                )
+                for incoming, incoming_value in rival_candidates:
+                    value_gap = abs(incoming_value - outgoing_value) / max(
+                        incoming_value, outgoing_value, 1.0
+                    )
+                    maximum_gap = {1: 0.15, 2: 0.18, 3: 0.20}[package_size]
+                    if value_gap > maximum_gap:
+                        continue
+                    if not _auction_trade_roster_is_legal(
+                        user_profile["counts"], outgoing, incoming, slots
+                    ) or not _auction_trade_roster_is_legal(
+                        opponent_profile["counts"], incoming, outgoing, slots
+                    ):
+                        continue
+
+                    incoming_user_utility = _auction_trade_package_utility(
+                        incoming, user_profile, budget
+                    )
+                    incoming_opponent_utility = _auction_trade_package_utility(
+                        incoming, opponent_profile, budget
+                    )
+                    user_improvement = 100 * (
+                        incoming_user_utility - outgoing_user_utility
+                    ) / max(outgoing_user_utility, 1.0)
+                    opponent_improvement = 100 * (
+                        outgoing_opponent_utility - incoming_opponent_utility
+                    ) / max(incoming_opponent_utility, 1.0)
+                    if (
+                        user_improvement < AUCTION_TRADE_MIN_USER_GAIN
+                        or opponent_improvement < AUCTION_TRADE_MIN_OPPONENT_GAIN
+                    ):
+                        continue
+
+                    fairness = round(100 * (1 - value_gap), 1)
+                    user_role = _auction_trade_gain_role(outgoing, incoming)
+                    opponent_role = _auction_trade_gain_role(incoming, outgoing)
+                    deltas = {
+                        "goals": _package_delta(outgoing, incoming, "expected_goals"),
+                        "assists": _package_delta(
+                            outgoing, incoming, "expected_assists"
+                        ),
+                        "fantasy_average": _package_delta(
+                            outgoing, incoming, "expected_fantasy_average"
+                        ),
+                        "starter": _package_delta(
+                            outgoing, incoming, "starter_probability"
+                        ),
+                    }
+                    opponent_name = str(opponent.get("name") or "Avversario")
+                    proposals.append(
+                        {
+                            "opponent_id": str(opponent.get("id") or ""),
+                            "opponent_name": opponent_name,
+                            "outgoing": list(outgoing),
+                            "incoming": list(incoming),
+                            "user_improvement": round(user_improvement, 1),
+                            "opponent_improvement": round(
+                                opponent_improvement, 1
+                            ),
+                            "fairness": fairness,
+                            "value_gap": round(value_gap * 100, 1),
+                            "user_role": user_role,
+                            "opponent_role": opponent_role,
+                            "deltas": deltas,
+                            "motivation": _auction_trade_motivation(
+                                opponent_name,
+                                user_role,
+                                opponent_role,
+                                user_improvement,
+                                opponent_improvement,
+                                value_gap,
+                            ),
+                            "ranking": (
+                                user_improvement * 0.55
+                                + opponent_improvement * 0.35
+                                + max(fairness - 80, 0) * 0.10
+                            ),
+                        }
+                    )
+
+    proposals.sort(
+        key=lambda item: (
+            item["ranking"],
+            item["user_improvement"],
+            item["opponent_improvement"],
+            item["fairness"],
+        ),
+        reverse=True,
+    )
+    selected: list[dict[str, Any]] = []
+    seen: set[tuple[str, tuple[str, ...], tuple[str, ...]]] = set()
+    per_opponent: dict[str, int] = {}
+    for proposal in proposals:
+        opponent_id = str(proposal["opponent_id"])
+        if per_opponent.get(opponent_id, 0) >= 2:
+            continue
+        signature = (
+            opponent_id,
+            tuple(sorted(str(row.get("id")) for row in proposal["outgoing"])),
+            tuple(sorted(str(row.get("id")) for row in proposal["incoming"])),
+        )
+        if signature in seen:
+            continue
+        seen.add(signature)
+        per_opponent[opponent_id] = per_opponent.get(opponent_id, 0) + 1
+        clean_proposal = dict(proposal)
+        clean_proposal.pop("ranking", None)
+        selected.append(clean_proposal)
+        if len(selected) >= max(int(limit), 1):
+            break
+
+    result["ready"] = True
+    result["trades"] = selected
+    if not selected:
+        result["reason"] = (
+            "Nessuno scambio supera insieme i controlli di miglioramento, "
+            "convenienza per l'avversario ed equilibrio dei valori."
+        )
+    return result
+
+
+def _auction_trade_roster(
+    purchases: list[dict[str, Any]],
+    catalog_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    roster: list[dict[str, Any]] = []
+    for purchase in purchases:
+        player_id = str(purchase.get("player_id") or purchase.get("id") or "")
+        if not player_id:
+            continue
+        merged = dict(purchase)
+        for field, value in catalog_by_id.get(player_id, {}).items():
+            if value not in (None, ""):
+                merged[field] = value
+        merged["id"] = player_id
+        merged["player_id"] = player_id
+        merged["price"] = _number(purchase.get("price"))
+        roster.append(merged)
+    return roster
+
+
+def _auction_trade_benchmarks(
+    rosters: list[list[dict[str, Any]]],
+) -> dict[str, dict[str, float]]:
+    fields = (
+        "quality",
+        "expected_fantasy_average",
+        "expected_goals",
+        "expected_assists",
+        "starter_probability",
+        "reliability",
+    )
+    result: dict[str, dict[str, float]] = {}
+    for role in ROLE_LABELS:
+        players = [
+            player
+            for roster in rosters
+            for player in roster
+            if str(player.get("role") or "").upper() == role
+        ]
+        result[role] = {}
+        for field in fields:
+            values = [
+                _auction_trade_quality(player, 0)
+                if field == "quality"
+                else _auction_trade_metric(player, field)
+                for player in players
+            ]
+            result[role][field] = _median(values) if values else 0.0
+    return result
+
+
+def _auction_trade_team_profile(
+    roster: list[dict[str, Any]],
+    slots: dict[str, int],
+    benchmarks: dict[str, dict[str, float]],
+) -> dict[str, Any]:
+    counts = {
+        role: sum(
+            1 for player in roster if str(player.get("role") or "").upper() == role
+        )
+        for role in ROLE_LABELS
+    }
+    fill = {
+        role: min(counts[role] / max(slots.get(role, 0), 1), 1.0)
+        if slots.get(role, 0) > 0
+        else 1.0
+        for role in ROLE_LABELS
+    }
+    max_fill = max(fill.values(), default=0.0)
+    role_weights: dict[str, float] = {}
+    metric_needs: dict[str, dict[str, float]] = {}
+    for role in ROLE_LABELS:
+        role_players = [
+            player
+            for player in roster
+            if str(player.get("role") or "").upper() == role
+        ]
+        benchmark_quality = benchmarks.get(role, {}).get("quality", 0.0)
+        team_quality = (
+            sum(_auction_trade_quality(player, 0) for player in role_players)
+            / len(role_players)
+            if role_players
+            else 0.0
+        )
+        quality_gap = _auction_trade_deficit(team_quality, benchmark_quality)
+        coverage_gap = max(1.0 - fill[role], 0.0)
+        relative_gap = max(max_fill - fill[role], 0.0)
+        role_weights[role] = (
+            1.0
+            + coverage_gap * 0.75
+            + relative_gap * 0.45
+            + quality_gap * 0.35
+        )
+        metric_needs[role] = {}
+        for field in (
+            "expected_fantasy_average",
+            "expected_goals",
+            "expected_assists",
+            "starter_probability",
+            "reliability",
+        ):
+            team_value = (
+                sum(_auction_trade_metric(player, field) for player in role_players)
+                / len(role_players)
+                if role_players
+                else 0.0
+            )
+            metric_needs[role][field] = _auction_trade_deficit(
+                team_value, benchmarks.get(role, {}).get(field, 0.0)
+            )
+    return {
+        "counts": counts,
+        "role_weights": role_weights,
+        "metric_needs": metric_needs,
+    }
+
+
+def _auction_trade_packages(
+    roster: list[dict[str, Any]], budget: float
+) -> dict[int, list[tuple[tuple[dict[str, Any], ...], float]]]:
+    return {
+        size: [
+            (package, sum(_auction_trade_quality(player, budget) for player in package))
+            for package in combinations(roster, size)
+        ]
+        for size in (1, 2, 3)
+        if len(roster) >= size
+    }
+
+
+def _auction_trade_candidate_packages(
+    candidates: list[tuple[tuple[dict[str, Any], ...], float]],
+    profile: dict[str, Any],
+    budget: float,
+    *,
+    limit: int,
+) -> list[tuple[tuple[dict[str, Any], ...], float]]:
+    """Keep multi-player evaluation fast by prioritising expendable bundles."""
+    return sorted(
+        candidates,
+        key=lambda item: (
+            _auction_trade_package_utility(item[0], profile, budget)
+            / max(item[1], 1.0),
+            item[1],
+        ),
+    )[: max(int(limit), 1)]
+
+
+def _auction_trade_quality(player: dict[str, Any], budget: float) -> float:
+    technical = max(_roster_upgrade_score(player), 1.0)
+    reference_budget = budget if budget > 0 else 500.0
+    market = _initial_auction_price(player, reference_budget)
+    paid = _number(player.get("price"))
+    return technical + market * 0.28 + paid * 0.08
+
+
+def _auction_trade_metric(player: dict[str, Any], field: str) -> float:
+    value = _number(player.get(field))
+    if field in {"starter_probability", "reliability"} and 0 < value <= 1:
+        value *= 100
+    return value
+
+
+def _auction_trade_deficit(value: float, benchmark: float) -> float:
+    if benchmark <= 0:
+        return 0.0
+    return max(0.0, min((benchmark - value) / benchmark, 1.0))
+
+
+def _auction_trade_package_utility(
+    package: tuple[dict[str, Any], ...],
+    profile: dict[str, Any],
+    budget: float,
+) -> float:
+    total = 0.0
+    for player in package:
+        role = str(player.get("role") or "").upper()
+        needs = profile["metric_needs"].get(role, {})
+        fit_bonus = (
+            _auction_trade_metric(player, "expected_fantasy_average")
+            * 2.0
+            * needs.get("expected_fantasy_average", 0.0)
+            + _auction_trade_metric(player, "expected_goals")
+            * 1.8
+            * needs.get("expected_goals", 0.0)
+            + _auction_trade_metric(player, "expected_assists")
+            * 1.5
+            * needs.get("expected_assists", 0.0)
+            + _auction_trade_metric(player, "starter_probability")
+            * 0.04
+            * needs.get("starter_probability", 0.0)
+            + _auction_trade_metric(player, "reliability")
+            * 0.025
+            * needs.get("reliability", 0.0)
+        )
+        total += (
+            _auction_trade_quality(player, budget)
+            * profile["role_weights"].get(role, 1.0)
+            + fit_bonus
+        )
+    return total
+
+
+def _auction_trade_roster_is_legal(
+    current_counts: dict[str, int],
+    outgoing: tuple[dict[str, Any], ...],
+    incoming: tuple[dict[str, Any], ...],
+    slots: dict[str, int],
+) -> bool:
+    updated = dict(current_counts)
+    for player in outgoing:
+        role = str(player.get("role") or "").upper()
+        updated[role] = updated.get(role, 0) - 1
+    for player in incoming:
+        role = str(player.get("role") or "").upper()
+        updated[role] = updated.get(role, 0) + 1
+    return all(0 <= updated.get(role, 0) <= slots.get(role, 0) for role in ROLE_LABELS)
+
+
+def _auction_trade_gain_role(
+    outgoing: tuple[dict[str, Any], ...],
+    incoming: tuple[dict[str, Any], ...],
+) -> str:
+    net = {
+        role: sum(
+            1 for player in incoming if str(player.get("role") or "").upper() == role
+        )
+        - sum(
+            1 for player in outgoing if str(player.get("role") or "").upper() == role
+        )
+        for role in ROLE_LABELS
+    }
+    gained = max(net, key=net.get)
+    if net[gained] > 0:
+        return gained
+    incoming_roles = [str(player.get("role") or "").upper() for player in incoming]
+    return incoming_roles[0] if incoming_roles else ""
+
+
+def _auction_trade_motivation(
+    opponent_name: str,
+    user_role: str,
+    opponent_role: str,
+    user_improvement: float,
+    opponent_improvement: float,
+    value_gap: float,
+) -> str:
+    user_label = ROLE_LABELS.get(user_role, "rosa").lower()
+    opponent_label = ROLE_LABELS.get(opponent_role, "rosa").lower()
+    return (
+        f"Tu rinforzi {user_label}; {opponent_name} riceve profili piu utili per "
+        f"{opponent_label}. Il vantaggio stimato e +{user_improvement:.1f}% per te "
+        f"e +{opponent_improvement:.1f}% per l'altra rosa, con valori tecnici "
+        f"distanti solo {value_gap * 100:.1f}%."
+    )
 
 
 def _trade_signature(

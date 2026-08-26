@@ -50,3 +50,15 @@ def test_fantasy_reload_refreshes_player_history_before_estimates() -> None:
         streamlit_app.fantasy_catalog_estimates.attach_player_history
         is streamlit_app.fantasy_player_history.attach_player_history
     )
+
+
+def test_fantasy_reload_exposes_auction_trade_analysis_to_ui() -> None:
+    delattr(streamlit_app.fantasy_service, "auction_trade_analysis")
+
+    refreshed_ui = streamlit_app.fresh_fantasy_ui()
+
+    assert hasattr(streamlit_app.fantasy_service, "auction_trade_analysis")
+    assert (
+        refreshed_ui.auction_trade_analysis
+        is streamlit_app.fantasy_service.auction_trade_analysis
+    )

@@ -11,6 +11,7 @@ from fantasy.service import (
     auction_player_assignment,
     auction_player_tier,
     auction_price_board,
+    auction_trade_analysis,
     create_auction_tier,
     create_league,
     delete_auction_tier,
@@ -367,6 +368,216 @@ def test_list_trade_analysis_preserves_roles_cost_and_budget() -> None:
         row["role"] for row in trade["incoming"]
     )
     assert {row["name"] for row in trade["incoming"]} == {"D high", "C high"}
+
+
+def test_auction_trade_analysis_matches_reciprocal_role_needs() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Scambi asta",
+        initial_budget=500,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 0, "D": 0, "C": 2, "A": 2},
+    )
+    managers = auction_managers(league)
+
+    def player(name: str, role: str, goals: float, assists: float) -> dict:
+        item = make_player(
+            name=name,
+            team="TEST",
+            role=role,
+            quote=20,
+            expected_goals=goals,
+            expected_assists=assists,
+            starter_probability=85,
+        )
+        item.update(
+            {
+                "fvm": 80,
+                "expected_fantasy_average": 6.8,
+                "reliability": 82,
+                "risk": 18,
+            }
+        )
+        return item
+
+    attackers = [
+        player("Attaccante uno", "A", 8, 3),
+        player("Attaccante due", "A", 7, 4),
+    ]
+    midfielders = [
+        player("Centrocampista uno", "C", 7, 4),
+        player("Centrocampista due", "C", 8, 3),
+    ]
+    for item in attackers:
+        record_auction_purchase(league, managers[0]["id"], item, 30)
+    for item in midfielders:
+        record_auction_purchase(league, managers[1]["id"], item, 30)
+
+    analysis = auction_trade_analysis(
+        league, [*attackers, *midfielders], limit=5
+    )
+
+    assert analysis["ready"] is True
+    assert analysis["evaluated_opponents"] == 1
+    assert analysis["trades"]
+    assert all(trade["user_improvement"] >= 4 for trade in analysis["trades"])
+    assert all(
+        trade["opponent_improvement"] >= 1.5 for trade in analysis["trades"]
+    )
+    assert all(trade["fairness"] >= 80 for trade in analysis["trades"])
+    first = analysis["trades"][0]
+    assert {row["role"] for row in first["outgoing"]} == {"A"}
+    assert {row["role"] for row in first["incoming"]} == {"C"}
+
+
+def test_auction_trade_analysis_rejects_lopsided_star_trade() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Niente regali",
+        initial_budget=500,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 0, "D": 0, "C": 1, "A": 1},
+    )
+    managers = auction_managers(league)
+    varela = make_player(
+        name="Varela",
+        team="LAZ",
+        role="C",
+        quote=8,
+        expected_goals=1,
+        expected_assists=1,
+        starter_probability=65,
+    )
+    varela.update(
+        {"fvm": 35, "expected_fantasy_average": 6.1, "reliability": 62, "risk": 28}
+    )
+    lautaro = make_player(
+        name="Lautaro",
+        team="INT",
+        role="A",
+        quote=38,
+        expected_goals=22,
+        expected_assists=6,
+        starter_probability=92,
+    )
+    lautaro.update(
+        {"fvm": 300, "expected_fantasy_average": 8.1, "reliability": 90, "risk": 12}
+    )
+    record_auction_purchase(league, managers[0]["id"], varela, 10)
+    record_auction_purchase(league, managers[1]["id"], lautaro, 120)
+
+    analysis = auction_trade_analysis(league, [varela, lautaro])
+
+    assert analysis["ready"] is True
+    assert analysis["trades"] == []
+    assert "equilibrio dei valori" in analysis["reason"]
+
+
+def test_auction_trade_analysis_can_balance_value_with_three_for_three() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Scambio tre per tre",
+        initial_budget=500,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 0, "D": 0, "C": 3, "A": 3},
+    )
+    managers = auction_managers(league)
+
+    def player(
+        name: str,
+        role: str,
+        *,
+        fantasy_average: float,
+        goals: float,
+        assists: float,
+        quote: float,
+        fvm: float,
+        starter: float,
+        reliability: float,
+        risk: float,
+    ) -> dict:
+        item = make_player(
+            name=name,
+            team="TEST",
+            role=role,
+            quote=quote,
+            expected_goals=goals,
+            expected_assists=assists,
+            starter_probability=starter,
+        )
+        item.update(
+            {
+                "fvm": fvm,
+                "expected_fantasy_average": fantasy_average,
+                "reliability": reliability,
+                "risk": risk,
+            }
+        )
+        return item
+
+    attackers = [
+        player(
+            "A top",
+            "A",
+            fantasy_average=8.8,
+            goals=28,
+            assists=8,
+            quote=45,
+            fvm=350,
+            starter=95,
+            reliability=92,
+            risk=8,
+        ),
+        *[
+            player(
+                f"A riserva {index}",
+                "A",
+                fantasy_average=5.2,
+                goals=0,
+                assists=0,
+                quote=1,
+                fvm=5,
+                starter=35,
+                reliability=40,
+                risk=50,
+            )
+            for index in range(2)
+        ],
+    ]
+    midfielders = [
+        player(
+            f"C equilibrato {index}",
+            "C",
+            fantasy_average=6.8,
+            goals=5,
+            assists=4,
+            quote=18,
+            fvm=90,
+            starter=82,
+            reliability=80,
+            risk=20,
+        )
+        for index in range(3)
+    ]
+    for index, item in enumerate(attackers):
+        record_auction_purchase(
+            league, managers[0]["id"], item, 130 if index == 0 else 1
+        )
+    for item in midfielders:
+        record_auction_purchase(league, managers[1]["id"], item, 30)
+
+    analysis = auction_trade_analysis(league, [*attackers, *midfielders])
+
+    assert analysis["trades"]
+    assert len(analysis["trades"][0]["outgoing"]) == 3
+    assert len(analysis["trades"][0]["incoming"]) == 3
+    assert analysis["trades"][0]["fairness"] >= 80
 
 
 def test_auction_tracks_every_manager_and_updates_comparable_prices() -> None:

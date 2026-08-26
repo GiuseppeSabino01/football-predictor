@@ -61,6 +61,7 @@ from fantasy.service import (
     auction_player_tier,
     auction_price_board,
     auction_taken_player_ids,
+    auction_trade_analysis,
     create_auction_tier,
     create_league,
     delete_auction_tier,
@@ -152,10 +153,17 @@ def _cached_listone_excel(
     return build_listone_excel(catalog, league)
 
 
+@st.cache_data(show_spinner=False, max_entries=12)
+def _cached_auction_trade_analysis(
+    league: dict[str, Any], catalog: list[dict[str, Any]], limit: int
+) -> dict[str, Any]:
+    return auction_trade_analysis(league, catalog, limit=limit)
+
+
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.26 v26.5.4 · Player board più compatto"
+        "Fantacalcio · Build 2026.08.26 v26.6.0 · Trade Finder per l'asta"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -2128,7 +2136,6 @@ def _render_auction_catalog_editor(
             "Q": indexed["Quotazione"],
             "Spesa iniziale": indexed["Spesa iniziale"],
             "Spesa aggiornata": indexed["Spesa aggiornata"],
-            "Max strategico": indexed["Spesa strategica"],
             "FM attesa": indexed["FM attesa"],
             "Gol attesi": indexed["Gol attesi"],
             "Assist attesi": indexed["Assist attesi"],
@@ -2263,7 +2270,6 @@ def _render_auction_catalog_editor(
             {"field": "Q", "width": 65, "type": "numericColumn"},
             {"field": "Spesa iniziale", "width": 112, "type": "numericColumn"},
             _auction_updated_price_column(),
-            {"field": "Max strategico", "width": 118, "type": "numericColumn"},
             {"field": "FM attesa", "width": 94, "type": "numericColumn"},
             {"field": "Gol attesi", "width": 92, "type": "numericColumn"},
             {"field": "Assist attesi", "width": 100, "type": "numericColumn"},
@@ -2490,7 +2496,6 @@ def _render_catalog_table(
         for column in (
             "Spesa iniziale",
             "Spesa aggiornata",
-            "Spesa strategica",
             "Comparabili",
         )
         if column in indexed.columns
@@ -2539,9 +2544,6 @@ def _render_catalog_table(
             ),
             "Spesa aggiornata": st.column_config.NumberColumn(
                 "Spesa aggiornata", format="%.0f", width="small"
-            ),
-            "Spesa strategica": st.column_config.NumberColumn(
-                "Max strategico", format="%.0f", width="small"
             ),
             "Comparabili": st.column_config.NumberColumn(
                 "Confronti", format="%d", width="small"
@@ -4631,6 +4633,8 @@ def _render_my_squad(
         _render_roster_table(workspace, league, storage)
     if league.get("game_mode") == GAME_MODE_LIST and summary["complete"]:
         _render_swap_lab(league, workspace.get("catalog", []))
+    elif league.get("game_mode") == GAME_MODE_AUCTION:
+        _render_auction_trade_lab(league, workspace.get("catalog", []))
     _render_sasa_analysis(workspace, league, storage, settings, summary, xi_summary)
 
 
@@ -5033,6 +5037,69 @@ def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> N
             f"<p>{escape(str(trade['motivation']))}</p></article>",
             unsafe_allow_html=True,
         )
+
+
+def _render_auction_trade_lab(
+    league: dict[str, Any], catalog: list[dict[str, Any]]
+) -> None:
+    analysis = _cached_auction_trade_analysis(league, catalog, 5)
+    st.markdown(
+        f'<section class="fantasy-swap-hero"><div><span>SASA · TRADE FINDER</span>'
+        f"<strong>Scambi vantaggiosi, ma credibili</strong><small>Ho incrociato "
+        f"la tua rosa con {analysis.get('evaluated_opponents', 0)} avversari e "
+        f"{analysis.get('evaluated_players', 0)} giocatori già acquistati.</small></div>"
+        f"<b>{len(analysis.get('trades', []))}</b></section>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Il motore valuta scambi 1×1, 2×2 e 3×3, gli slot scoperti, la qualità dei "
+        "reparti e il valore tecnico dei giocatori. Mostra una proposta soltanto "
+        "se migliora la tua rosa, aiuta anche l'avversario e resta equilibrata."
+    )
+    trades = analysis.get("trades", [])
+    if not trades:
+        st.info(str(analysis.get("reason") or "Nessuno scambio realistico trovato."))
+        return
+
+    for index, trade in enumerate(trades, start=1):
+        outgoing = "".join(
+            _auction_swap_player_chip(player, "out")
+            for player in trade["outgoing"]
+        )
+        incoming = "".join(
+            _auction_swap_player_chip(player, "in")
+            for player in trade["incoming"]
+        )
+        deltas = trade["deltas"]
+        opponent_name = escape(str(trade["opponent_name"]))
+        st.markdown(
+            f'<article class="fantasy-swap-card"><header><span>PROPOSTA {index} · '
+            f"{opponent_name}</span><b>+{trade['user_improvement']:.1f}% PER TE · "
+            f"+{trade['opponent_improvement']:.1f}% PER {opponent_name}</b></header>"
+            f'<div class="fantasy-swap-flow"><section><small>TU CEDI</small>{outgoing}</section>'
+            f'<div class="fantasy-swap-arrow"><strong>⇄</strong>'
+            f"<span>Equità {trade['fairness']:.0f}/100</span></div>"
+            f"<section><small>{opponent_name} CEDE</small>{incoming}</section></div>"
+            f'<div class="fantasy-swap-deltas">'
+            f"<span>Gol {deltas['goals']:+.1f}</span>"
+            f"<span>Assist {deltas['assists']:+.1f}</span>"
+            f"<span>Somma FM {deltas['fantasy_average']:+.2f}</span>"
+            f"<span>Scarto valori {trade['value_gap']:.1f}%</span></div>"
+            f"<p>{escape(str(trade['motivation']))}</p></article>",
+            unsafe_allow_html=True,
+        )
+
+
+def _auction_swap_player_chip(player: dict[str, Any], direction: str) -> str:
+    role = escape(str(player.get("role") or ""))
+    name = escape(str(player.get("name") or ""))
+    team = escape(str(player.get("team") or ""))
+    price = float(player.get("price") or 0)
+    return (
+        f'<div class="fantasy-swap-player {direction}"><span>{role}</span>'
+        f"<div><strong>{name}</strong><small>{team} · pagato {price:.0f} CR</small>"
+        f"</div></div>"
+    )
 
 
 def _swap_player_chip(player: dict[str, Any], direction: str) -> str:
