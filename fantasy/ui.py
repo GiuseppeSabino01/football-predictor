@@ -132,6 +132,19 @@ def _auction_updated_price_column() -> dict[str, Any]:
     }
 
 
+def _auction_player_column() -> dict[str, Any]:
+    """Use a compact pinned player column on the auction board."""
+    return {
+        "field": "Giocatore",
+        "headerName": "Giocatore",
+        "width": 155,
+        "minWidth": 135,
+        "pinned": "left",
+        "lockPinned": True,
+        "suppressMovable": True,
+    }
+
+
 @st.cache_data(show_spinner=False, max_entries=8)
 def _cached_listone_excel(
     catalog: list[dict[str, Any]], league: dict[str, Any]
@@ -142,7 +155,7 @@ def _cached_listone_excel(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.26 v26.5.3 · Prezzo aggiornato sempre visibile"
+        "Fantacalcio · Build 2026.08.26 v26.5.4 · Player board più compatto"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -2068,13 +2081,6 @@ def _render_auction_catalog_editor(
         {
             "_player_id": indexed["_id"].astype(str),
             "Scheda": False,
-            "In rosa": [
-                "✓"
-                if assignments[str(player_id)]
-                and assignments[str(player_id)].get("is_user")
-                else ""
-                for player_id in indexed["_id"]
-            ],
             "★": [
                 "★" if str(player_id) in watchlist else ""
                 for player_id in indexed["_id"]
@@ -2197,7 +2203,6 @@ def _render_auction_catalog_editor(
                 "width": 72,
                 "pinned": "left",
             },
-            {"field": "In rosa", "width": 82, "pinned": "left"},
             {"field": "★", "width": 55},
             {
                 "field": "Partecipante",
@@ -2230,15 +2235,7 @@ def _render_auction_catalog_editor(
                 "minWidth": 180,
             },
             {"field": "Ruolo", "width": 78},
-            {
-                "field": "Giocatore",
-                "headerName": "Giocatore",
-                "width": 180,
-                "minWidth": 150,
-                "pinned": "left",
-                "lockPinned": True,
-                "suppressMovable": True,
-            },
+            _auction_player_column(),
             {
                 "field": "Stop",
                 "headerName": "🩼",
