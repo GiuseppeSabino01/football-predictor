@@ -119,21 +119,13 @@ def _auction_assigned_row_class_rule(unassigned: str) -> JsCode:
     )
 
 
-def _auction_credit_column() -> dict[str, Any]:
-    """Keep the paid price visible while the rest of the board scrolls."""
+def _auction_updated_price_column() -> dict[str, Any]:
+    """Keep the live auction estimate visible while the board scrolls."""
     return {
-        "field": "Prezzo asta",
-        "headerName": "Crediti",
-        "editable": True,
-        "cellDataType": "number",
-        "cellEditor": "agNumberCellEditor",
-        "valueParser": JsCode(
-            """function(params) {
-                const value = Number(params.newValue);
-                return Number.isFinite(value) && value >= 0 ? value : params.oldValue;
-            }"""
-        ),
-        "width": 92,
+        "field": "Spesa aggiornata",
+        "headerName": "Prezzo aggiornato",
+        "width": 138,
+        "type": "numericColumn",
         "pinned": "left",
         "lockPinned": True,
         "suppressMovable": True,
@@ -150,7 +142,7 @@ def _cached_listone_excel(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.26 v26.5.2 · Crediti asta sempre visibili"
+        "Fantacalcio · Build 2026.08.26 v26.5.3 · Prezzo aggiornato sempre visibile"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -2216,7 +2208,20 @@ def _render_auction_catalog_editor(
                 "cellEditorParams": {"values": [unassigned, *manager_names]},
                 "minWidth": 190,
             },
-            _auction_credit_column(),
+            {
+                "field": "Prezzo asta",
+                "headerName": "Crediti",
+                "editable": True,
+                "cellDataType": "number",
+                "cellEditor": "agNumberCellEditor",
+                "valueParser": JsCode(
+                    """function(params) {
+                        const value = Number(params.newValue);
+                        return Number.isFinite(value) && value >= 0 ? value : params.oldValue;
+                    }"""
+                ),
+                "width": 88,
+            },
             {
                 "field": "Fascia personale",
                 "editable": True,
@@ -2260,7 +2265,7 @@ def _render_auction_catalog_editor(
             {"field": "Squadra", "width": 86},
             {"field": "Q", "width": 65, "type": "numericColumn"},
             {"field": "Spesa iniziale", "width": 112, "type": "numericColumn"},
-            {"field": "Spesa aggiornata", "width": 125, "type": "numericColumn"},
+            _auction_updated_price_column(),
             {"field": "Max strategico", "width": 118, "type": "numericColumn"},
             {"field": "FM attesa", "width": 94, "type": "numericColumn"},
             {"field": "Gol attesi", "width": 92, "type": "numericColumn"},
@@ -2367,7 +2372,7 @@ def _render_auction_catalog_editor(
                 "opacity": "0.48 !important",
                 "filter": "grayscale(1) !important",
             },
-            ".fantasy-player-assigned .ag-cell[col-id='Prezzo asta']": {
+            ".fantasy-player-assigned .ag-cell[col-id='Spesa aggiornata']": {
                 "background": "rgba(255, 209, 102, .10) !important",
                 "color": "#ffd166 !important",
                 "font-weight": "800 !important",

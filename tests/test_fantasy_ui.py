@@ -1,4 +1,4 @@
-from fantasy.ui import _auction_assigned_row_class_rule, _auction_credit_column
+from fantasy.ui import _auction_assigned_row_class_rule, _auction_updated_price_column
 
 
 def test_assigned_row_rule_follows_the_live_participant_cell() -> None:
@@ -9,11 +9,11 @@ def test_assigned_row_rule_follows_the_live_participant_cell() -> None:
     assert "_assigned" not in rule.js_code
 
 
-def test_auction_credits_stay_pinned_and_editable() -> None:
-    column = _auction_credit_column()
+def test_live_auction_price_stays_pinned() -> None:
+    column = _auction_updated_price_column()
 
-    assert column["field"] == "Prezzo asta"
-    assert column["headerName"] == "Crediti"
+    assert column["field"] == "Spesa aggiornata"
+    assert column["headerName"] == "Prezzo aggiornato"
     assert column["pinned"] == "left"
     assert column["lockPinned"] is True
-    assert column["editable"] is True
+    assert "editable" not in column
