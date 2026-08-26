@@ -119,6 +119,27 @@ def _auction_assigned_row_class_rule(unassigned: str) -> JsCode:
     )
 
 
+def _auction_credit_column() -> dict[str, Any]:
+    """Keep the paid price visible while the rest of the board scrolls."""
+    return {
+        "field": "Prezzo asta",
+        "headerName": "Crediti",
+        "editable": True,
+        "cellDataType": "number",
+        "cellEditor": "agNumberCellEditor",
+        "valueParser": JsCode(
+            """function(params) {
+                const value = Number(params.newValue);
+                return Number.isFinite(value) && value >= 0 ? value : params.oldValue;
+            }"""
+        ),
+        "width": 92,
+        "pinned": "left",
+        "lockPinned": True,
+        "suppressMovable": True,
+    }
+
+
 @st.cache_data(show_spinner=False, max_entries=8)
 def _cached_listone_excel(
     catalog: list[dict[str, Any]], league: dict[str, Any]
@@ -129,7 +150,7 @@ def _cached_listone_excel(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.25 v26.5.1 · Giocatori assegnati attenuati"
+        "Fantacalcio · Build 2026.08.26 v26.5.2 · Crediti asta sempre visibili"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -2195,20 +2216,7 @@ def _render_auction_catalog_editor(
                 "cellEditorParams": {"values": [unassigned, *manager_names]},
                 "minWidth": 190,
             },
-            {
-                "field": "Prezzo asta",
-                "headerName": "Crediti",
-                "editable": True,
-                "cellDataType": "number",
-                "cellEditor": "agNumberCellEditor",
-                "valueParser": JsCode(
-                    """function(params) {
-                        const value = Number(params.newValue);
-                        return Number.isFinite(value) && value >= 0 ? value : params.oldValue;
-                    }"""
-                ),
-                "width": 88,
-            },
+            _auction_credit_column(),
             {
                 "field": "Fascia personale",
                 "editable": True,
@@ -2352,12 +2360,19 @@ def _render_auction_catalog_editor(
             ".fantasy-player-assigned": {
                 "background": "#111514 !important",
                 "color": "#5b6661 !important",
-                "opacity": "0.48 !important",
                 "border-left": "5px solid #78827e !important",
-                "filter": "grayscale(1) !important",
             },
             ".fantasy-player-assigned .ag-cell": {
                 "color": "#5b6661 !important",
+                "opacity": "0.48 !important",
+                "filter": "grayscale(1) !important",
+            },
+            ".fantasy-player-assigned .ag-cell[col-id='Prezzo asta']": {
+                "background": "rgba(255, 209, 102, .10) !important",
+                "color": "#ffd166 !important",
+                "font-weight": "800 !important",
+                "opacity": "1 !important",
+                "filter": "none !important",
             },
             ".fantasy-player-assigned .ag-cell[col-id='Giocatore']": {
                 "text-decoration": "line-through !important",
