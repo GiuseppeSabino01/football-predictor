@@ -25,6 +25,7 @@ from fantasy.service import (
     reset_preferred_xi,
     role_balance_recommendation,
     roster_summary,
+    set_auction_trade_exclusions,
     set_captain,
     set_preferred_xi,
     suggest_lineup,
@@ -414,6 +415,8 @@ def test_auction_trade_analysis_matches_reciprocal_role_needs() -> None:
         record_auction_purchase(league, managers[0]["id"], item, 30)
     for item in midfielders:
         record_auction_purchase(league, managers[1]["id"], item, 30)
+    excluded_id = attackers[0]["id"]
+    set_auction_trade_exclusions(league, [excluded_id])
 
     analysis = auction_trade_analysis(
         league, [*attackers, *midfielders], limit=5
@@ -427,6 +430,18 @@ def test_auction_trade_analysis_matches_reciprocal_role_needs() -> None:
         trade["opponent_improvement"] >= 1.5 for trade in analysis["trades"]
     )
     assert all(trade["fairness"] >= 80 for trade in analysis["trades"])
+    assert all(
+        0 <= trade["user_improvement"] <= 15
+        and 0 <= trade["opponent_improvement"] <= 15
+        and trade["gain_gap"] <= 5
+        for trade in analysis["trades"]
+    )
+    assert analysis["excluded_players"] == 1
+    assert all(
+        excluded_id
+        not in {str(player.get("id")) for player in trade["outgoing"]}
+        for trade in analysis["trades"]
+    )
     first = analysis["trades"][0]
     assert {row["role"] for row in first["outgoing"]} == {"A"}
     assert {row["role"] for row in first["incoming"]} == {"C"}
@@ -615,7 +630,35 @@ def test_auction_trade_analysis_returns_best_balanced_fallbacks() -> None:
     assert len(analysis["trades"]) == 1
     assert analysis["trades"][0]["meets_threshold"] is False
     assert analysis["trades"][0]["fairness"] == 100
+    assert analysis["trades"][0]["gain_gap"] == 0
     assert "migliori candidati" in analysis["reason"]
+
+
+def test_auction_trade_exclusions_are_normalized_and_removed_with_player() -> None:
+    workspace = new_workspace()
+    league = create_league(
+        workspace,
+        "Intoccabili",
+        initial_budget=500,
+        participants=2,
+        game_mode=GAME_MODE_AUCTION,
+        roster_slots={"P": 0, "D": 0, "C": 0, "A": 2},
+    )
+    manager_id = auction_managers(league)[0]["id"]
+    leao = make_player(name="Leao", team="MIL", role="A", quote=35)
+    record_auction_purchase(league, manager_id, leao, 100)
+
+    selected = set_auction_trade_exclusions(
+        league, [leao["id"], "non-mio", leao["id"]]
+    )
+
+    assert selected == [leao["id"]]
+    assert normalize_workspace(workspace)["leagues"][0][
+        "auction_trade_excluded_player_ids"
+    ] == [leao["id"]]
+
+    remove_purchase(league, leao["id"])
+    assert league["auction_trade_excluded_player_ids"] == []
 
 
 def test_auction_tracks_every_manager_and_updates_comparable_prices() -> None:

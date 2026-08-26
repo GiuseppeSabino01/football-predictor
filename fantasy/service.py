@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from heapq import heappush, heapreplace
 from itertools import combinations
+from math import tanh
 from typing import Any
 from uuid import uuid4
 
@@ -37,6 +38,8 @@ FORMATIONS = {
 }
 AUCTION_TRADE_MIN_USER_GAIN = 4.0
 AUCTION_TRADE_MIN_OPPONENT_GAIN = 1.5
+AUCTION_TRADE_MAX_GAIN = 15.0
+AUCTION_TRADE_MAX_GAIN_GAP = 5.0
 AUCTION_ROLE_BUDGET_SHARES = {"P": 0.06, "D": 0.16, "C": 0.30, "A": 0.48}
 AUCTION_CROSS_ROLE_ELASTICITY = 0.60
 
@@ -134,6 +137,7 @@ def create_league(
         "auction_tiers_initialized": True,
         "auction_player_tiers": {},
         "player_notes": {},
+        "auction_trade_excluded_player_ids": [],
         "watchlist": [],
         "analysis": "",
         "preferred_xi": [],
@@ -339,6 +343,28 @@ def auction_taken_player_ids(league: dict[str, Any]) -> set[str]:
             continue
         taken.update(str(row.get("player_id")) for row in manager.get("purchases", []))
     return taken
+
+
+def set_auction_trade_exclusions(
+    league: dict[str, Any], player_ids: list[str]
+) -> list[str]:
+    """Persist user-owned players that the Trade Finder must never offer."""
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        raise ValueError("Gli intoccabili sono disponibili solo nei fantacalci ad asta.")
+    owned_ids = {
+        str(purchase.get("player_id") or "")
+        for purchase in league.get("purchases", [])
+    }
+    selected: list[str] = []
+    seen: set[str] = set()
+    for player_id in player_ids:
+        clean_id = str(player_id or "")
+        if clean_id in owned_ids and clean_id not in seen:
+            selected.append(clean_id)
+            seen.add(clean_id)
+    league["auction_trade_excluded_player_ids"] = selected
+    league["updated_at"] = utc_now()
+    return selected
 
 
 def record_auction_purchase(
@@ -1609,6 +1635,7 @@ def auction_trade_analysis(
         "reason": "",
         "evaluated_opponents": 0,
         "evaluated_players": 0,
+        "excluded_players": 0,
         "fallback": False,
         "trades": [],
     }
@@ -1628,6 +1655,21 @@ def auction_trade_analysis(
     )
     if not user_roster:
         result["reason"] = "Assegna almeno un giocatore alla tua squadra."
+        return result
+    excluded_ids = {
+        str(player_id)
+        for player_id in league.get("auction_trade_excluded_player_ids", [])
+    }
+    user_trade_pool = [
+        player
+        for player in user_roster
+        if str(player.get("player_id") or player.get("id") or "") not in excluded_ids
+    ]
+    result["excluded_players"] = len(user_roster) - len(user_trade_pool)
+    if not user_trade_pool:
+        result["reason"] = (
+            "Tutti i giocatori della tua rosa sono segnati come intoccabili."
+        )
         return result
 
     opponent_rosters = [
@@ -1650,7 +1692,7 @@ def auction_trade_analysis(
     }
     budget = float(league.get("initial_budget") or 0)
     user_profile = _auction_trade_team_profile(user_roster, slots, benchmarks)
-    user_packages = _auction_trade_packages(user_roster, budget)
+    user_packages = _auction_trade_packages(user_trade_pool, budget)
     result["evaluated_opponents"] = len(opponent_rosters)
     result["evaluated_players"] = sum(len(roster) for roster in all_rosters)
 
@@ -1712,12 +1754,27 @@ def auction_trade_analysis(
                     incoming_opponent_utility = _auction_trade_package_utility(
                         incoming, opponent_profile, budget
                     )
-                    user_improvement = 100 * (
+                    raw_user_improvement = 100 * (
                         incoming_user_utility - outgoing_user_utility
                     ) / max(outgoing_user_utility, 1.0)
-                    opponent_improvement = 100 * (
+                    raw_opponent_improvement = 100 * (
                         outgoing_opponent_utility - incoming_opponent_utility
                     ) / max(incoming_opponent_utility, 1.0)
+                    user_improvement = _auction_trade_gain_score(
+                        raw_user_improvement
+                    )
+                    opponent_improvement = _auction_trade_gain_score(
+                        raw_opponent_improvement
+                    )
+                    gain_gap = abs(user_improvement - opponent_improvement)
+                    if (
+                        user_improvement < 0
+                        or opponent_improvement < 0
+                        or max(user_improvement, opponent_improvement)
+                        > AUCTION_TRADE_MAX_GAIN
+                        or gain_gap > AUCTION_TRADE_MAX_GAIN_GAP
+                    ):
+                        continue
                     fairness = round(100 * (1 - value_gap), 1)
                     user_role = _auction_trade_gain_role(outgoing, incoming)
                     opponent_role = _auction_trade_gain_role(incoming, outgoing)
@@ -1747,6 +1804,7 @@ def auction_trade_analysis(
                             "opponent_improvement": round(
                                 opponent_improvement, 1
                             ),
+                            "gain_gap": round(gain_gap, 1),
                             "fairness": fairness,
                             "value_gap": round(value_gap * 100, 1),
                             "meets_threshold": meets_threshold,
@@ -1762,9 +1820,10 @@ def auction_trade_analysis(
                                 value_gap,
                             ),
                             "ranking": (
-                                user_improvement * 0.55
-                                + opponent_improvement * 0.35
+                                min(user_improvement, opponent_improvement) * 0.55
+                                + (user_improvement + opponent_improvement) * 0.125
                                 + max(fairness - 80, 0) * 0.10
+                                - gain_gap * 0.25
                             ),
                         }
                     if meets_threshold:
@@ -2001,6 +2060,11 @@ def _auction_trade_deficit(value: float, benchmark: float) -> float:
     return max(0.0, min((benchmark - value) / benchmark, 1.0))
 
 
+def _auction_trade_gain_score(raw_improvement: float) -> float:
+    """Compress role-fit gains into a credible, bounded percentage."""
+    return AUCTION_TRADE_MAX_GAIN * tanh(raw_improvement / 35.0)
+
+
 def _auction_trade_package_utility(
     package: tuple[dict[str, Any], ...],
     profile: dict[str, Any],
@@ -2186,6 +2250,11 @@ def _median(values) -> float:
 
 def remove_purchase(league: dict[str, Any], player_id: str) -> None:
     league["purchases"] = [row for row in league.get("purchases", []) if row.get("player_id") != player_id]
+    league["auction_trade_excluded_player_ids"] = [
+        item
+        for item in league.get("auction_trade_excluded_player_ids", [])
+        if str(item) != str(player_id)
+    ]
     league["analysis"] = ""
     _invalidate_sasa(league)
     league["preferred_xi"] = [
@@ -2451,12 +2520,15 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("auction_tiers", [])
     league.setdefault("auction_player_tiers", {})
     league.setdefault("player_notes", {})
+    league.setdefault("auction_trade_excluded_player_ids", [])
     if not isinstance(league["auction_tiers"], list):
         league["auction_tiers"] = []
     if not isinstance(league["auction_player_tiers"], dict):
         league["auction_player_tiers"] = {}
     if not isinstance(league["player_notes"], dict):
         league["player_notes"] = {}
+    if not isinstance(league["auction_trade_excluded_player_ids"], list):
+        league["auction_trade_excluded_player_ids"] = []
     if not league.get("auction_tiers_initialized"):
         if not league["auction_tiers"]:
             league["auction_tiers"] = _new_auction_tiers()
@@ -2478,6 +2550,17 @@ def _normalize_league(league: dict[str, Any]) -> None:
         for player_id, note in league["player_notes"].items()
         if str(player_id) and str(note or "").strip()
     }
+    owned_ids = {
+        str(purchase.get("player_id") or "")
+        for purchase in league.get("purchases", [])
+    }
+    league["auction_trade_excluded_player_ids"] = list(
+        dict.fromkeys(
+            str(player_id)
+            for player_id in league["auction_trade_excluded_player_ids"]
+            if str(player_id) in owned_ids
+        )
+    )
     league.setdefault("watchlist", [])
     league.setdefault("analysis", "")
     league.setdefault("preferred_xi", [])

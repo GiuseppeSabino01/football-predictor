@@ -78,6 +78,7 @@ from fantasy.service import (
     role_balance_recommendation,
     roster_summary,
     run_auction_multiverse,
+    set_auction_trade_exclusions,
     set_captain,
     set_preferred_xi,
     simulate_auction_purchases,
@@ -163,7 +164,7 @@ def _cached_auction_trade_analysis(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.26 v26.6.1 · Prezzi dinamici e Trade Finder"
+        "Fantacalcio · Build 2026.08.26 v26.6.2 · Giocatori intoccabili"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -4634,7 +4635,12 @@ def _render_my_squad(
     if league.get("game_mode") == GAME_MODE_LIST and summary["complete"]:
         _render_swap_lab(league, workspace.get("catalog", []))
     elif league.get("game_mode") == GAME_MODE_AUCTION:
-        _render_auction_trade_lab(league, workspace.get("catalog", []))
+        _render_auction_trade_lab(
+            workspace,
+            league,
+            workspace.get("catalog", []),
+            storage,
+        )
     _render_sasa_analysis(workspace, league, storage, settings, summary, xi_summary)
 
 
@@ -5040,21 +5046,60 @@ def _render_swap_lab(league: dict[str, Any], catalog: list[dict[str, Any]]) -> N
 
 
 def _render_auction_trade_lab(
-    league: dict[str, Any], catalog: list[dict[str, Any]]
+    workspace: dict[str, Any],
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    storage: FantasyWorkspaceStorage,
 ) -> None:
+    own_players = sorted(
+        league.get("purchases", []),
+        key=lambda player: (
+            "PDCA".find(str(player.get("role") or "")),
+            str(player.get("name") or ""),
+        ),
+    )
+    own_by_id = {
+        str(player.get("player_id") or ""): player for player in own_players
+    }
+    saved_exclusions = [
+        str(player_id)
+        for player_id in league.get("auction_trade_excluded_player_ids", [])
+        if str(player_id) in own_by_id
+    ]
+    selected_exclusions = st.multiselect(
+        "Giocatori intoccabili",
+        options=list(own_by_id),
+        default=saved_exclusions,
+        format_func=lambda player_id: (
+            f"{own_by_id[player_id].get('role')} · "
+            f"{own_by_id[player_id].get('name')}"
+        ),
+        help=(
+            "I giocatori selezionati non verranno mai inseriti tra quelli che cedi, "
+            "neppure negli scambi 2×2 o 3×3. La scelta viene salvata automaticamente."
+        ),
+        key=f"auction_trade_exclusions_{league['id']}",
+    )
+    if set(selected_exclusions) != set(saved_exclusions):
+        set_auction_trade_exclusions(league, selected_exclusions)
+        touch_workspace(workspace)
+        _save_workspace(workspace, storage)
+
     analysis = _cached_auction_trade_analysis(league, catalog, 10)
     st.markdown(
         f'<section class="fantasy-swap-hero"><div><span>SASA · TRADE FINDER</span>'
         f"<strong>Scambi vantaggiosi, ma credibili</strong><small>Ho incrociato "
         f"la tua rosa con {analysis.get('evaluated_opponents', 0)} avversari e "
-        f"{analysis.get('evaluated_players', 0)} giocatori già acquistati.</small></div>"
+        f"{analysis.get('evaluated_players', 0)} giocatori già acquistati. "
+        f"Intoccabili: {analysis.get('excluded_players', 0)}.</small></div>"
         f"<b>{len(analysis.get('trades', []))}</b></section>",
         unsafe_allow_html=True,
     )
     st.caption(
         "Il motore valuta scambi 1×1, 2×2 e 3×3, gli slot scoperti, la qualità dei "
-        "reparti e il valore tecnico dei giocatori. Se nessuna proposta supera tutte "
-        "le soglie, mostra comunque i 10 candidati piu interessanti ed equilibrati."
+        "reparti e il valore tecnico dei giocatori. Scarta vantaggi eccessivi o troppo "
+        "sbilanciati; se nessuna proposta supera le soglie, mostra comunque i 10 "
+        "candidati credibili piu interessanti."
     )
     trades = analysis.get("trades", [])
     if not trades:
@@ -5088,7 +5133,8 @@ def _render_auction_trade_lab(
             f"<span>Gol {deltas['goals']:+.1f}</span>"
             f"<span>Assist {deltas['assists']:+.1f}</span>"
             f"<span>Somma FM {deltas['fantasy_average']:+.2f}</span>"
-            f"<span>Scarto valori {trade['value_gap']:.1f}%</span></div>"
+            f"<span>Scarto valori {trade['value_gap']:.1f}%</span>"
+            f"<span>Scarto benefici {trade['gain_gap']:.1f} pt</span></div>"
             f"<p>{escape(str(trade['motivation']))}</p></article>",
             unsafe_allow_html=True,
         )
