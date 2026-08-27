@@ -1,6 +1,7 @@
 from fantasy.ui import (
     _auction_assigned_row_class_rule,
     _auction_player_column,
+    _auction_trade_gain_gap,
     _auction_updated_price_column,
 )
 
@@ -30,3 +31,16 @@ def test_auction_player_column_is_compact_and_pinned() -> None:
     assert column["width"] == 155
     assert column["minWidth"] == 135
     assert column["pinned"] == "left"
+
+
+def test_trade_gain_gap_supports_proposals_cached_by_older_builds() -> None:
+    assert _auction_trade_gain_gap(
+        {"user_improvement": 8.0, "opponent_improvement": 5.5}
+    ) == 2.5
+    assert _auction_trade_gain_gap(
+        {
+            "gain_gap": 1.25,
+            "user_improvement": 8.0,
+            "opponent_improvement": 5.5,
+        }
+    ) == 1.25

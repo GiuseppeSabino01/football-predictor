@@ -156,15 +156,19 @@ def _cached_listone_excel(
 
 @st.cache_data(show_spinner=False, max_entries=12)
 def _cached_auction_trade_analysis(
-    league: dict[str, Any], catalog: list[dict[str, Any]], limit: int
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    limit: int,
+    cache_version: str,
 ) -> dict[str, Any]:
+    del cache_version
     return auction_trade_analysis(league, catalog, limit=limit)
 
 
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.26 v26.6.2 · Giocatori intoccabili"
+        "Fantacalcio · Build 2026.08.26 v26.6.3 · Cache Trade Finder corretta"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -5085,7 +5089,7 @@ def _render_auction_trade_lab(
         touch_workspace(workspace)
         _save_workspace(workspace, storage)
 
-    analysis = _cached_auction_trade_analysis(league, catalog, 10)
+    analysis = _cached_auction_trade_analysis(league, catalog, 10, "trade-v3")
     st.markdown(
         f'<section class="fantasy-swap-hero"><div><span>SASA · TRADE FINDER</span>'
         f"<strong>Scambi vantaggiosi, ma credibili</strong><small>Ho incrociato "
@@ -5119,6 +5123,7 @@ def _render_auction_trade_lab(
         )
         deltas = trade["deltas"]
         opponent_name = escape(str(trade["opponent_name"]))
+        gain_gap = _auction_trade_gain_gap(trade)
         threshold_label = " · SOTTO SOGLIA" if not trade.get("meets_threshold", True) else ""
         st.markdown(
             f'<article class="fantasy-swap-card"><header><span>PROPOSTA {index} · '
@@ -5134,7 +5139,7 @@ def _render_auction_trade_lab(
             f"<span>Assist {deltas['assists']:+.1f}</span>"
             f"<span>Somma FM {deltas['fantasy_average']:+.2f}</span>"
             f"<span>Scarto valori {trade['value_gap']:.1f}%</span>"
-            f"<span>Scarto benefici {trade['gain_gap']:.1f} pt</span></div>"
+            f"<span>Scarto benefici {gain_gap:.1f} pt</span></div>"
             f"<p>{escape(str(trade['motivation']))}</p></article>",
             unsafe_allow_html=True,
         )
@@ -5150,6 +5155,22 @@ def _auction_swap_player_chip(player: dict[str, Any], direction: str) -> str:
         f"<div><strong>{name}</strong><small>{team} · pagato {price:.0f} CR</small>"
         f"</div></div>"
     )
+
+
+def _auction_trade_gain_gap(trade: dict[str, Any]) -> float:
+    """Read the new field or derive it for proposals cached by older builds."""
+    stored = trade.get("gain_gap")
+    if stored is not None:
+        try:
+            return float(stored)
+        except (TypeError, ValueError):
+            pass
+    try:
+        user_gain = float(trade.get("user_improvement") or 0)
+        opponent_gain = float(trade.get("opponent_improvement") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return abs(user_gain - opponent_gain)
 
 
 def _swap_player_chip(player: dict[str, Any], direction: str) -> str:
