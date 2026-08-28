@@ -23,6 +23,11 @@ class BrowserWorkspaceStorage:
         self.client = None
         self.last_error = ""
         try:
+            from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+            if get_script_run_ctx() is None:
+                self.last_error = "Browser storage disponibile solo durante una sessione Streamlit."
+                return
             from streamlit_local_storage import LocalStorage
 
             # A stable component key lets the package hydrate its cached browser values
