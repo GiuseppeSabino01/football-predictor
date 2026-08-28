@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from config.settings import Settings
 from schemas import MatchPrediction
@@ -17,6 +19,7 @@ class SupabaseStorage:
         self.settings = settings
         self.client = None
         self.last_error = ""
+        self.http = _retrying_session()
         if settings.has_supabase:
             try:
                 from supabase import create_client
@@ -140,7 +143,7 @@ class SupabaseStorage:
 
     def _rest_load_json_state(self, state_key: str) -> list[dict[str, Any]]:
         try:
-            response = requests.get(
+            response = self.http.get(
                 self._rest_table_url(),
                 headers=self._rest_headers(),
                 params={
@@ -163,7 +166,7 @@ class SupabaseStorage:
         headers = self._rest_headers()
         headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
         try:
-            response = requests.post(
+            response = self.http.post(
                 self._rest_table_url(),
                 headers=headers,
                 params={"on_conflict": "cache_key"},
@@ -238,6 +241,26 @@ class SupabaseStorage:
         return simulations
 
 
+def _retrying_session() -> requests.Session:
+    """Retry transient Supabase network/DNS failures without duplicating app state."""
+    retry = Retry(
+        total=3,
+        connect=3,
+        read=0,
+        status=2,
+        backoff_factor=0.4,
+        status_forcelist=(502, 503, 504),
+        allowed_methods=frozenset({"GET", "POST"}),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    session = requests.Session()
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
 def _json_safe(value: Any) -> Any:
     """Return a Postgres-jsonb-safe copy, replacing NaN and infinities."""
     if isinstance(value, dict):
@@ -251,4 +274,15 @@ def _json_safe(value: Any) -> Any:
 
 def _safe_error(error: Exception) -> str:
     message = " ".join(str(error).split())
+    lowered = message.casefold()
+    if "nameresolutionerror" in lowered or "failed to resolve" in lowered:
+        return (
+            "Supabase temporaneamente non raggiungibile per un errore DNS. "
+            "Il salvataggio verra ritentato automaticamente; il backup browser resta disponibile."
+        )
+    if "connectionerror" in lowered or "max retries exceeded" in lowered:
+        return (
+            "Connessione a Supabase temporaneamente non disponibile. "
+            "Il salvataggio verra ritentato automaticamente; il backup browser resta disponibile."
+        )
     return message[:280] or error.__class__.__name__
