@@ -113,6 +113,20 @@ def normalize_team(team: Any) -> str:
     return TEAM_ALIASES.get(clean, clean)
 
 
+def serie_a_teams() -> tuple[str, ...]:
+    """Return every club in the official calendar, independently of the roster."""
+    return tuple(
+        sorted(
+            {
+                normalize_team(team)
+                for round_fixtures in OFFICIAL_FIXTURES_2026_27
+                for fixture in round_fixtures
+                for team in fixture
+            }
+        )
+    )
+
+
 def season_next_matchday(today: date | None = None) -> int:
     reference = today or date.today()
     for matchday, scheduled_date in enumerate(MATCHDAY_DATES_2026_27, start=1):

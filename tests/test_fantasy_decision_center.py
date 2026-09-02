@@ -8,6 +8,7 @@ from fantasy.decision_center import (
     injury_return_label,
     player_availability,
     recommend_lineup,
+    serie_a_teams,
     season_next_matchday,
     simulate_purchase,
 )
@@ -62,6 +63,14 @@ def test_official_calendar_contains_38_complete_matchdays():
         teams = [team for fixture in fixtures for team in fixture]
         assert len(fixtures) == 10
         assert len(set(teams)) == 20
+
+
+def test_serie_a_teams_are_available_without_roster_players():
+    teams = serie_a_teams()
+
+    assert len(teams) == 20
+    assert teams == tuple(sorted(teams))
+    assert {"INTER", "JUVENTUS", "MILAN", "NAPOLI", "ROMA"} <= set(teams)
 
 
 def test_next_matchday_uses_the_official_season_dates():

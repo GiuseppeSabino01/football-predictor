@@ -3,6 +3,7 @@ from fantasy.ui import (
     _auction_player_column,
     _auction_trade_gain_gap,
     _auction_updated_price_column,
+    _strategic_calendar_groups,
 )
 
 
@@ -44,3 +45,19 @@ def test_trade_gain_gap_supports_proposals_cached_by_older_builds() -> None:
             "opponent_improvement": 5.5,
         }
     ) == 1.25
+
+
+def test_strategic_calendar_contains_all_teams_without_players() -> None:
+    groups = _strategic_calendar_groups({"purchases": []})
+
+    assert len(groups) == 20
+    assert all(names == [] for names in groups.values())
+
+
+def test_strategic_calendar_adds_owned_players_without_hiding_other_teams() -> None:
+    groups = _strategic_calendar_groups(
+        {"purchases": [{"name": "Lautaro", "team": "INT"}]}
+    )
+
+    assert len(groups) == 20
+    assert groups["INTER"] == ["Lautaro"]

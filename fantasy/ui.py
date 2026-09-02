@@ -34,8 +34,10 @@ from fantasy.decision_center import (
     fixture_outlook,
     injury_return_label,
     matchday_date,
+    normalize_team,
     player_availability,
     recommend_lineup,
+    serie_a_teams,
     season_next_matchday,
     simulate_purchase,
 )
@@ -168,7 +170,7 @@ def _cached_auction_trade_analysis(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.08.26 v26.6.3 · Cache Trade Finder corretta"
+        "Fantacalcio · Build 2026.09.02 v26.7.0 · Calendario completo 20 squadre"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -4214,11 +4216,6 @@ def _render_decision_center(
         f"</div><aside><small>DA LEGGERE</small><b>{unread_count}</b></aside></section>",
         unsafe_allow_html=True,
     )
-    if not league.get("purchases"):
-        st.info(
-            "Aggiungi almeno un giocatore alla rosa per attivare il Decision Center."
-        )
-        return
     lineup_tab, calendar_tab, alert_tab = st.tabs(
         ["Assistente di giornata", "Calendario strategico", f"Avvisi · {unread_count}"]
     )
@@ -4474,6 +4471,15 @@ def _fixture_tone(difficulty: float | None) -> str:
     return "hard"
 
 
+def _strategic_calendar_groups(league: dict[str, Any]) -> dict[str, list[str]]:
+    grouped = {team: [] for team in serie_a_teams()}
+    for player in league.get("purchases", []):
+        team = normalize_team(player.get("team"))
+        if team in grouped:
+            grouped[team].append(str(player.get("name") or ""))
+    return grouped
+
+
 def _render_strategic_calendar(
     league: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> None:
@@ -4493,11 +4499,7 @@ def _render_strategic_calendar(
         "Verde = partita favorevole · ambra = equilibrata · rosso = impegnativa. "
         "La difficolta e calcolata sulla forza del listone e sul fattore casa/trasferta."
     )
-    grouped: dict[str, list[str]] = {}
-    for player in league.get("purchases", []):
-        grouped.setdefault(str(player.get("team") or ""), []).append(
-            str(player.get("name") or "")
-        )
+    grouped = _strategic_calendar_groups(league)
     rows = []
     for team, names in sorted(grouped.items()):
         outlook = fixture_outlook(
@@ -4515,7 +4517,8 @@ def _render_strategic_calendar(
             )
         rows.append(
             f'<div class="fantasy-calendar-row"><div><strong>{escape(team)}</strong>'
-            f"<small>{escape(' · '.join(names))}</small></div><section>{''.join(chips) or '<em>Calendario non disponibile</em>'}</section></div>"
+            f"<small>{escape(' · '.join(names) if names else 'Nessun giocatore in rosa')}</small>"
+            f"</div><section>{''.join(chips) or '<em>Calendario non disponibile</em>'}</section></div>"
         )
     st.markdown(
         f'<div class="fantasy-calendar-board">{"".join(rows)}</div>',
