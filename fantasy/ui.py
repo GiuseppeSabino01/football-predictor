@@ -110,6 +110,9 @@ AUCTION_TIER_PALETTE = {
 }
 CATALOG_AUTOSAVE_DEBOUNCE_MS = 1200
 OFFICIAL_CATALOG_SESSION_KEY = "fantasy_official_catalog_session_v2650"
+STRATEGIC_CALENDAR_WINDOWS = (
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 38,
+)
 
 
 def _auction_assigned_row_class_rule(unassigned: str) -> JsCode:
@@ -170,7 +173,7 @@ def _cached_auction_trade_analysis(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.09.02 v26.7.0 · Calendario completo 20 squadre"
+        "Fantacalcio · Build 2026.09.23 v26.7.1 · Calendario dinamico per difficolta"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -4480,51 +4483,84 @@ def _strategic_calendar_groups(league: dict[str, Any]) -> dict[str, list[str]]:
     return grouped
 
 
+def _strategic_calendar_rows(
+    league: dict[str, Any],
+    catalog: list[dict[str, Any]],
+    *,
+    start_matchday: int,
+    limit: int,
+) -> list[dict[str, Any]]:
+    rows = []
+    for team, names in _strategic_calendar_groups(league).items():
+        outlook = fixture_outlook(
+            team,
+            catalog,
+            start_matchday=int(start_matchday),
+            limit=int(limit),
+        )
+        difficulties = [float(fixture.get("difficulty") or 3) for fixture in outlook]
+        rows.append(
+            {
+                "team": team,
+                "names": names,
+                "outlook": outlook,
+                "average_difficulty": (
+                    sum(difficulties) / len(difficulties) if difficulties else None
+                ),
+            }
+        )
+    return sorted(
+        rows,
+        key=lambda row: (
+            row["average_difficulty"]
+            if row["average_difficulty"] is not None
+            else float("inf"),
+            row["team"],
+        ),
+    )
+
+
 def _render_strategic_calendar(
     league: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> None:
     upcoming_matchday = season_next_matchday()
-    start_column, horizon_column = st.columns([2, 1])
-    start_matchday = start_column.selectbox(
-        "Parti dalla giornata",
-        list(range(1, 39)),
-        index=upcoming_matchday - 1,
-        format_func=lambda value: (
-            f"{value}ª giornata · {matchday_date(value).strftime('%d/%m/%Y')}"
-            if matchday_date(value)
-            else f"{value}ª giornata"
-        ),
-        key=f"calendar_start_v22_{league['id']}",
-    )
-    matchday_limit = horizon_column.selectbox(
-        "Prossime giornate",
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 38],
-        index=4,
-        help="Include la giornata di partenza, fino al termine della stagione.",
-        key=f"calendar_limit_{league['id']}",
-    )
+    start_column, window_column = st.columns([1.6, 1])
+    with start_column:
+        start_matchday = st.selectbox(
+            "Parti dalla giornata",
+            list(range(1, 39)),
+            index=upcoming_matchday - 1,
+            format_func=lambda value: (
+                f"{value}ª giornata · {matchday_date(value).strftime('%d/%m/%Y')}"
+                if matchday_date(value)
+                else f"{value}ª giornata"
+            ),
+            key=f"calendar_start_v23_{league['id']}",
+        )
+    with window_column:
+        matchday_limit = st.selectbox(
+            "Prossime giornate",
+            STRATEGIC_CALENDAR_WINDOWS,
+            index=4,
+            key=f"calendar_window_v23_{league['id']}",
+        )
     st.caption(
         "Verde = partita favorevole · ambra = equilibrata · rosso = impegnativa. "
-        "La difficolta e calcolata sulla forza del listone e sul fattore casa/trasferta."
-    )
-    grouped = _strategic_calendar_groups(league)
-    calendars = []
-    for team, names in grouped.items():
-        outlook = fixture_outlook(
-            team, catalog, start_matchday=int(start_matchday), limit=int(matchday_limit)
-        )
-        average_difficulty = (
-            sum(float(fixture["difficulty"]) for fixture in outlook) / len(outlook)
-            if outlook else None
-        )
-        calendars.append((team, names, outlook, average_difficulty))
-    calendars.sort(
-        key=lambda item: (
-            item[3] if item[3] is not None else float("inf"), item[0]
-        )
+        "La difficolta e calcolata sulla forza del listone e sul fattore casa/trasferta. "
+        "Le squadre sono ordinate dal calendario piu semplice al piu difficile."
     )
     rows = []
-    for team, names, outlook, average_difficulty in calendars:
+    calendar_rows = _strategic_calendar_rows(
+        league,
+        catalog,
+        start_matchday=int(start_matchday),
+        limit=int(matchday_limit),
+    )
+    for calendar_row in calendar_rows:
+        team = str(calendar_row["team"])
+        names = calendar_row["names"]
+        outlook = calendar_row["outlook"]
+        average_difficulty = calendar_row["average_difficulty"]
         chips = []
         for fixture in outlook:
             difficulty = float(fixture.get("difficulty") or 3)
@@ -4536,32 +4572,30 @@ def _render_strategic_calendar(
                 f"<b>{difficulty:.1f}</b></span>"
             )
         average_label = (
-            f"{average_difficulty:.1f}" if average_difficulty is not None else "—"
+            f"Media difficolta: {average_difficulty:.2f}/5"
+            if average_difficulty is not None
+            else "Media difficolta: n/d"
         )
+        roster_label = " · ".join(names) if names else "Nessun giocatore in rosa"
         rows.append(
             f'<div class="fantasy-calendar-row"><div><strong>{escape(team)}</strong>'
-            f"<small>Difficoltà media: {average_label}</small>"
-            f"<small>{escape(' · '.join(names) if names else 'Nessun giocatore in rosa')}</small>"
+            f"<small>{escape(average_label)} · {escape(roster_label)}</small>"
             f"</div><section>{''.join(chips) or '<em>Calendario non disponibile</em>'}</section></div>"
         )
     st.markdown(
         f'<div class="fantasy-calendar-board">{"".join(rows)}</div>',
         unsafe_allow_html=True,
     )
-    end_matchday = min(int(start_matchday) + int(matchday_limit) - 1, 38)
-    visible_matchdays = end_matchday - int(start_matchday) + 1
-    period_label = (
-        f"G{start_matchday}–G{end_matchday}" if visible_matchdays > 1 else f"G{start_matchday}"
-    )
     st.caption(
         f"Fonte: [calendario ufficiale Lega Serie A · 38 giornate]({FIXTURE_SOURCE_URL}). "
-        f"Periodo visualizzato: {period_label} · "
-        f"{visible_matchdays} {'giornate' if visible_matchdays > 1 else 'giornata'}. "
-        "Squadre ordinate dal calendario più facile al più difficile; "
-        "medie e rotazioni si riferiscono solo alle partite visualizzate."
+        f"La vista considera fino a {int(matchday_limit)} giornate dalla giornata "
+        "selezionata."
     )
     rotations = best_rotation_pairs(
-        league, catalog, start_matchday=int(start_matchday), limit=int(matchday_limit)
+        league,
+        catalog,
+        start_matchday=int(start_matchday),
+        limit=int(matchday_limit),
     )
     if rotations:
         st.markdown("##### Rotazioni intelligenti")
