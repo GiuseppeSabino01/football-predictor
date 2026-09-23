@@ -4484,7 +4484,8 @@ def _render_strategic_calendar(
     league: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> None:
     upcoming_matchday = season_next_matchday()
-    start_matchday = st.selectbox(
+    start_column, horizon_column = st.columns([2, 1])
+    start_matchday = start_column.selectbox(
         "Parti dalla giornata",
         list(range(1, 39)),
         index=upcoming_matchday - 1,
@@ -4495,16 +4496,35 @@ def _render_strategic_calendar(
         ),
         key=f"calendar_start_v22_{league['id']}",
     )
+    matchday_limit = horizon_column.selectbox(
+        "Prossime giornate",
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 38],
+        index=4,
+        help="Include la giornata di partenza, fino al termine della stagione.",
+        key=f"calendar_limit_{league['id']}",
+    )
     st.caption(
         "Verde = partita favorevole · ambra = equilibrata · rosso = impegnativa. "
         "La difficolta e calcolata sulla forza del listone e sul fattore casa/trasferta."
     )
     grouped = _strategic_calendar_groups(league)
-    rows = []
-    for team, names in sorted(grouped.items()):
+    calendars = []
+    for team, names in grouped.items():
         outlook = fixture_outlook(
-            team, catalog, start_matchday=int(start_matchday), limit=5
+            team, catalog, start_matchday=int(start_matchday), limit=int(matchday_limit)
         )
+        average_difficulty = (
+            sum(float(fixture["difficulty"]) for fixture in outlook) / len(outlook)
+            if outlook else None
+        )
+        calendars.append((team, names, outlook, average_difficulty))
+    calendars.sort(
+        key=lambda item: (
+            item[3] if item[3] is not None else float("inf"), item[0]
+        )
+    )
+    rows = []
+    for team, names, outlook, average_difficulty in calendars:
         chips = []
         for fixture in outlook:
             difficulty = float(fixture.get("difficulty") or 3)
@@ -4515,8 +4535,12 @@ def _render_strategic_calendar(
                 f"<strong>{venue} {escape(str(fixture.get('opponent') or ''))}</strong>"
                 f"<b>{difficulty:.1f}</b></span>"
             )
+        average_label = (
+            f"{average_difficulty:.1f}" if average_difficulty is not None else "—"
+        )
         rows.append(
             f'<div class="fantasy-calendar-row"><div><strong>{escape(team)}</strong>'
+            f"<small>Difficoltà media: {average_label}</small>"
             f"<small>{escape(' · '.join(names) if names else 'Nessun giocatore in rosa')}</small>"
             f"</div><section>{''.join(chips) or '<em>Calendario non disponibile</em>'}</section></div>"
         )
@@ -4524,12 +4548,20 @@ def _render_strategic_calendar(
         f'<div class="fantasy-calendar-board">{"".join(rows)}</div>',
         unsafe_allow_html=True,
     )
+    end_matchday = min(int(start_matchday) + int(matchday_limit) - 1, 38)
+    visible_matchdays = end_matchday - int(start_matchday) + 1
+    period_label = (
+        f"G{start_matchday}–G{end_matchday}" if visible_matchdays > 1 else f"G{start_matchday}"
+    )
     st.caption(
         f"Fonte: [calendario ufficiale Lega Serie A · 38 giornate]({FIXTURE_SOURCE_URL}). "
-        "La vista mostra la giornata selezionata e le quattro successive."
+        f"Periodo visualizzato: {period_label} · "
+        f"{visible_matchdays} {'giornate' if visible_matchdays > 1 else 'giornata'}. "
+        "Squadre ordinate dal calendario più facile al più difficile; "
+        "medie e rotazioni si riferiscono solo alle partite visualizzate."
     )
     rotations = best_rotation_pairs(
-        league, catalog, start_matchday=int(start_matchday), limit=5
+        league, catalog, start_matchday=int(start_matchday), limit=int(matchday_limit)
     )
     if rotations:
         st.markdown("##### Rotazioni intelligenti")
