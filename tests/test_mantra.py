@@ -8,7 +8,7 @@ from openpyxl import load_workbook
 from fantasy.decision_center import best_rotation_pairs, recommend_lineup, simulate_purchase
 from fantasy.catalog import normalize_catalog_dataframe
 from fantasy.export import build_listone_excel, restore_listone_excel
-from fantasy.mantra import MANTRA_FORMATIONS, best_lineup, eligible, formation_slots, mantra_roles, solve_lineup
+from fantasy.mantra import MANTRA_FORMATIONS, best_lineup, can_purchase, eligible, formation_slots, mantra_roles, solve_lineup
 from fantasy.official_catalog import catalog_fingerprint, parse_official_html
 from fantasy.service import (
     add_purchase, auction_manager_summary, auction_managers, auction_price_board,
@@ -72,18 +72,64 @@ def test_mantra_can_buy_more_than_classic_attack_quota():
 
 
 def test_mantra_limits_apply_to_opponents_and_remaining_budget():
-    draft = league(mantra_roster_slots={"P": 1, "movement": 10})
+    draft = league()
     manager = auction_managers(draft)[1]["id"]
-    for index in range(10):
-        record_auction_purchase(draft, manager, player(index), 1)
+    for index in range(22):
+        record_auction_purchase(draft, manager, player(index, "Por", "P"), 1)
     summary = auction_manager_summary(draft, manager)
-    assert summary["remaining_slots"] == 1
-    assert summary["target_size"] == 11
-    assert summary["remaining_budget"] == 490
+    assert summary["remaining_slots"] == 8
+    assert summary["minimum_remaining_slots"] == 0
+    assert summary["target_size"] == 30
+    assert summary["minimum_size"] == 22
+    assert summary["remaining_budget"] == 478
+    assert summary["complete"]
+    for index in range(22, 30):
+        record_auction_purchase(draft, manager, player(index, "Por", "P"), 1)
     with pytest.raises(ValueError, match="Mantra"):
-        record_auction_purchase(draft, manager, player(11), 1)
-    record_auction_purchase(draft, manager, player(12, "Por", "P"), 1)
-    assert auction_manager_summary(draft, manager)["complete"]
+        record_auction_purchase(draft, manager, player(31), 1)
+    assert auction_manager_summary(draft, manager)["remaining_slots"] == 0
+
+
+@pytest.mark.parametrize("mantra,classic", [("Por", "P"), ("Dc", "D"), ("M/C", "C"), ("Pc", "A")])
+def test_mantra_allows_thirty_players_of_any_single_role(mantra, classic):
+    draft = league()
+    for index in range(30):
+        assert can_purchase(draft, player(index, mantra, classic))
+        add_purchase(draft, player(index, mantra, classic), 1)
+        assert roster_summary(draft)["complete"] == (index + 1 >= 22)
+    before = deepcopy(draft)
+    assert not can_purchase(draft, player(31, mantra, classic))
+    assert not simulate_purchase(draft, player(31, mantra, classic), 1)["valid"]
+    with pytest.raises(ValueError, match="massimo"):
+        add_purchase(draft, player(31, mantra, classic), 1)
+    assert draft == before
+
+
+def test_mantra_prices_reserve_minimum_twenty_two_not_thirty_players():
+    draft = league()
+    for index in range(22):
+        add_purchase(draft, player(index), 10)
+    p = {**player(100, "T", "C"), "mantra_fvm": 1000}
+    assert auction_price_board(draft, [p])[p["id"]]["updated"] == 280
+    assert roster_summary(draft)["complete"]
+    assert can_purchase(draft, p)
+
+
+def test_legacy_mantra_keeper_quotas_migrate_without_changing_roster():
+    draft = league()
+    draft["mantra_roster_slots"] = {"P": 1, "movement": 21}
+    draft["purchases"] = [player(i, "Por", "P") for i in range(8)]
+    normalized = normalize_workspace({"leagues": [draft]})["leagues"][0]
+    assert normalized["mantra_roster_slots"] == {"min": 22, "max": 30}
+    for original, restored in zip(draft["purchases"], normalized["purchases"], strict=True):
+        assert all(restored[key] == value for key, value in original.items())
+    assert can_purchase(normalized, player(100, "Por", "P"))
+
+
+@pytest.mark.parametrize("limits", [{"min": 21, "max": 30}, {"min": 22, "max": 31}, {"min": 30, "max": 22}])
+def test_invalid_mantra_roster_ranges_are_rejected(limits):
+    with pytest.raises(ValueError, match="22 e 30"):
+        league(mantra_roster_slots=limits)
 
 
 def test_mantra_role_parser_and_unknown_roles():
@@ -212,6 +258,10 @@ def test_excel_roundtrip_preserves_mantra_configuration_and_roles():
     raw = build_listone_excel(catalog, draft)
     book = load_workbook(BytesIO(raw), read_only=True)
     assert "Ruolo Mantra" in next(book["Listone"].iter_rows(values_only=True))
+    headers = list(next(book["Listone"].iter_rows(values_only=True)))
+    values = list(next(book["Listone"].iter_rows(min_row=2, values_only=True)))
+    assert values[headers.index("Ruolo")] == "Por"
+    assert values[headers.index("Ruolo Classic")] == "P"
     restore_listone_excel(raw, catalog, draft)
     assert draft["scoring_system"] == "mantra"
     assert draft["purchases"][0]["mantra_role"] == "Por"
@@ -253,11 +303,11 @@ def test_mantra_settings_preserve_slot_counts_and_normalization():
     update_league_settings(draft, name="Test", initial_budget=500, participants=2,
                           game_mode="auction", modifier_enabled=True, captain_enabled=False,
                           roster_slots={"P": 3, "D": 8, "C": 8, "A": 6},
-                          mantra_roster_slots={"P": 2, "movement": 25})
+                          mantra_roster_slots={"min": 22, "max": 28})
     normalized = normalize_workspace({"leagues": [draft]})["leagues"][0]
     assert normalized["scoring_system"] == "mantra"
-    assert normalized["mantra_roster_slots"] == {"P": 2, "movement": 25}
-    assert roster_summary(normalized)["target_size"] == 27
+    assert normalized["mantra_roster_slots"] == {"min": 22, "max": 28}
+    assert roster_summary(normalized)["target_size"] == 28
     assert not normalized["modifier_enabled"]
 
 
@@ -268,6 +318,7 @@ def _mantra_ui_app(section="switch", empty=False):
     from fantasy.ui import (
         _render_scoring_system, _render_mantra_coverage, _render_top_xi_editor,
         _render_matchday_assistant, _render_create_form,
+        _render_manage_form, _render_quick_purchase,
     )
 
     class MemoryStorage:
@@ -292,6 +343,9 @@ def _mantra_ui_app(section="switch", empty=False):
         _render_scoring_system(workspace, draft, storage)
     elif section == "create":
         _render_create_form(workspace, storage, "ui-test")
+    elif section == "manage":
+        _render_manage_form(workspace, draft, storage)
+        _render_quick_purchase(workspace, draft, storage)
     else:
         _render_mantra_coverage(draft, workspace["catalog"])
         _render_top_xi_editor(workspace, draft, storage)
@@ -322,12 +376,47 @@ def test_mantra_coverage_pitch_and_matchday_ui_render(empty):
     assert len(app.selectbox[0].options) == 11
 
 
-def test_mantra_creation_form_uses_movement_capacity_not_classic_quotas():
+def test_mantra_creation_form_uses_total_range_not_positional_quotas():
     from streamlit.testing.v1 import AppTest
     app = AppTest.from_function(_mantra_ui_app, args=("create",)).run()
     app.radio[1].set_value("mantra").run()
     assert not app.exception
     labels = {widget.label for widget in app.number_input}
-    assert "Portieri Mantra" in labels
-    assert "Giocatori di movimento Mantra" in labels
-    assert not {"D", "C", "A"} & labels
+    assert "Minimo giocatori Mantra" in labels
+    assert "Massimo giocatori Mantra" in labels
+    assert not {"P", "D", "C", "A", "Portieri Mantra", "Giocatori di movimento Mantra"} & labels
+
+
+def test_mantra_settings_and_quick_purchase_show_no_classic_role_controls():
+    from streamlit.testing.v1 import AppTest
+    app = AppTest.from_function(_mantra_ui_app, args=("manage",)).run()
+    assert not app.exception
+    labels = {widget.label for widget in app.number_input}
+    assert {"Minimo giocatori Mantra", "Massimo giocatori Mantra"} <= labels
+    assert not {"P", "D", "C", "A", "Portieri Mantra", "Giocatori di movimento Mantra"} & labels
+    assert not any(widget.label == "Ruolo" for widget in app.selectbox)
+    assert app.multiselect[0].label == "Ruoli Mantra"
+    assert "Dc" in app.multiselect[0].options
+    assert "Pc" in app.multiselect[0].options
+
+
+def test_mantra_editor_uses_catalog_roles_even_with_a_classic_cached_frame(monkeypatch):
+    from types import SimpleNamespace
+    from fantasy.catalog import catalog_dataframe
+    from fantasy import ui
+    captured = {}
+
+    def grid(data, **kwargs):
+        captured["data"] = data.copy()
+        return SimpleNamespace(data=data)
+
+    monkeypatch.setattr(ui, "AgGrid", grid)
+    monkeypatch.setattr(ui, "_catalog_injury_statuses", lambda players: {})
+    catalog = eleven()
+    frame = catalog_dataframe(catalog)
+    for column in ("Spesa iniziale", "Spesa aggiornata", "Spesa strategica"):
+        frame[column] = 10
+    draft = league()
+    ui._render_auction_catalog_editor(frame, catalog, draft, {}, None,
+                                      key="test_roles", version_key="test_roles_version", watchlist=set())
+    assert captured["data"]["Ruolo"].tolist() == ["/".join(mantra_roles(p)) for p in catalog]

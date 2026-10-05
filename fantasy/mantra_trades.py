@@ -40,7 +40,7 @@ def mantra_trade_analysis(league, catalog, *, limit=10):
               "reason": "Registra le rose degli avversari per valutare scambi Mantra."}
     if not result["ready"]:
         return result
-    keeper_limit, movement_limit = roster_limits(league)
+    _, maximum = roster_limits(league)
     own_ids = frozenset(str(p["player_id"]) for p in own)
     universe = {str(p["player_id"]): p for p in own}
     for _, roster in rivals:
@@ -55,8 +55,7 @@ def mantra_trade_analysis(league, catalog, *, limit=10):
         return count, sum(_quality(p) for p in selected) + .12 * sum(_quality(p) for p in roster)
 
     def legal(ids):
-        keepers = sum(str(universe[pid].get("role") or "").upper() == "P" for pid in ids)
-        return keepers <= keeper_limit and len(ids) - keepers <= movement_limit
+        return len(ids) <= maximum
 
     def profile(roster, module):
         slots = formation_slots(module)

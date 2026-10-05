@@ -108,7 +108,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.10.05 · Serie A v4 · Fantacalcio v27.0.0")
+    st.caption("Build 2026.10.05 · Serie A v4 · Fantacalcio v27.0.1")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:

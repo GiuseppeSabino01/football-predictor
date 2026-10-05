@@ -12,6 +12,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from fantasy.catalog import catalog_dataframe
+from fantasy.mantra import is_mantra, role_display
 from fantasy.service import (
     GAME_MODE_AUCTION,
     GAME_MODE_LIST,
@@ -53,6 +54,9 @@ def build_listone_excel(catalog: list[dict[str, Any]], league: dict[str, Any]) -
     sheet.title = "Listone"
 
     base_frame = catalog_dataframe(catalog)
+    if is_mantra(league):
+        base_frame["Ruolo Classic"] = base_frame["Ruolo"]
+        base_frame["Ruolo"] = [role_display(player, league) for player in catalog]
     base_headers = [column for column in base_frame.columns if column != "_id"]
     extra_headers = [
         "Propensione bonus",
@@ -278,7 +282,7 @@ def _match_restore_rows(
                 (
                     _restore_key(row.get("Giocatore")),
                     _restore_key(row.get("Squadra")),
-                    _restore_key(row.get("Ruolo")),
+                    _restore_key(row.get("Ruolo Classic") or row.get("Ruolo")),
                 ),
                 [],
             )
@@ -288,7 +292,7 @@ def _match_restore_rows(
                 fallback_candidates = by_name_role.get(
                     (
                         _restore_key(row.get("Giocatore")),
-                        _restore_key(row.get("Ruolo")),
+                        _restore_key(row.get("Ruolo Classic") or row.get("Ruolo")),
                     ),
                     [],
                 )

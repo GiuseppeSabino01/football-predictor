@@ -419,7 +419,7 @@ def simulate_purchase(
         errors.append("Il prezzo supera i crediti rimasti.")
     role_limit = int(league.get("roster_slots", {}).get(role, 0))
     if is_mantra(league) and not can_purchase(league, player):
-        errors.append("Gli slot portieri o movimento Mantra sono gia completi.")
+        errors.append("Hai raggiunto il massimo di giocatori della rosa Mantra.")
     if not is_mantra(league) and summary["role_counts"].get(role, 0) >= role_limit:
         errors.append(f"Gli slot {ROLE_LABELS.get(role, role).lower()} sono gia completi.")
     current_goals = sum(number(row.get("expected_goals")) for row in league.get("purchases", []))

@@ -115,16 +115,14 @@ def best_lineup(players: list[dict[str, Any]], score=None) -> dict[str, Any]:
 
 
 def roster_limits(league: dict[str, Any]) -> tuple[int, int]:
-    slots = league.get("roster_slots", {"P": 3, "D": 7, "C": 7, "A": 5})
+    """Total Mantra roster range, never quotas for individual roles.
+
+    Old P/movement configurations migrate to the requested 22–30 range.
+    """
     configured = league.get("mantra_roster_slots") or {}
-    return int(configured.get("P", slots.get("P", 3))), int(configured.get(
-        "movement", sum(int(slots.get(r, 0)) for r in ("D", "C", "A"))
-    ))
+    return int(configured.get("min", 22)), int(configured.get("max", 30))
 
 
 def can_purchase(league: dict[str, Any], player: dict[str, Any]) -> bool:
-    keepers, movement = roster_limits(league)
-    purchases = league.get("purchases", [])
-    is_keeper = str(player.get("role") or "").upper() == "P"
-    count = sum((str(p.get("role") or "").upper() == "P") == is_keeper for p in purchases)
-    return count < (keepers if is_keeper else movement)
+    _, maximum = roster_limits(league)
+    return len(league.get("purchases", [])) < maximum

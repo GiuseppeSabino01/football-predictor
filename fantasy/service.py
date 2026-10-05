@@ -121,19 +121,17 @@ def create_league(
     slots = {role: int((roster_slots or DEFAULT_ROSTER_SLOTS).get(role, 0)) for role in ROLE_LABELS}
     if any(value < 0 for value in slots.values()) or sum(slots.values()) == 0:
         raise ValueError("La composizione della rosa non e valida.")
-    if scoring_system == MANTRA:
-        limits = mantra_roster_slots or {"P": slots["P"], "movement": sum(slots[r] for r in ("D", "C", "A"))}
-        if int(limits.get("P", 0)) < 1 or int(limits.get("movement", 0)) < 10:
-            raise ValueError("Per Mantra servono almeno un portiere e 10 giocatori di movimento.")
+    limits = {"min": 22, "max": 30, **(mantra_roster_slots or {})}
+    minimum, maximum = int(limits["min"]), int(limits["max"])
+    if not 22 <= minimum <= maximum <= 30:
+        raise ValueError("La rosa Mantra deve avere un minimo e un massimo compresi tra 22 e 30 giocatori.")
     league = {
         "id": uuid4().hex,
         "name": clean_name,
         "season": season.strip() or "2026/27",
         "game_mode": game_mode,
         "scoring_system": scoring_system,
-        "mantra_roster_slots": deepcopy(mantra_roster_slots or {
-            "P": slots["P"], "movement": sum(slots[r] for r in ("D", "C", "A"))
-        }),
+        "mantra_roster_slots": {"min": minimum, "max": maximum},
         "initial_budget": int(initial_budget),
         "participants": int(participants) if game_mode == GAME_MODE_AUCTION else None,
         "roster_slots": slots,
@@ -228,17 +226,15 @@ def update_league_settings(
     if any(value < 0 for value in slots.values()) or sum(slots.values()) == 0:
         raise ValueError("La composizione della rosa non e valida.")
     if mantra_roster_slots is not None:
-        keepers = int(mantra_roster_slots.get("P", 0))
-        movement = int(mantra_roster_slots.get("movement", 0))
-        if keepers < 1 or movement < 10:
-            raise ValueError("Per Mantra servono almeno un portiere e 10 giocatori di movimento.")
+        minimum, maximum = roster_limits({"mantra_roster_slots": mantra_roster_slots})
+        if not 22 <= minimum <= maximum <= 30:
+            raise ValueError("La rosa Mantra deve avere un minimo e un massimo compresi tra 22 e 30 giocatori.")
         for roster in [league.get("purchases", []), *[
             manager.get("purchases", []) for manager in league.get("auction_managers", [])
             if not manager.get("is_user")
         ]]:
-            keeper_count = sum(str(p.get("role") or "").upper() == "P" for p in roster)
-            if keeper_count > keepers or len(roster) - keeper_count > movement:
-                raise ValueError("I limiti Mantra non possono essere inferiori agli acquisti gia presenti.")
+            if len(roster) > maximum:
+                raise ValueError("Il massimo della rosa Mantra non puo essere inferiore agli acquisti gia presenti.")
     current_counts = roster_summary(league)["role_counts"] if not is_mantra(league) else {}
     for role, count in current_counts.items():
         if slots[role] < count:
@@ -259,7 +255,7 @@ def update_league_settings(
         }
     )
     if mantra_roster_slots is not None:
-        league["mantra_roster_slots"] = {"P": keepers, "movement": movement}
+        league["mantra_roster_slots"] = {"min": minimum, "max": maximum}
     if is_mantra(league):
         league["modifier_enabled"] = False
     if not captain_enabled:
@@ -314,11 +310,11 @@ def set_scoring_system(league: dict[str, Any], system: str) -> None:
                 if count > int(slots.get(role, 0)):
                     raise ValueError(f"Per tornare a Classic aumenta prima gli slot {label.lower()}: una rosa ne contiene {count}.")
     else:
-        keepers, movement = roster_limits(league)
+        minimum, maximum = roster_limits(league)
         for roster in rosters:
-            count = sum(str(p.get("role") or "").upper() == "P" for p in roster)
-            if count > keepers or len(roster) - count > movement:
-                raise ValueError("Aumenta prima i limiti della rosa Mantra: una squadra ha gia piu acquisti.")
+            if len(roster) > maximum:
+                raise ValueError("Una squadra supera il massimo di giocatori della rosa Mantra.")
+        league["mantra_roster_slots"] = {"min": minimum, "max": maximum}
         league["classic_modifier_enabled"] = bool(league.get("modifier_enabled"))
     league["scoring_system"] = system
     league["modifier_enabled"] = False if system == MANTRA else bool(league.get("classic_modifier_enabled", True))
@@ -568,7 +564,7 @@ def simulate_auction_purchases(
             player = available_by_role[role].pop()
             legal_max = int(
                 summary["remaining_budget"]
-                - min_bid * (summary["remaining_slots"] - 1)
+                - min_bid * max(summary["minimum_remaining_slots"] - 1, 0)
             )
             if legal_max < min_bid:
                 raise ValueError(
@@ -1231,7 +1227,7 @@ def auction_price_board(
         if not manager.get("is_user")
     ]
     highest_opponent_credit = max(opponent_credits, default=budget)
-    remaining_slots = int(user_summary["remaining_slots"] if user_summary else 0)
+    remaining_slots = int(user_summary["minimum_remaining_slots"] if user_summary else 0)
     own_credit = float(user_summary["remaining_budget"] if user_summary else budget)
     min_bid = max(_number(league.get("min_bid")), 1.0)
     affordable = max(
@@ -1440,7 +1436,7 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
         raise ValueError("Ruolo non riconosciuto.")
     role_limit = int(league.get("roster_slots", DEFAULT_ROSTER_SLOTS).get(role, 0))
     if is_mantra(league) and not can_purchase(league, player):
-        raise ValueError("Hai completato gli slot portieri o giocatori di movimento Mantra.")
+        raise ValueError("Hai raggiunto il massimo di giocatori della rosa Mantra.")
     if not is_mantra(league) and summary["role_counts"][role] >= role_limit:
         raise ValueError(f"Hai gia completato gli slot {ROLE_LABELS[role].lower()}.")
 
@@ -2541,25 +2537,29 @@ def roster_summary(league: dict[str, Any]) -> dict[str, Any]:
     initial_budget = float(league.get("initial_budget", 0) or 0)
     remaining_slots = sum(missing.values())
     target_size = sum(int(value) for value in slots.values())
+    minimum_size = target_size
+    minimum_remaining_slots = remaining_slots
+    complete = remaining_slots == 0
     if is_mantra(league):
-        keepers, movement = roster_limits(league)
-        target_size = keepers + movement
-        missing_keepers = max(keepers - role_counts["P"], 0)
-        missing_movement = max(movement - len(purchases) + role_counts["P"], 0)
-        # D/C/A values remain compatibility keys, not mandatory role quotas.
-        missing = {"P": missing_keepers, "D": missing_movement, "C": missing_movement, "A": missing_movement}
-        remaining_slots = missing_keepers + missing_movement
+        minimum_size, target_size = roster_limits(league)
+        remaining_slots = max(target_size - len(purchases), 0)
+        minimum_remaining_slots = max(minimum_size - len(purchases), 0)
+        # Compatibility keys only: every role can use all remaining places.
+        missing = {role: remaining_slots for role in ROLE_LABELS}
+        complete = minimum_size <= len(purchases) <= target_size
     remaining_budget = max(initial_budget - spent, 0.0)
     return {
         "spent": spent,
         "remaining_budget": remaining_budget,
         "remaining_slots": remaining_slots,
+        "minimum_remaining_slots": minimum_remaining_slots,
         "credits_per_slot": remaining_budget / remaining_slots if remaining_slots else remaining_budget,
         "role_counts": role_counts,
         "missing": missing,
         "roster_size": len(purchases),
         "target_size": target_size,
-        "complete": remaining_slots == 0,
+        "minimum_size": minimum_size,
+        "complete": complete,
         "expected_goals": sum(_number(row.get("expected_goals")) for row in purchases),
         "expected_assists": sum(_number(row.get("expected_assists")) for row in purchases),
         "modifier_ready": not is_mantra(league) and role_counts["P"] >= 1 and role_counts["D"] >= 4,
@@ -2624,6 +2624,11 @@ def _normalize_league(league: dict[str, Any]) -> None:
         league["scoring_system"] = CLASSIC
     if is_mantra(league):
         league["modifier_enabled"] = False
+    minimum, maximum = roster_limits(league)
+    # Drop legacy positional limits, including in old saved sessions.
+    if not 22 <= minimum <= maximum <= 30:
+        minimum, maximum = 22, 30
+    league["mantra_roster_slots"] = {"min": minimum, "max": maximum}
     league.setdefault("participants", 10 if league["game_mode"] == GAME_MODE_AUCTION else None)
     if league["game_mode"] == GAME_MODE_LIST:
         league["participants"] = None
