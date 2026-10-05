@@ -6,6 +6,7 @@ from hashlib import sha1
 from typing import Any, Iterable
 
 from fantasy.service import FORMATIONS, ROLE_LABELS, roster_summary
+from fantasy.mantra import is_mantra, best_lineup, can_purchase, mantra_roles
 
 FIXTURE_SOURCE_URL = (
     "https://www.legaseriea.it/serie-a/news/"
@@ -291,7 +292,10 @@ def recommend_lineup(
         player for player in players if not player.get("availability_unavailable")
     ]
     candidates: list[dict[str, Any]] = []
-    for formation, required in FORMATIONS.items():
+    if is_mantra(league):
+        best = best_lineup(available_players, lambda p: number(p.get("decision_score")))
+        candidates = [best] if best["complete"] else []
+    for formation, required in ({} if is_mantra(league) else FORMATIONS).items():
         selected: list[dict[str, Any]] = []
         feasible = True
         for role, count in required.items():
@@ -316,15 +320,16 @@ def recommend_lineup(
                 }
             )
     if not candidates:
-        fallback = sorted(
+        fallback = best["players"] if is_mantra(league) else sorted(
             available_players,
             key=lambda player: number(player.get("decision_score")),
             reverse=True,
         )[:11]
         return {
-            "formation": None,
+            "formation": best["formation"] if is_mantra(league) else None,
             "players": fallback,
-            "bench": [player for player in players if player not in fallback],
+            "bench": [player for player in players if str(player.get("player_id")) not in
+                      {str(selected.get("player_id")) for selected in fallback}],
             "captain": fallback[0] if fallback else None,
             "complete": False,
             "score": sum(number(player.get("decision_score")) for player in fallback),
@@ -368,10 +373,12 @@ def best_rotation_pairs(
     strengths = team_strengths(catalog)
     pairs: list[dict[str, Any]] = []
     purchases = league.get("purchases", [])
-    for role in ROLE_LABELS:
-        role_players = [player for player in purchases if player.get("role") == role]
+    for role in ([None] if is_mantra(league) else ROLE_LABELS):
+        role_players = purchases if is_mantra(league) else [player for player in purchases if player.get("role") == role]
         for first_index, first in enumerate(role_players):
             for second in role_players[first_index + 1:]:
+                if is_mantra(league) and not (set(mantra_roles(first)) & set(mantra_roles(second))):
+                    continue
                 if normalize_team(first.get("team")) == normalize_team(second.get("team")):
                     continue
                 first_fixtures = fixtures_for_team(first.get("team"), start_matchday=start_matchday, limit=limit)
@@ -387,7 +394,7 @@ def best_rotation_pairs(
                 ]
                 pairs.append(
                     {
-                        "role": role,
+                        "role": "/".join(sorted(set(mantra_roles(first)) & set(mantra_roles(second)))) if is_mantra(league) else role,
                         "first": first,
                         "second": second,
                         "average_difficulty": round(sum(best_each_week) / len(best_each_week), 2),
@@ -411,7 +418,9 @@ def simulate_purchase(
     if price > summary["remaining_budget"]:
         errors.append("Il prezzo supera i crediti rimasti.")
     role_limit = int(league.get("roster_slots", {}).get(role, 0))
-    if summary["role_counts"].get(role, 0) >= role_limit:
+    if is_mantra(league) and not can_purchase(league, player):
+        errors.append("Gli slot portieri o movimento Mantra sono gia completi.")
+    if not is_mantra(league) and summary["role_counts"].get(role, 0) >= role_limit:
         errors.append(f"Gli slot {ROLE_LABELS.get(role, role).lower()} sono gia completi.")
     current_goals = sum(number(row.get("expected_goals")) for row in league.get("purchases", []))
     current_assists = sum(number(row.get("expected_assists")) for row in league.get("purchases", []))

@@ -9,6 +9,11 @@ from math import tanh
 from typing import Any
 from uuid import uuid4
 
+from fantasy.mantra import (
+    CLASSIC, MANTRA, MANTRA_FORMATIONS, best_lineup, can_purchase,
+    is_mantra, mantra_roles, roster_limits, solve_lineup,
+)
+
 DEFAULT_ROSTER_SLOTS = {"P": 3, "D": 7, "C": 7, "A": 5}
 GAME_MODE_AUCTION = "auction"
 GAME_MODE_LIST = "list"
@@ -98,6 +103,8 @@ def create_league(
     modifier_enabled: bool = True,
     captain_enabled: bool = False,
     game_mode: str = GAME_MODE_AUCTION,
+    scoring_system: str = CLASSIC,
+    mantra_roster_slots: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     clean_name = name.strip()
     if not clean_name:
@@ -106,21 +113,31 @@ def create_league(
         raise ValueError("Il budget deve essere maggiore di zero.")
     if game_mode not in GAME_MODES:
         raise ValueError("Modalita di gioco non riconosciuta.")
+    if scoring_system not in {CLASSIC, MANTRA} or (scoring_system == MANTRA and game_mode != GAME_MODE_AUCTION):
+        raise ValueError("Mantra e disponibile come configurazione dell'asta.")
     if game_mode == GAME_MODE_AUCTION and (participants is None or participants < 2):
         raise ValueError("Servono almeno due partecipanti.")
     now = utc_now()
     slots = {role: int((roster_slots or DEFAULT_ROSTER_SLOTS).get(role, 0)) for role in ROLE_LABELS}
     if any(value < 0 for value in slots.values()) or sum(slots.values()) == 0:
         raise ValueError("La composizione della rosa non e valida.")
+    if scoring_system == MANTRA:
+        limits = mantra_roster_slots or {"P": slots["P"], "movement": sum(slots[r] for r in ("D", "C", "A"))}
+        if int(limits.get("P", 0)) < 1 or int(limits.get("movement", 0)) < 10:
+            raise ValueError("Per Mantra servono almeno un portiere e 10 giocatori di movimento.")
     league = {
         "id": uuid4().hex,
         "name": clean_name,
         "season": season.strip() or "2026/27",
         "game_mode": game_mode,
+        "scoring_system": scoring_system,
+        "mantra_roster_slots": deepcopy(mantra_roster_slots or {
+            "P": slots["P"], "movement": sum(slots[r] for r in ("D", "C", "A"))
+        }),
         "initial_budget": int(initial_budget),
         "participants": int(participants) if game_mode == GAME_MODE_AUCTION else None,
         "roster_slots": slots,
-        "modifier_enabled": bool(modifier_enabled),
+        "modifier_enabled": bool(modifier_enabled) if scoring_system == CLASSIC else False,
         "captain_enabled": bool(captain_enabled),
         "captain_player_id": None,
         "purchases": [],
@@ -165,6 +182,7 @@ def update_league_settings(
     modifier_enabled: bool,
     captain_enabled: bool,
     roster_slots: dict[str, int],
+    mantra_roster_slots: dict[str, int] | None = None,
 ) -> None:
     clean_name = name.strip()
     spent = sum(_number(row.get("price")) for row in league.get("purchases", []))
@@ -209,7 +227,19 @@ def update_league_settings(
     slots = {role: int(roster_slots.get(role, 0)) for role in ROLE_LABELS}
     if any(value < 0 for value in slots.values()) or sum(slots.values()) == 0:
         raise ValueError("La composizione della rosa non e valida.")
-    current_counts = roster_summary(league)["role_counts"]
+    if mantra_roster_slots is not None:
+        keepers = int(mantra_roster_slots.get("P", 0))
+        movement = int(mantra_roster_slots.get("movement", 0))
+        if keepers < 1 or movement < 10:
+            raise ValueError("Per Mantra servono almeno un portiere e 10 giocatori di movimento.")
+        for roster in [league.get("purchases", []), *[
+            manager.get("purchases", []) for manager in league.get("auction_managers", [])
+            if not manager.get("is_user")
+        ]]:
+            keeper_count = sum(str(p.get("role") or "").upper() == "P" for p in roster)
+            if keeper_count > keepers or len(roster) - keeper_count > movement:
+                raise ValueError("I limiti Mantra non possono essere inferiori agli acquisti gia presenti.")
+    current_counts = roster_summary(league)["role_counts"] if not is_mantra(league) else {}
     for role, count in current_counts.items():
         if slots[role] < count:
             raise ValueError(
@@ -228,9 +258,14 @@ def update_league_settings(
             "updated_at": utc_now(),
         }
     )
+    if mantra_roster_slots is not None:
+        league["mantra_roster_slots"] = {"P": keepers, "movement": movement}
+    if is_mantra(league):
+        league["modifier_enabled"] = False
     if not captain_enabled:
         league["captain_player_id"] = None
     if game_mode == GAME_MODE_LIST:
+        league["scoring_system"] = CLASSIC
         for purchase in league.get("purchases", []):
             if purchase.get("quote") is not None:
                 purchase["price"] = _number(purchase.get("quote"))
@@ -257,6 +292,43 @@ def delete_league(workspace: dict[str, Any], league_id: str) -> None:
 
 def find_league(workspace: dict[str, Any], league_id: str | None) -> dict[str, Any] | None:
     return next((league for league in workspace.get("leagues", []) if league.get("id") == league_id), None)
+
+
+def set_scoring_system(league: dict[str, Any], system: str) -> None:
+    """Change one auction's rules without replacing any purchase or manager."""
+    if system not in {CLASSIC, MANTRA}:
+        raise ValueError("Sistema non riconosciuto: scegli Classic o Mantra.")
+    if system == MANTRA and league.get("game_mode") != GAME_MODE_AUCTION:
+        raise ValueError("Mantra e disponibile solo per le aste.")
+    if system == league.get("scoring_system", CLASSIC):
+        return
+    rosters = [league.get("purchases", []), *[
+        manager.get("purchases", []) for manager in league.get("auction_managers", [])
+        if not manager.get("is_user")
+    ]]
+    if system == CLASSIC:
+        slots = league.get("roster_slots", DEFAULT_ROSTER_SLOTS)
+        for roster in rosters:
+            for role, label in ROLE_LABELS.items():
+                count = sum(str(p.get("role") or "").upper() == role for p in roster)
+                if count > int(slots.get(role, 0)):
+                    raise ValueError(f"Per tornare a Classic aumenta prima gli slot {label.lower()}: una rosa ne contiene {count}.")
+    else:
+        keepers, movement = roster_limits(league)
+        for roster in rosters:
+            count = sum(str(p.get("role") or "").upper() == "P" for p in roster)
+            if count > keepers or len(roster) - count > movement:
+                raise ValueError("Aumenta prima i limiti della rosa Mantra: una squadra ha gia piu acquisti.")
+        league["classic_modifier_enabled"] = bool(league.get("modifier_enabled"))
+    league["scoring_system"] = system
+    league["modifier_enabled"] = False if system == MANTRA else bool(league.get("classic_modifier_enabled", True))
+    league["preferred_xi"] = []
+    league["preferred_xi_customized"] = False
+    league["preferred_formation"] = None
+    league["analysis"] = ""
+    _invalidate_sasa(league)
+    _bump_auction_state(league)
+    league["updated_at"] = utc_now()
 
 
 def auction_managers(league: dict[str, Any]) -> list[dict[str, Any]]:
@@ -328,6 +400,9 @@ def auction_manager_summary(league: dict[str, Any], manager_id: str) -> dict[str
         raise ValueError("Partecipante non trovato.")
     purchases = league.get("purchases", []) if manager.get("is_user") else manager.get("purchases", [])
     draft = {
+        "game_mode": league.get("game_mode"),
+        "scoring_system": league.get("scoring_system", CLASSIC),
+        "mantra_roster_slots": league.get("mantra_roster_slots"),
         "initial_budget": league.get("initial_budget", 0),
         "roster_slots": league.get("roster_slots", DEFAULT_ROSTER_SLOTS),
         "purchases": purchases,
@@ -398,6 +473,8 @@ def record_auction_purchase(
     else:
         draft = {
             "game_mode": GAME_MODE_AUCTION,
+            "scoring_system": league.get("scoring_system", CLASSIC),
+            "mantra_roster_slots": deepcopy(league.get("mantra_roster_slots")),
             "initial_budget": league.get("initial_budget", 0),
             "roster_slots": deepcopy(league.get("roster_slots", DEFAULT_ROSTER_SLOTS)),
             "purchases": deepcopy(manager.get("purchases", [])),
@@ -750,6 +827,8 @@ def run_auction_multiverse(
     mode: str = "standard",
     seed: int | None = None,
 ) -> dict[str, Any]:
+    if is_mantra(league):
+        raise ValueError("Il Multiverso Classic non valuta le posizioni Mantra. Usa la copertura tattica Mantra.")
     from fantasy.multiverse import simulate_multiverse
 
     snapshot = build_auction_snapshot(league, catalog)
@@ -1120,8 +1199,13 @@ def auction_price_board(
         return {}
     managers = auction_managers(league)
     budget = float(league.get("initial_budget", 0) or 0)
+    def pricing_player(player):
+        if not is_mantra(league):
+            return player
+        return {**player, "fvm": player.get("mantra_fvm"),
+                "quote": player.get("mantra_quote", player.get("quote"))}
     baseline_by_id = {
-        str(player.get("id")): _initial_auction_price(player, budget) for player in catalog
+        str(player.get("id")): _initial_auction_price(pricing_player(player), budget) for player in catalog
     }
     groups: dict[tuple[str, str], list[float]] = {}
     catalog_by_id = {str(player.get("id")): player for player in catalog}
@@ -1130,10 +1214,10 @@ def auction_price_board(
         for purchase in purchases:
             player_id = str(purchase.get("player_id"))
             comparable = catalog_by_id.get(player_id, purchase)
-            baseline = baseline_by_id.get(player_id) or _initial_auction_price(comparable, budget)
+            baseline = baseline_by_id.get(player_id) or _initial_auction_price(pricing_player(comparable), budget)
             if baseline <= 0:
                 continue
-            group = _auction_comparable_group(comparable)
+            group = ("/".join(mantra_roles(comparable)), "ruolo Mantra") if is_mantra(league) else _auction_comparable_group(comparable)
             ratio = max(0.35, min(_number(purchase.get("price")) / baseline, 2.25))
             groups.setdefault(group, []).append(ratio)
 
@@ -1173,11 +1257,14 @@ def auction_price_board(
         player_id = str(player.get("id"))
         role = str(player.get("role") or "").upper()
         initial = baseline_by_id[player_id]
-        comparable_ratios = groups.get(_auction_comparable_group(player), [])
+        group = ("/".join(mantra_roles(player)), "ruolo Mantra") if is_mantra(league) else _auction_comparable_group(player)
+        comparable_ratios = groups.get(group, [])
         market_factor = _robust_average(comparable_ratios) if comparable_ratios else 1.0
         cross_role_factor, other_departments_delta = role_pressure.get(
             role, (1.0, 0.0)
         )
+        if is_mantra(league):
+            cross_role_factor, other_departments_delta = 1.0, 0.0
         updated = (
             max(1.0, round(initial * market_factor * cross_role_factor))
             if initial > 0
@@ -1186,6 +1273,8 @@ def auction_price_board(
         role_is_open = bool(
             user_summary and user_summary.get("missing", {}).get(role, 0) > 0
         )
+        if is_mantra(league):
+            role_is_open = can_purchase(league, player)
         if role_is_open:
             updated = min(updated, affordable)
         strategic = min(updated, highest_opponent_credit + 1, affordable)
@@ -1194,7 +1283,8 @@ def auction_price_board(
             "updated": updated,
             "strategic": max(strategic, 0.0),
             "comparables": len(comparable_ratios),
-            "group": _auction_comparable_group(player)[1],
+            "group": group[1],
+            "price_source": "FVM Mantra" if is_mantra(league) and player.get("mantra_fvm") else "Modello analitico" if is_mantra(league) else "FVM Classic",
             "highest_opponent_credit": highest_opponent_credit,
             "cross_role_factor": cross_role_factor,
             "other_departments_delta": other_departments_delta,
@@ -1349,7 +1439,9 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
     if role not in ROLE_LABELS:
         raise ValueError("Ruolo non riconosciuto.")
     role_limit = int(league.get("roster_slots", DEFAULT_ROSTER_SLOTS).get(role, 0))
-    if summary["role_counts"][role] >= role_limit:
+    if is_mantra(league) and not can_purchase(league, player):
+        raise ValueError("Hai completato gli slot portieri o giocatori di movimento Mantra.")
+    if not is_mantra(league) and summary["role_counts"][role] >= role_limit:
         raise ValueError(f"Hai gia completato gli slot {ROLE_LABELS[role].lower()}.")
 
     purchase = {
@@ -1357,6 +1449,9 @@ def add_purchase(league: dict[str, Any], player: dict[str, Any], price: float) -
         "name": str(player.get("name", "")).strip(),
         "team": str(player.get("team", "")).strip(),
         "role": role,
+        "mantra_role": "/".join(mantra_roles(player)),
+        "mantra_quote": _optional_number(player.get("mantra_quote")),
+        "mantra_fvm": _optional_number(player.get("mantra_fvm")),
         "price": clean_price,
         "quote": _optional_number(player.get("quote")),
         "fvm": _optional_number(player.get("fvm")),
@@ -1630,6 +1725,9 @@ def auction_trade_analysis(
     limit: int = 10,
 ) -> dict[str, Any]:
     """Find realistic 1x1, 2x2 and 3x3 trades that benefit both managers."""
+    if is_mantra(league):
+        from fantasy.mantra_trades import mantra_trade_analysis
+        return mantra_trade_analysis(league, catalog, limit=limit)
     result: dict[str, Any] = {
         "ready": False,
         "reason": "",
@@ -2275,10 +2373,15 @@ def selected_top_xi(league: dict[str, Any]) -> list[dict[str, Any]]:
             for player_id in league.get("preferred_xi", [])
             if str(player_id) in by_id
         ][:11]
-        return [by_id[player_id] for player_id in selected_ids]
+        selected = [by_id[player_id] for player_id in selected_ids]
+        if is_mantra(league):
+            return solve_lineup(selected, top_xi_formation(league))
+        return selected
     formation = top_xi_formation(league)
     formation_players = top_xi_for_formation(league, formation)
     if len(formation_players) == 11:
+        return formation_players
+    if is_mantra(league):
         return formation_players
     return sorted(
         purchases,
@@ -2293,6 +2396,10 @@ def selected_top_xi(league: dict[str, Any]) -> list[dict[str, Any]]:
 
 def top_xi_formation(league: dict[str, Any]) -> str:
     preferred = str(league.get("preferred_formation") or "")
+    if is_mantra(league):
+        if preferred in MANTRA_FORMATIONS:
+            return preferred
+        return best_lineup(league.get("purchases", []), lambda p: _number(p.get("price")))["formation"]
     if preferred in FORMATIONS:
         return preferred
     candidates = [
@@ -2307,6 +2414,8 @@ def top_xi_formation(league: dict[str, Any]) -> str:
 
 
 def top_xi_for_formation(league: dict[str, Any], formation: str) -> list[dict[str, Any]]:
+    if is_mantra(league):
+        return solve_lineup(league.get("purchases", []), formation, lambda p: _number(p.get("price")))
     required = FORMATIONS.get(formation)
     if not required:
         return []
@@ -2337,19 +2446,28 @@ def set_preferred_xi(
     purchased_ids = {str(row.get("player_id")) for row in league.get("purchases", [])}
     if any(player_id not in purchased_ids for player_id in clean_ids):
         raise ValueError("La Top 11 puo contenere solo giocatori della tua rosa.")
+    by_id = {str(row.get("player_id")): row for row in league.get("purchases", [])}
     if formation is not None:
-        required = FORMATIONS.get(formation)
+        required = MANTRA_FORMATIONS.get(formation) if is_mantra(league) else FORMATIONS.get(formation)
         if not required:
             raise ValueError("Modulo non riconosciuto.")
-        by_id = {str(row.get("player_id")): row for row in league.get("purchases", [])}
-        role_counts = {role: 0 for role in ROLE_LABELS}
-        for player_id in clean_ids:
-            role = str(by_id[player_id].get("role", ""))
-            if role in role_counts:
-                role_counts[role] += 1
-        if any(role_counts[role] != int(required.get(role, 0)) for role in ROLE_LABELS):
-            raise ValueError(f"I giocatori scelti non rispettano il modulo {formation}.")
+        if is_mantra(league):
+            if len(solve_lineup([by_id[key] for key in clean_ids], formation)) != 11:
+                raise ValueError(f"I ruoli Mantra scelti non coprono il modulo {formation} senza malus.")
+        else:
+            role_counts = {role: 0 for role in ROLE_LABELS}
+            for player_id in clean_ids:
+                role = str(by_id[player_id].get("role", ""))
+                if role in role_counts:
+                    role_counts[role] += 1
+            if any(role_counts[role] != int(required.get(role, 0)) for role in ROLE_LABELS):
+                raise ValueError(f"I giocatori scelti non rispettano il modulo {formation}.")
         league["preferred_formation"] = formation
+    elif is_mantra(league):
+        best = best_lineup([by_id[key] for key in clean_ids])
+        if not best["complete"]:
+            raise ValueError("I giocatori scelti non formano un undici Mantra valido.")
+        league["preferred_formation"] = best["formation"]
     league["preferred_xi"] = clean_ids
     league["preferred_xi_customized"] = True
     _invalidate_sasa(league)
@@ -2358,7 +2476,7 @@ def set_preferred_xi(
 
 def reset_preferred_xi(league: dict[str, Any], *, formation: str | None = None) -> None:
     if formation is not None:
-        if formation not in FORMATIONS:
+        if formation not in (MANTRA_FORMATIONS if is_mantra(league) else FORMATIONS):
             raise ValueError("Modulo non riconosciuto.")
         league["preferred_formation"] = formation
     league["preferred_xi"] = []
@@ -2422,6 +2540,15 @@ def roster_summary(league: dict[str, Any]) -> dict[str, Any]:
     spent = sum(_number(row.get("price")) for row in purchases)
     initial_budget = float(league.get("initial_budget", 0) or 0)
     remaining_slots = sum(missing.values())
+    target_size = sum(int(value) for value in slots.values())
+    if is_mantra(league):
+        keepers, movement = roster_limits(league)
+        target_size = keepers + movement
+        missing_keepers = max(keepers - role_counts["P"], 0)
+        missing_movement = max(movement - len(purchases) + role_counts["P"], 0)
+        # D/C/A values remain compatibility keys, not mandatory role quotas.
+        missing = {"P": missing_keepers, "D": missing_movement, "C": missing_movement, "A": missing_movement}
+        remaining_slots = missing_keepers + missing_movement
     remaining_budget = max(initial_budget - spent, 0.0)
     return {
         "spent": spent,
@@ -2431,16 +2558,24 @@ def roster_summary(league: dict[str, Any]) -> dict[str, Any]:
         "role_counts": role_counts,
         "missing": missing,
         "roster_size": len(purchases),
-        "target_size": sum(int(value) for value in slots.values()),
+        "target_size": target_size,
         "complete": remaining_slots == 0,
         "expected_goals": sum(_number(row.get("expected_goals")) for row in purchases),
         "expected_assists": sum(_number(row.get("expected_assists")) for row in purchases),
-        "modifier_ready": role_counts["P"] >= 1 and role_counts["D"] >= 4,
+        "modifier_ready": not is_mantra(league) and role_counts["P"] >= 1 and role_counts["D"] >= 4,
     }
 
 
 def suggest_lineup(league: dict[str, Any]) -> dict[str, Any] | None:
     purchases = league.get("purchases", [])
+    if is_mantra(league):
+        best = best_lineup(purchases)
+        if not best["complete"]:
+            return None
+        return {**best, "players": {
+            role: [p for p in best["players"] if p.get("role") == role]
+            for role in ROLE_LABELS
+        }}
     by_role = {
         role: sorted(
             (row for row in purchases if row.get("role") == role),
@@ -2485,6 +2620,10 @@ def _normalize_league(league: dict[str, Any]) -> None:
     league.setdefault("game_mode", GAME_MODE_AUCTION)
     if league.get("game_mode") not in GAME_MODES:
         league["game_mode"] = GAME_MODE_AUCTION
+    if league.get("scoring_system") not in {CLASSIC, MANTRA} or league["game_mode"] != GAME_MODE_AUCTION:
+        league["scoring_system"] = CLASSIC
+    if is_mantra(league):
+        league["modifier_enabled"] = False
     league.setdefault("participants", 10 if league["game_mode"] == GAME_MODE_AUCTION else None)
     if league["game_mode"] == GAME_MODE_LIST:
         league["participants"] = None

@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from fantasy.mantra import mantra_roles
 
 from fantasy.analytics import bonus_propensity
 from fantasy.catalog import make_player_id, normalize_catalog_dataframe, normalize_role
@@ -102,6 +103,10 @@ def fetch_official_catalog(timeout: int = 18) -> dict:
         if not _valid_role_distribution(players):
             players = parse_official_html(html, load_seed_catalog())
             method = "Pagina ufficiale"
+        else:
+            # The official XLSX may expose only Classic prices. Enrich it
+            # with the separate, explicitly labelled Mantra columns in HTML.
+            players = _merge_official_updates(players, parse_official_html(html, players))
         transfers = _download_official_transfers(session, headers, timeout)
         removed_count = 0
         moved_count = 0
@@ -211,13 +216,32 @@ def parse_official_html(
                     "name": name,
                     "team": team,
                     "role": role,
-                    "initial_quote": numbers[0],
-                    "quote": numbers[1],
-                    "fvm": numbers[-1],
+                    "initial_quote": _official_cell(row, "c_qi", numbers[0]),
+                    "quote": _official_cell(row, "c_qa", numbers[1]),
+                    "fvm": _official_cell(row, "c_fvm", numbers[-1]),
+                    "mantra_role": _detect_mantra_role(row),
+                    "mantra_initial_quote": _official_cell(row, "m_qi"),
+                    "mantra_quote": _official_cell(row, "m_qa"),
+                    "mantra_fvm": _official_cell(row, "m_fvm"),
                     "source": "Fantacalcio.it",
                 }
             )
     return players
+
+
+def _official_cell(row, key: str, fallback=None):
+    cell = row.select_one(f'[data-col-key="{key}"]')
+    value = _number_from_text(cell.get_text(" ", strip=True)) if cell else None
+    return value if value is not None else fallback
+
+
+def _detect_mantra_role(row) -> str:
+    roles = mantra_roles(row.get("data-filter-role-mantra"))
+    if not roles:
+        roles = mantra_roles([
+            tag.get("data-value") for tag in row.select(".role-mantra[data-value]")
+        ])
+    return "/".join(roles)
 
 
 def parse_official_transfers_html(html: str) -> list[dict]:
@@ -326,6 +350,9 @@ def catalog_fingerprint(players: list[dict]) -> tuple:
                 str(player.get("id", "")),
                 str(player.get("team", "")),
                 str(player.get("role", "")),
+                str(player.get("mantra_role", "")),
+                _number(player.get("mantra_quote")),
+                _number(player.get("mantra_fvm")),
                 _number(player.get("quote")),
                 _number(player.get("fvm")),
                 _number(player.get("bonus")),
@@ -426,7 +453,7 @@ def _merge_official(base: list[dict], official: list[dict]) -> list[dict]:
             by_id[str(copied.get("id"))] = copied
             by_name.setdefault(_normalize_name(copied.get("name")), []).append(copied)
             continue
-        for field in ("name", "team", "initial_quote", "quote", "fvm", "source"):
+        for field in ("name", "team", "initial_quote", "quote", "fvm", "source", "mantra_role", "mantra_quote", "mantra_fvm", "mantra_initial_quote"):
             if update.get(field) not in (None, ""):
                 target[field] = update[field]
     return base
@@ -446,7 +473,14 @@ def _authoritative_official_catalog(
         stable_id = str(enriched.get("id")) if enriched else ""
         stable_role = str(enriched.get("role")) if enriched else ""
         player = deepcopy(enriched) if enriched else {}
+        # An offline/older listone can lack the optional Mantra columns. Keep
+        # verified seed roles in that case instead of clearing them.
+        known_mantra = {field: player.get(field) for field in
+                       ("mantra_role", "mantra_quote", "mantra_fvm", "mantra_initial_quote")}
         player.update(deepcopy(update))
+        for field, value in known_mantra.items():
+            if player.get(field) in (None, "") and value not in (None, ""):
+                player[field] = value
         if stable_id:
             player["id"] = stable_id
         if stable_role:

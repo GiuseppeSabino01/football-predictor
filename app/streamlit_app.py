@@ -25,6 +25,8 @@ import fantasy.catalog_estimates as fantasy_catalog_estimates
 import fantasy.decision_center as fantasy_decision_center
 import fantasy.export as fantasy_export
 import fantasy.injuries as fantasy_injuries
+import fantasy.mantra as fantasy_mantra
+import fantasy.mantra_trades as fantasy_mantra_trades
 import fantasy.official_catalog as fantasy_official_catalog
 import fantasy.player_history as fantasy_player_history
 import fantasy.service as fantasy_service
@@ -79,6 +81,8 @@ def fresh_prediction_service():
 
 def fresh_fantasy_ui():
     """Ricarica i moduli Fantacalcio nell'ordine delle loro dipendenze."""
+    importlib.reload(fantasy_mantra)
+    importlib.reload(fantasy_mantra_trades)
     importlib.reload(fantasy_service)
     importlib.reload(fantasy_analytics)
     importlib.reload(fantasy_player_history)
@@ -104,7 +108,7 @@ def require_login() -> bool:
         return True
 
     render_login_header()
-    st.caption("Build 2026.09.02 · Serie A v4 · Fantacalcio v26.7.0")
+    st.caption("Build 2026.10.05 · Serie A v4 · Fantacalcio v27.0.0")
     password = st.text_input("Password", type="password")
     if st.button("Entra", type="primary"):
         if password == app_password:

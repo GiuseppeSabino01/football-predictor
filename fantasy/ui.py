@@ -27,6 +27,10 @@ from fantasy.analytics import (
     optional_number as analytics_optional_number,
 )
 from fantasy.catalog import catalog_dataframe, make_player, merge_catalog
+from fantasy.mantra import (
+    CLASSIC, MANTRA, MANTRA_ROLES, MANTRA_FORMATIONS, best_lineup,
+    can_purchase, eligible, formation_slots, is_mantra, mantra_roles, role_display, roster_limits,
+)
 from fantasy.decision_center import (
     FIXTURE_SOURCE_URL,
     best_rotation_pairs,
@@ -82,6 +86,7 @@ from fantasy.service import (
     run_auction_multiverse,
     set_auction_trade_exclusions,
     set_captain,
+    set_scoring_system,
     set_preferred_xi,
     simulate_auction_purchases,
     toggle_watchlist,
@@ -109,7 +114,7 @@ AUCTION_TIER_PALETTE = {
     "gray": ("Grigio", "⚪", "#a7b0ad"),
 }
 CATALOG_AUTOSAVE_DEBOUNCE_MS = 1200
-OFFICIAL_CATALOG_SESSION_KEY = "fantasy_official_catalog_session_v2650"
+OFFICIAL_CATALOG_SESSION_KEY = "fantasy_official_catalog_session_mantra_v1"
 
 
 def _auction_assigned_row_class_rule(unassigned: str) -> JsCode:
@@ -170,7 +175,7 @@ def _cached_auction_trade_analysis(
 def render_fantasy_page(settings: Settings) -> None:
     render_fantasy_styles()
     st.caption(
-        "Fantacalcio · Build 2026.09.02 v26.7.0 · Calendario completo 20 squadre"
+        "Fantacalcio · Build 2026.10.05 v27.0.0 · Asta Classic / Mantra"
     )
     storage = FantasyWorkspaceStorage(settings)
     workspace = _load_workspace(storage)
@@ -184,6 +189,7 @@ def render_fantasy_page(settings: Settings) -> None:
     if not league:
         return
 
+    _render_scoring_system(workspace, league, storage)
     summary = roster_summary(league)
     _render_league_hero(league, summary)
     list_mode = league.get("game_mode") == GAME_MODE_LIST
@@ -201,6 +207,29 @@ def render_fantasy_page(settings: Settings) -> None:
     with decision_tab:
         _render_decision_center(workspace, league, storage)
     _render_sync_status(storage)
+
+
+def _render_scoring_system(workspace, league, storage) -> None:
+    if league.get("game_mode") != GAME_MODE_AUCTION:
+        return
+    current = league.get("scoring_system", CLASSIC)
+    selected = st.radio(
+        "Configurazione dell'asta", [CLASSIC, MANTRA],
+        index=0 if current == CLASSIC else 1, format_func=str.capitalize,
+        horizontal=True, key=f"scoring_system_{league['id']}_{current}",
+        help="Stessa asta, stessi partecipanti, acquisti e crediti. Cambiano i ruoli e le regole tattiche.",
+    )
+    if selected != current:
+        try:
+            set_scoring_system(league, selected)
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            touch_workspace(workspace)
+            _save_workspace(workspace, storage)
+            st.rerun()
+    if is_mantra(league):
+        st.caption("Mantra · Ruoli multipli ufficiali e 11 moduli. Limiti rosa: portieri + movimento, senza quote D/C/A.")
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -403,6 +432,9 @@ def _refresh_purchased_player_data(
         "name",
         "team",
         "role",
+        "mantra_role",
+        "mantra_quote",
+        "mantra_fvm",
         "quote",
         "fvm",
         "expected_goals",
@@ -430,7 +462,11 @@ def _refresh_purchased_player_data(
     )
     for league in workspace.get("leagues", []):
         league_changed = False
-        for purchase in league.get("purchases", []):
+        purchases = [*league.get("purchases", []), *[
+            purchase for manager in league.get("auction_managers", [])
+            if not manager.get("is_user") for purchase in manager.get("purchases", [])
+        ]]
+        for purchase in purchases:
             player = by_id.get(str(purchase.get("player_id")))
             if not player:
                 continue
@@ -540,6 +576,10 @@ def _render_create_form(
         "Nell'asta registri i partecipanti e il prezzo battuto. "
         "Nel listone il costo e sempre la quotazione ufficiale."
     )
+    system = st.radio(
+        "Configurazione dell'asta", [CLASSIC, MANTRA], format_func=str.capitalize,
+        horizontal=True, key=f"create_system_{key_suffix}",
+    ) if game_mode == GAME_MODE_AUCTION else CLASSIC
     with st.form(f"create_fantasy_league_{key_suffix}"):
         name = st.text_input("Nome", placeholder="Es. Fanta amici")
         budget = st.number_input(
@@ -561,22 +601,31 @@ def _render_create_form(
             )
         season = st.text_input("Stagione", value="2026/27")
         st.markdown("**Composizione rosa**")
-        slot_columns = st.columns(4)
-        slots = {
-            role: int(
-                slot_columns[index].number_input(
-                    role,
-                    min_value=0,
-                    max_value=30,
-                    value=DEFAULT_ROSTER_SLOTS[role],
-                    key=f"create_slot_{key_suffix}_{role}",
-                    help=ROLE_LABELS[role],
+        slots = dict(DEFAULT_ROSTER_SLOTS)
+        if system == CLASSIC:
+            slot_columns = st.columns(4)
+            slots = {
+                role: int(
+                    slot_columns[index].number_input(
+                        role,
+                        min_value=0,
+                        max_value=30,
+                        value=DEFAULT_ROSTER_SLOTS[role],
+                        key=f"create_slot_{key_suffix}_{role}",
+                        help=ROLE_LABELS[role],
+                    )
                 )
-            )
-            for index, role in enumerate(ROLE_LABELS)
-        }
+                for index, role in enumerate(ROLE_LABELS)
+            }
         modifier, captain = st.columns(2)
-        modifier_enabled = modifier.toggle("Modificatore difesa", value=True)
+        modifier_enabled = modifier.toggle("Modificatore difesa Classic", value=system == CLASSIC, disabled=system == MANTRA)
+        mantra_slots = None
+        if system == MANTRA:
+            st.caption("In Mantra configuri portieri e giocatori di movimento, senza quote D/C/A.")
+            mantra_slots = {
+                "P": int(st.number_input("Portieri Mantra", min_value=1, max_value=10, value=3)),
+                "movement": int(st.number_input("Giocatori di movimento Mantra", min_value=10, max_value=50, value=22)),
+            }
         captain_enabled = captain.toggle("Capitano", value=False)
         submitted = st.form_submit_button(
             "Crea fantacalcio", type="primary", use_container_width=True
@@ -594,6 +643,8 @@ def _render_create_form(
             modifier_enabled=modifier_enabled,
             captain_enabled=captain_enabled,
             game_mode=game_mode,
+            scoring_system=system,
+            mantra_roster_slots=mantra_slots,
         )
     except ValueError as error:
         st.error(str(error))
@@ -633,6 +684,8 @@ def _render_manage_form(
                 value=int(league.get("participants") or 10),
             )
         st.markdown("**Composizione rosa**")
+        if is_mantra(league):
+            st.caption("Le quote Classic restano configurabili per un eventuale ritorno a Classic. Non limitano gli acquisti Mantra.")
         current_slots = league.get("roster_slots", DEFAULT_ROSTER_SLOTS)
         slot_columns = st.columns(4)
         slots = {
@@ -650,8 +703,15 @@ def _render_manage_form(
         }
         modifier_column, captain_column = st.columns(2)
         modifier = modifier_column.toggle(
-            "Modificatore difesa", value=bool(league.get("modifier_enabled"))
+            "Modificatore difesa Classic", value=bool(league.get("modifier_enabled")), disabled=is_mantra(league)
         )
+        mantra_slots = None
+        if is_mantra(league):
+            keepers, movement = roster_limits(league)
+            mantra_slots = {
+                "P": int(st.number_input("Portieri Mantra", min_value=1, max_value=10, value=keepers)),
+                "movement": int(st.number_input("Giocatori di movimento Mantra", min_value=10, max_value=50, value=movement)),
+            }
         captain = captain_column.toggle(
             "Capitano", value=bool(league.get("captain_enabled"))
         )
@@ -669,6 +729,7 @@ def _render_manage_form(
                 modifier_enabled=modifier,
                 captain_enabled=captain,
                 roster_slots=slots,
+                mantra_roster_slots=mantra_slots,
             )
         except ValueError as error:
             st.error(str(error))
@@ -718,7 +779,10 @@ def _render_preparation(
     if not list_mode:
         _render_auction_room(workspace, league, storage, catalog)
         _render_opponents_dna(league, catalog)
-        _render_auction_multiverse(workspace, league, storage, catalog)
+        if not is_mantra(league):
+            _render_auction_multiverse(workspace, league, storage, catalog)
+        else:
+            _render_mantra_coverage(league, catalog)
     purchased_ids = (
         {str(row.get("player_id")) for row in league.get("purchases", [])}
         if list_mode
@@ -774,7 +838,8 @@ def _render_preparation(
             player for player in catalog if str(player.get("id")) not in purchased_ids
         ]
     )
-    _render_role_advisors(workspace, league, storage, advisor_catalog)
+    if not is_mantra(league):
+        _render_role_advisors(workspace, league, storage, advisor_catalog)
     if list_mode:
         _render_auction_tier_manager(workspace, league, storage)
 
@@ -783,7 +848,10 @@ def _render_preparation(
     )
     search = search_column.text_input("Cerca", placeholder="Nome giocatore")
     selected_roles = role_column.multiselect(
-        "Ruolo", list(ROLE_LABELS), default=list(ROLE_LABELS)
+        "Ruolo Mantra" if is_mantra(league) else "Ruolo",
+        [*MANTRA_ROLES, "N/D"] if is_mantra(league) else list(ROLE_LABELS),
+        default=[*MANTRA_ROLES, "N/D"] if is_mantra(league) else list(ROLE_LABELS),
+        key=f"board_role_filter_{league['id']}_{league.get('scoring_system', CLASSIC)}",
     )
     teams = sorted(
         {str(player.get("team", "")) for player in catalog if player.get("team")}
@@ -811,6 +879,10 @@ def _render_preparation(
     )
 
     frame = catalog_dataframe(catalog)
+    if is_mantra(league):
+        frame["Ruolo"] = [role_display(player, league) for player in catalog]
+        frame["Quotazione"] = [player.get("mantra_quote", player.get("quote")) for player in catalog]
+        frame["FVM / 1000"] = [player.get("mantra_fvm") for player in catalog]
     if not list_mode:
         price_board = auction_price_board(league, catalog)
         frame["Spesa iniziale"] = frame["_id"].map(
@@ -828,7 +900,7 @@ def _render_preparation(
     if search:
         frame = frame[frame["Giocatore"].str.contains(search, case=False, na=False)]
     if selected_roles:
-        frame = frame[frame["Ruolo"].isin(selected_roles)]
+        frame = frame[frame["Ruolo"].map(lambda value: bool(set(mantra_roles(value)) & set(selected_roles)) or (not mantra_roles(value) and "N/D" in selected_roles))] if is_mantra(league) else frame[frame["Ruolo"].isin(selected_roles)]
     if selected_teams:
         frame = frame[frame["Squadra"].isin(selected_teams)]
     if sort_label in frame.columns:
@@ -1000,7 +1072,7 @@ def _render_auction_room(
         unsafe_allow_html=True,
     )
     st.caption(
-        "La spesa aggiornata usa tutte le aggiudicazioni dello stesso reparto, senza distinguere le fasce. "
+        ("La spesa aggiornata usa il FVM Mantra e le aggiudicazioni di giocatori con gli stessi ruoli multipli. " if is_mantra(league) else "La spesa aggiornata usa tutte le aggiudicazioni dello stesso reparto, senza distinguere le fasce. ") +
         "Il massimo strategico considera anche i crediti residui degli avversari e il budget da "
         "conservare per completare la tua rosa."
     )
@@ -1816,7 +1888,7 @@ def _render_list_catalog_editor(
     first_id = str(indexed.iloc[0]["_id"])
     last_id = str(indexed.iloc[-1]["_id"])
     editor_version = int(st.session_state.get(version_key, 0))
-    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}_{editor_version}"
+    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}_{editor_version}_{league.get('scoring_system', CLASSIC)}"
     tier_labels_by_color: dict[str, list[str]] = {}
     for tier in custom_tiers:
         color = str(tier.get("color") or "gray")
@@ -2166,7 +2238,7 @@ def _render_auction_catalog_editor(
     first_id = str(indexed.iloc[0]["_id"])
     last_id = str(indexed.iloc[-1]["_id"])
     editor_version = int(st.session_state.get(version_key, 0))
-    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}_{editor_version}"
+    editor_key = f"{key}_{len(indexed)}_{first_id}_{last_id}_{editor_version}_{league.get('scoring_system', CLASSIC)}"
     tier_labels_by_color: dict[str, list[str]] = {}
     for tier in custom_tiers:
         color = str(tier.get("color") or "gray")
@@ -2248,7 +2320,7 @@ def _render_auction_catalog_editor(
                 "cellEditorParams": {"values": [no_tier, *tier_id_by_label]},
                 "minWidth": 180,
             },
-            {"field": "Ruolo", "width": 78},
+            {"field": "Ruolo", "width": 125 if is_mantra(league) else 78},
             _auction_player_column(),
             {
                 "field": "Stop",
@@ -2888,12 +2960,12 @@ def _render_top_players_visual_lab(
         )
         role_column, metric_column, starter_column = st.columns([0.8, 1.2, 1])
         role_filter = role_column.selectbox(
-            "Reparto",
-            ["Tutti", "P", "D", "C", "A"],
+            "Ruolo Mantra" if is_mantra(league) else "Reparto",
+            ["Tutti", *MANTRA_ROLES] if is_mantra(league) else ["Tutti", "P", "D", "C", "A"],
             format_func=lambda value: (
-                "Tutti i ruoli" if value == "Tutti" else ROLE_LABELS[value]
+                "Tutti i ruoli" if value == "Tutti" else value if is_mantra(league) else ROLE_LABELS[value]
             ),
-            key=f"visual_lab_role_{league['id']}",
+            key=f"visual_lab_role_{league['id']}_{league.get('scoring_system', CLASSIC)}",
         )
         metric_label = metric_column.selectbox(
             "Evidenzia i top per",
@@ -2918,7 +2990,7 @@ def _render_top_players_visual_lab(
                 ),
             }
             for player in catalog
-            if (role_filter == "Tutti" or str(player.get("role")) == role_filter)
+            if (role_filter == "Tutti" or (role_filter in mantra_roles(player) if is_mantra(league) else str(player.get("role")) == role_filter))
             and analytics_number(player.get("starter_probability")) >= minimum_starter
         ]
         if not filtered:
@@ -2931,6 +3003,7 @@ def _render_top_players_visual_lab(
             reverse=True,
         )[:18]
         frame = _players_analytics_frame(filtered)
+        frame["Ruolo"] = [role_display(p, league) for p in filtered]
         top_ids = {str(player.get("id")) for player in top_players}
         frame["Top selezionato"] = frame["_id"].isin(top_ids)
 
@@ -3183,7 +3256,7 @@ def _render_player_detail(
     st.markdown(
         f"""
         <section class="fantasy-player-hero role-{role.lower()}">
-            <div class="fantasy-player-role">{escape(role)}</div>
+            <div class="fantasy-player-role">{escape(role_display(player, league))}</div>
             <div class="fantasy-player-title">
                 <span>{escape(role_names.get(role, "Calciatore"))} · {escape(str(player.get("team") or "Svincolato"))}</span>
                 <h3>{escape(str(player.get("name") or ""))}</h3>
@@ -3960,6 +4033,11 @@ def _render_budget_metrics(summary: dict[str, Any]) -> None:
 
 
 def _render_role_plan(league: dict[str, Any], summary: dict[str, Any]) -> None:
+    if is_mantra(league):
+        keepers, movement = roster_limits(league)
+        count = summary["role_counts"]["P"]
+        st.caption(f"Portieri {count}/{keepers} · Movimento {summary['roster_size'] - count}/{movement}")
+        return
     cards = []
     slots = league.get("roster_slots", DEFAULT_ROSTER_SLOTS)
     for role, label in ROLE_LABELS.items():
@@ -3984,6 +4062,7 @@ def _render_quick_purchase(
             name = col_name.text_input("Nome")
             team = col_team.text_input("Squadra")
             role = col_role.selectbox("Ruolo", list(ROLE_LABELS))
+            manual_mantra_roles = st.multiselect("Ruoli Mantra (da fonte verificata)", list(MANTRA_ROLES), key=f"quick_mantra_roles_{league['id']}") if is_mantra(league) else []
             price = col_price.number_input(
                 "Prezzo", min_value=0.0, max_value=1000.0, value=1.0
             )
@@ -3991,6 +4070,7 @@ def _render_quick_purchase(
         if submit:
             try:
                 player = make_player(name=name, team=team, role=role, quote=price)
+                player["mantra_role"] = "/".join(manual_mantra_roles)
                 workspace["catalog"] = merge_catalog(
                     workspace.get("catalog", []), [player]
                 )
@@ -4041,7 +4121,7 @@ def _render_roster_table(
     news_items = _cached_fantasy_news()
     rows = [
         {
-            "Ruolo": row.get("role"),
+            "Ruolo": role_display(row, league),
             "Giocatore": row.get("name"),
             "Squadra": row.get("team"),
             price_label: row.get("price"),
@@ -4127,7 +4207,7 @@ def _render_what_if_simulator(
             "Giocatore da simulare",
             list(by_id),
             format_func=lambda player_id: (
-                f"{by_id[player_id].get('role')} · {by_id[player_id].get('name')} · "
+                f"{role_display(by_id[player_id], league)} · {by_id[player_id].get('name')} · "
                 f"{by_id[player_id].get('team')}"
             ),
             key=f"what_if_player_{league['id']}",
@@ -4289,9 +4369,18 @@ def _render_matchday_assistant(
     role_labels = {"A": "Attacco", "C": "Centrocampo", "D": "Difesa", "P": "Porta"}
     role_rows = []
     captain_id = str((captain or {}).get("player_id") or "")
-    for role in ("A", "C", "D", "P"):
+    groups = [(role_labels[role], [p for p in players if p.get("role") == role]) for role in ("A", "C", "D", "P")]
+    if is_mantra(league):
+        groups = []
+        offset = 0
+        for line in MANTRA_FORMATIONS.get(str(recommendation.get("formation")), ()):
+            indices = set(range(offset, offset + len(line)))
+            groups.insert(0, (" · ".join(line), [p for p in players if p.get("lineup_index") in indices]))
+            offset += len(line)
+    for label, group_players in groups:
         cards = []
-        for player in (row for row in players if row.get("role") == role):
+        for player in group_players:
+            role = str(player.get("role") or "")
             fixture = player.get("decision_fixture") or {}
             difficulty = _number_or_none(fixture.get("difficulty"))
             tone = _fixture_tone(difficulty)
@@ -4315,7 +4404,7 @@ def _render_matchday_assistant(
                 )
             cards.append(
                 f'<div class="fantasy-decision-player role-{role.lower()} {tone}">'
-                f"<span>{escape(role)} · {float(_number_or_none(player.get('decision_score'), 0) or 0):.0f}</span>"
+                f"<span>{escape(role_display(player, league))} · {float(_number_or_none(player.get('decision_score'), 0) or 0):.0f}</span>"
                 f"<strong>{escape(str(player.get('name') or ''))}</strong>"
                 f"<small>{escape(str(player.get('team') or ''))} {venue} {escape(str(opponent))}"
                 f"{' · D ' + f'{difficulty:.1f}' if difficulty is not None else ''}</small>"
@@ -4323,7 +4412,7 @@ def _render_matchday_assistant(
             )
         if cards:
             role_rows.append(
-                f'<div class="fantasy-decision-line"><b>{role_labels[role]}</b>'
+                f'<div class="fantasy-decision-line"><b>{escape(label)}</b>'
                 f"<div>{''.join(cards)}</div></div>"
             )
     st.markdown(
@@ -4688,6 +4777,9 @@ def _render_top_xi_editor(
     league: dict[str, Any],
     storage: FantasyWorkspaceStorage,
 ) -> None:
+    if is_mantra(league):
+        _render_mantra_xi_editor(workspace, league, storage)
+        return
     catalog_by_id = {
         str(player.get("id")): player for player in workspace.get("catalog", [])
     }
@@ -4859,6 +4951,79 @@ def _render_top_xi_editor(
     if not selection_complete:
         missing = 11 - len(set(selected_ids))
         st.warning(f"Completa il campo: mancano {missing} giocatori alla Top 11.")
+
+
+def _render_mantra_coverage(league, catalog) -> None:
+    with st.expander("Mantra · Copertura tattica e ruoli da cercare", expanded=True):
+        purchases = league.get("purchases", [])
+        st.caption("I multiruolo coprono piu posizioni, ma ogni giocatore puo occupare un solo posto nell'undici. Il Multiverso Classic non viene applicato al Mantra.")
+        coverage = best_lineup(purchases)
+        st.metric("Miglior copertura senza malus", f"{len(coverage['players'])}/11", coverage["formation"])
+        counts = {r: sum(r in mantra_roles(p) for p in purchases) for r in MANTRA_ROLES}
+        st.dataframe(pd.DataFrame([{"Ruolo Mantra": r, "In rosa": n} for r, n in counts.items()]), hide_index=True, use_container_width=True)
+        unknown = [p.get("name") for p in purchases if not mantra_roles(p)]
+        if unknown:
+            st.warning("Ruolo Mantra non disponibile: " + ", ".join(str(n) for n in unknown) + ". Non vengono assegnati ruoli presunti.")
+        occupied = {p["lineup_index"] for p in coverage["players"]}
+        missing = [slot for i, slot in enumerate(formation_slots(coverage["formation"])) if i not in occupied]
+        taken = auction_taken_player_ids(league)
+        candidates = sorted(
+            [p for p in catalog if str(p.get("id")) not in taken and can_purchase(league, p) and any(eligible(p, slot) for slot in missing)],
+            key=lambda p: float(p.get("fantasy_score") or 0), reverse=True,
+        )[:5]
+        if missing:
+            st.caption("Posizioni mancanti nel modulo: " + " · ".join(missing))
+            for p in candidates:
+                st.caption(f"{role_display(p, league)} · {p.get('name')} · {p.get('team')}")
+        else:
+            st.success("La rosa consente un undici Mantra completo senza malus.")
+
+
+def _render_mantra_xi_editor(workspace, league, storage) -> None:
+    purchases = league.get("purchases", [])
+    by_id = {str(p.get("player_id")): p for p in purchases}
+    default = top_xi_formation(league)
+    formation = st.selectbox("Modulo Mantra", list(MANTRA_FORMATIONS), index=list(MANTRA_FORMATIONS).index(default), key=f"mantra_formation_{league['id']}")
+    st.caption("Posizioni della griglia ufficiale 2026/27. Selezione senza malus; un multiruolo non puo comparire due volte.")
+    players = top_xi_for_formation(league, formation)
+    if league.get("preferred_xi_customized") and formation == league.get("preferred_formation"):
+        players = top_xi_summary(league)["players"]
+    defaults = {p["lineup_index"]: str(p["player_id"]) for p in players}
+    selected = []
+    index = 0
+    for line in MANTRA_FORMATIONS[formation]:
+        columns = st.columns(len(line))
+        for slot, column in zip(line, columns, strict=True):
+            options = [None, *[pid for pid, player in by_id.items() if pid not in selected and eligible(player, slot)]]
+            default_id = defaults.get(index)
+            if default_id not in options:
+                default_id = None
+            with column:
+                pid = st.selectbox(
+                    slot, options, index=options.index(default_id),
+                    format_func=lambda value: "Posto libero" if value is None else f"{by_id[value].get('name')} · {role_display(by_id[value], league)}",
+                    key=f"mantra_pitch_{league['id']}_{formation}_{len(purchases)}_{league.get('preferred_xi_customized')}_{index}",
+                )
+                if pid:
+                    selected.append(pid)
+                    st.markdown(_lineup_player_card(by_id[pid], slot), unsafe_allow_html=True)
+            index += 1
+    st.caption(f"Top 11 Mantra: {len(selected)}/11 · {sum(float(by_id[pid].get('price') or 0) for pid in selected):.0f} crediti in campo")
+    save, reset = st.columns(2)
+    if save.button("Salva Top 11 Mantra", disabled=len(selected) != 11, key=f"save_mantra_{league['id']}"):
+        try:
+            set_preferred_xi(league, selected, formation=formation)
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            touch_workspace(workspace)
+            _save_workspace(workspace, storage)
+            st.rerun()
+    if reset.button("Ripristina i piu costosi", key=f"reset_mantra_{league['id']}"):
+        reset_preferred_xi(league, formation=formation)
+        touch_workspace(workspace)
+        _save_workspace(workspace, storage)
+        st.rerun()
 
 
 def _lineup_player_card(
@@ -5124,7 +5289,7 @@ def _render_auction_trade_lab(
         touch_workspace(workspace)
         _save_workspace(workspace, storage)
 
-    analysis = _cached_auction_trade_analysis(league, catalog, 10, "trade-v3")
+    analysis = _cached_auction_trade_analysis(league, catalog, 10, "trade-mantra-v1")
     st.markdown(
         f'<section class="fantasy-swap-hero"><div><span>SASA · TRADE FINDER</span>'
         f"<strong>Scambi vantaggiosi, ma credibili</strong><small>Ho incrociato "
@@ -5149,11 +5314,11 @@ def _render_auction_trade_lab(
 
     for index, trade in enumerate(trades, start=1):
         outgoing = "".join(
-            _auction_swap_player_chip(player, "out")
+            _auction_swap_player_chip({**player, "role": role_display(player, league)}, "out")
             for player in trade["outgoing"]
         )
         incoming = "".join(
-            _auction_swap_player_chip(player, "in")
+            _auction_swap_player_chip({**player, "role": role_display(player, league)}, "in")
             for player in trade["incoming"]
         )
         deltas = trade["deltas"]
@@ -5325,7 +5490,8 @@ Fanta: {league.get("name")} - stagione {league.get("season")} - modalita {"listo
 Budget iniziale: {league.get("initial_budget")}; spesi: {summary["spent"]}; rimasti: {summary["remaining_budget"]}.
 Capitano: {"regola attiva, " + str(captain_name) if league.get("captain_enabled") else "regola non attiva"}.
 Composizione rosa prevista: {league.get("roster_slots")}.
-Slot mancanti: {summary["missing"]}.
+Sistema di gioco: {league.get("scoring_system", CLASSIC)}. In Mantra valuta ruoli multipli e moduli ufficiali, non quote D/C/A.
+Slot mancanti: {summary["remaining_slots"]}. Composizione: {league.get("mantra_roster_slots") if is_mantra(league) else league.get("roster_slots")}.
 Top 11 selezionata ({xi_summary.get("count", 0)}/11):
 {chr(10).join(top_xi_lines) or "non ancora disponibile"}
 Totali Top 11: gol attesi {xi_summary.get("expected_goals_total")}; assist attesi {xi_summary.get("expected_assists_total")}; somma fantamedie attese {xi_summary.get("expected_fantasy_average_sum")}.

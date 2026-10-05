@@ -10,6 +10,7 @@ from typing import Any, BinaryIO
 import pandas as pd
 
 from fantasy.service import player_score
+from fantasy.mantra import mantra_roles
 
 CATALOG_COLUMNS = [
     "name",
@@ -34,6 +35,9 @@ COLUMN_ALIASES = {
     "role": {"r", "ruolo", "role", "ruolo classic", "ruolo classico"},
     "quote": {"qt a", "qa", "quotazione", "quotazione attuale", "costo", "price"},
     "fvm": {"fvm", "fvm 1000", "fvm classic"},
+    "mantra_role": {"rm", "ruolo mantra", "mantra role", "mantra_role"},
+    "mantra_quote": {"quotazione mantra", "qt a mantra", "qa mantra", "mantra_quote"},
+    "mantra_fvm": {"fvm mantra", "fvm 1000 mantra", "mantra_fvm"},
     "predicted_quote": {
         "quotazione prevista",
         "quotazione prevista fine anno",
@@ -121,6 +125,11 @@ def normalize_catalog_dataframe(dataframe: pd.DataFrame) -> list[dict[str, Any]]
             player[field] = (
                 _optional_number(raw_row.get(source_column)) if source_column else None
             )
+        if mapped.get("mantra_role"):
+            player["mantra_role"] = "/".join(mantra_roles(_text(raw_row.get(mapped["mantra_role"]))))
+        for field in ("mantra_quote", "mantra_fvm"):
+            if mapped.get(field):
+                player[field] = _optional_number(raw_row.get(mapped[field]))
         player["fantasy_score"] = player_score(player)
         players.append(player)
     if not players:
@@ -195,6 +204,7 @@ def catalog_dataframe(players: list[dict[str, Any]]) -> pd.DataFrame:
                 "Giocatore": player.get("name", ""),
                 "Squadra": player.get("team", ""),
                 "Ruolo": player.get("role", ""),
+                "Ruolo Mantra": player.get("mantra_role", ""),
                 "Dati": "STIMA" if player.get("analysis_estimated") else "ANALISI",
                 "Origine dati": analysis_source,
                 "Quotazione": player.get("quote"),
